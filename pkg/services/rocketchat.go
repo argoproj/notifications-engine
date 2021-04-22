@@ -39,16 +39,12 @@ func (n *RocketChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type RocketChatOptions struct {
-	Alias              string   `json:"alias"`
-	Email              string   `json:"email"`
-	Password           string   `json:"password"`
-	Icon               string   `json:"icon"`
-	Avatar             string   `json:"avatar"`
-	Token              string   `json:"token"`
-	ServerUrl          string   `json:"serverUrl"`
-	SigningSecret      string   `json:"signingSecret"`
-	Channels           []string `json:"channels"`
-	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
+	Alias     string `json:"alias"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	Icon      string `json:"icon"`
+	Avatar    string `json:"avatar"`
+	ServerUrl string `json:"serverUrl"`
 }
 
 type rocketChatService struct {
