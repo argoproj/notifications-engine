@@ -8,10 +8,10 @@ import (
 	"strings"
 	texttemplate "text/template"
 
-	"github.com/argoproj/notifications-engine/pkg/util/text"
 	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
 type WebhookNotification struct {

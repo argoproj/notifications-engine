@@ -8,8 +8,9 @@ import (
 	"net/http"
 	texttemplate "text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	log "github.com/sirupsen/logrus"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 type TeamsNotification struct {
