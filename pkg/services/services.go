@@ -16,6 +16,7 @@ type Notification struct {
 	Email      *EmailNotification      `json:"email,omitempty"`
 	Slack      *SlackNotification      `json:"slack,omitempty"`
 	Mattermost *MattermostNotification `json:"mattermost,omitempty"`
+	RocketChat *RocketChatNotification `json:"rocketchat,omitempty"`
 	Teams      *TeamsNotification      `json:"teams,omitempty"`
 	Webhook    WebhookNotifications    `json:"webhook,omitempty"`
 	Opsgenie   *OpsgenieNotification   `json:"opsgenie,omitempty"`
@@ -35,6 +36,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.Mattermost != nil {
 		sources = append(sources, n.Mattermost)
+	}
+	if n.RocketChat != nil {
+		sources = append(sources, n.RocketChat)
 	}
 	if n.Email != nil {
 		sources = append(sources, n.Email)
@@ -84,6 +88,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewMattermostService(opts), nil
+	case "rocketchat":
+		var opts RocketChatOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewRocketChatService(opts), nil
 	case "grafana":
 		var opts GrafanaOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
