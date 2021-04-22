@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/RocketChat/Rocket.Chat.Go.SDK/models"
-	"github.com/RocketChat/Rocket.Chat.Go.SDK/rest"
 	"net/url"
 	"regexp"
 	"strings"
 	texttemplate "text/template"
 
+	"github.com/RocketChat/Rocket.Chat.Go.SDK/models"
+	"github.com/RocketChat/Rocket.Chat.Go.SDK/rest"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -77,7 +77,7 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 
 	message := models.PostMessage{Alias: r.opts.Alias, Text: notification.Message}
 	// It's a channel
-	if strings.ContainsAny(dest.Recipient, "@#") {
+	if strings.HasPrefix(dest.Recipient, "#") || strings.HasPrefix(dest.Recipient, "@") {
 		message.Channel = dest.Recipient
 	} else {
 		message.RoomID = dest.Recipient
@@ -89,11 +89,11 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 			log.Warnf("Icon reference '%v' is not a valid emoij", r.opts.Icon)
 		}
 	}
-	if r.opts.Icon != "" {
+	if r.opts.Avatar != "" {
 		if isValidAvatarURL(r.opts.Avatar) {
 			message.Avatar = r.opts.Avatar
 		} else {
-			log.Warnf("Icon reference '%v' is not a valid emoij", r.opts.Avatar)
+			log.Warnf("Avatar reference '%v' is not a valid URL", r.opts.Avatar)
 		}
 	}
 
