@@ -39,7 +39,9 @@ func (n *RocketChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type RocketChatOptions struct {
-	Username           string   `json:"username"`
+	Alias              string   `json:"alias"`
+	Email              string   `json:"email"`
+	Password           string   `json:"password"`
 	Icon               string   `json:"icon"`
 	Avatar             string   `json:"avatar"`
 	Token              string   `json:"token"`
@@ -64,11 +66,16 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 	if err != nil {
 		return err
 	}
-	err = nil
 
 	rl := rest.NewClient(serverUrl, false)
 
-	message := models.PostMessage{Alias: r.opts.Username, Text: notification.Message}
+	credentials := models.UserCredentials{Email: r.opts.Email, Password: r.opts.Password}
+	err = rl.Login(&credentials)
+	if err != nil {
+		return err
+	}
+
+	message := models.PostMessage{Alias: r.opts.Alias, Text: notification.Message}
 	// It's a channel
 	if strings.ContainsAny(dest.Recipient, "@#") {
 		message.Channel = dest.Recipient
