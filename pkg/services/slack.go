@@ -67,7 +67,7 @@ type slackService struct {
 	opts SlackOptions
 }
 
-var validIconEmoij = regexp.MustCompile(`^:.+:$`)
+var validIconEmoji = regexp.MustCompile(`^:.+:$`)
 
 func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
@@ -88,7 +88,7 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		msgOptions = append(msgOptions, slack.MsgOptionUsername(s.opts.Username))
 	}
 	if s.opts.Icon != "" {
-		if validIconEmoij.MatchString(s.opts.Icon) {
+		if validIconEmoji.MatchString(s.opts.Icon) {
 			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(s.opts.Icon))
 		} else if isValidIconURL(s.opts.Icon) {
 			msgOptions = append(msgOptions, slack.MsgOptionIconURL(s.opts.Icon))

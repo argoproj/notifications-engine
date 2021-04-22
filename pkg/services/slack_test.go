@@ -8,9 +8,9 @@ import (
 )
 
 func TestValidIconEmoij(t *testing.T) {
-	assert.Equal(t, true, validIconEmoij.MatchString(":slack:"))
-	assert.Equal(t, true, validIconEmoij.MatchString(":chart_with_upwards_trend:"))
-	assert.Equal(t, false, validIconEmoij.MatchString("http://lorempixel.com/48/48"))
+	assert.Equal(t, true, validIconEmoji.MatchString(":slack:"))
+	assert.Equal(t, true, validIconEmoji.MatchString(":chart_with_upwards_trend:"))
+	assert.Equal(t, false, validIconEmoji.MatchString("http://lorempixel.com/48/48"))
 }
 
 func TestValidIconURL(t *testing.T) {
