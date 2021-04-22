@@ -1,9 +1,10 @@
 package services
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"text/template"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestValidIconEmoij(t *testing.T) {

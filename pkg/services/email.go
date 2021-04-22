@@ -4,8 +4,9 @@ import (
 	"bytes"
 	texttemplate "text/template"
 
-	"github.com/argoproj/notifications-engine/pkg/util/text"
 	"gomodules.xyz/notify/smtp"
+
+	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
 type EmailNotification struct {
