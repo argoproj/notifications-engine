@@ -2,7 +2,9 @@
 
 1. Login to your RocketChat instance
 2. Go to user management
+![2](https://user-images.githubusercontent.com/15252187/115824993-7ccad900-a411-11eb-89de-6a0c4438ffdf.png)
 3. Add new user with `bot` role. Also note that `Require password change` checkbox mus be not checked
+![3](https://user-images.githubusercontent.com/15252187/115825174-b4d21c00-a411-11eb-8f20-cda48cea9fad.png)
 4. Copy username and password that you was created for bot user
 5. Create a public or private channel, or a team, for this example `my_channel`
 6. Add your bot to this channel **otherwise it won't work**
