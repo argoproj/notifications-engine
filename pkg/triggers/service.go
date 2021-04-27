@@ -5,6 +5,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"github.com/argoproj/notifications-engine/pkg/util/text"
+
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
 )
@@ -43,7 +45,7 @@ func NewService(triggers map[string][]Condition) (*service, error) {
 	}
 	for _, t := range triggers {
 		for _, condition := range t {
-			prog, err := expr.Compile(condition.When)
+			prog, err := expr.Compile(text.Coalesce(condition.When, "false"))
 			if err != nil {
 				return nil, err
 			}
