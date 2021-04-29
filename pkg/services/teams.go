@@ -16,6 +16,7 @@ import (
 type TeamsNotification struct {
 	Template        string `json:"template,omitempty"`
 	Title           string `json:"title,omitempty"`
+	Summary         string `json:"summary,omitempty"`
 	Text            string `json:"text,omitempty"`
 	ThemeColor      string `json:"themeColor,omitempty"`
 	Facts           string `json:"facts,omitempty"`
@@ -32,6 +33,11 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 	title, err := texttemplate.New(name).Funcs(f).Parse(n.Title)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams.title : %w", name, err)
+	}
+
+	summary, err := texttemplate.New(name).Funcs(f).Parse(n.Summary)
+	if err != nil {
+		return nil, fmt.Errorf("error in '%s' teams.summary : %w", name, err)
 	}
 
 	text, err := texttemplate.New(name).Funcs(f).Parse(n.Text)
@@ -78,6 +84,14 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		}
 		if val := titleBuff.String(); val != "" {
 			notification.Teams.Title = val
+		}
+
+		var summaryBuff bytes.Buffer
+		if err := summary.Execute(&summaryBuff, vars); err != nil {
+			return err
+		}
+		if val := summaryBuff.String(); val != "" {
+			notification.Teams.Summary = val
 		}
 
 		var textBuff bytes.Buffer
@@ -188,6 +202,10 @@ func teamsNotificationToMessage(n Notification) (*teamsMessage, error) {
 		message.Title = n.Teams.Title
 	}
 
+	if n.Teams.Summary != "" {
+		message.Summary = n.Teams.Summary
+	}
+
 	if n.Teams.Text != "" {
 		message.Text = n.Teams.Text
 	}
@@ -252,6 +270,7 @@ type teamsMessage struct {
 	Type            string         `json:"@type"`
 	Context         string         `json:"context"`
 	Title           string         `json:"title"`
+	Summary         string         `json:"summary"`
 	Text            string         `json:"text"`
 	ThemeColor      string         `json:"themeColor,omitempty"`
 	PotentialAction []teamsAction  `json:"potentialAction,omitempty"`
