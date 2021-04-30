@@ -16,6 +16,7 @@ func TestGetTemplater_Teams(t *testing.T) {
 		Teams: &TeamsNotification{
 			Template:        "template {{.value}}",
 			Title:           "title {{.value}}",
+			Summary:         "summary {{.value}}",
 			Text:            "text {{.value}}",
 			Facts:           "facts {{.value}}",
 			Sections:        "sections {{.value}}",
@@ -44,6 +45,7 @@ func TestGetTemplater_Teams(t *testing.T) {
 
 	assert.Equal(t, notification.Teams.Template, "template value")
 	assert.Equal(t, notification.Teams.Title, "title value")
+	assert.Equal(t, notification.Teams.Summary, "summary value")
 	assert.Equal(t, notification.Teams.Text, "text value")
 	assert.Equal(t, notification.Teams.Sections, "sections value")
 	assert.Equal(t, notification.Teams.Facts, "facts value")
@@ -152,6 +154,7 @@ func TestTeams_MessageFields(t *testing.T) {
 			Sections:        "[{\"sections\": true}]",
 			PotentialAction: "[{\"actions\": true}]",
 			Title:           "Title",
+			Summary:         "Summary",
 			ThemeColor:      "#000080",
 		},
 	}
@@ -167,6 +170,7 @@ func TestTeams_MessageFields(t *testing.T) {
 
 	assert.Contains(t, receivedBody.Text, notification.Teams.Text)
 	assert.Contains(t, receivedBody.Title, notification.Teams.Title)
+	assert.Contains(t, receivedBody.Summary, notification.Teams.Summary)
 	assert.Contains(t, receivedBody.ThemeColor, notification.Teams.ThemeColor)
 	assert.Contains(t, receivedBody.PotentialAction, teamsAction{"actions": true})
 	assert.Contains(t, receivedBody.Sections, teamsSection{"sections": true})
