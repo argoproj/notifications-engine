@@ -71,7 +71,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface) 
 	}()
 	mockAPI := mocks.NewMockAPI(mockCtrl)
 	mockAPI.EXPECT().GetConfig().Return(api.Config{}).AnyTimes()
-	resourceClient := client.Resource(testGVR).Namespace("default")
+	resourceClient := client.Resource(testGVR)
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
 			ListFunc: func(options v1.ListOptions) (object runtime.Object, err error) {
@@ -113,11 +113,11 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 		return true
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
 
-	err = ctrl.processResource(app, logEntry)
+	annotations, err := ctrl.processResource(app, logEntry)
 
 	assert.NoError(t, err)
 
-	state := NewState(app.GetAnnotations()[NotifiedAnnotationKey])
+	state := NewState(annotations[NotifiedAnnotationKey])
 	assert.NotNil(t, state[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
@@ -136,7 +136,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 
-	err = ctrl.processResource(app, logEntry)
+	_, err = ctrl.processResource(app, logEntry)
 
 	assert.NoError(t, err)
 }
@@ -156,10 +156,10 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
-	err = ctrl.processResource(app, logEntry)
+	annotations, err := ctrl.processResource(app, logEntry)
 
 	assert.NoError(t, err)
-	state = NewState(app.GetAnnotations()[NotifiedAnnotationKey])
+	state = NewState(annotations[NotifiedAnnotationKey])
 	assert.Empty(t, state)
 }
 
@@ -186,7 +186,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	assert.NoError(t, err)
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
-	go ctrl.Run(ctx, 1)
+	go ctrl.Run(1, ctx.Done())
 
 	select {
 	case <-time.After(time.Second * 5):

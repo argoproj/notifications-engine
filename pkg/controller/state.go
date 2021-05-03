@@ -64,12 +64,15 @@ func (s NotificationsState) SetAlreadyNotified(trigger string, result triggers.C
 	return true
 }
 
-func (s NotificationsState) Persist(res metav1.Object) error {
+func (s NotificationsState) Persist(res metav1.Object) (map[string]string, error) {
 	s.truncate(notifiedHistoryMaxSize)
 
-	annotations := res.GetAnnotations()
-	if annotations == nil {
-		annotations = map[string]string{}
+	annotations := map[string]string{}
+
+	if res.GetAnnotations() != nil {
+		for k, v := range res.GetAnnotations() {
+			annotations[k] = v
+		}
 	}
 
 	if len(s) == 0 {
@@ -77,14 +80,12 @@ func (s NotificationsState) Persist(res metav1.Object) error {
 	} else {
 		stateJson, err := json.Marshal(s)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		annotations[NotifiedAnnotationKey] = string(stateJson)
 	}
 
-	res.SetAnnotations(annotations)
-
-	return nil
+	return annotations, nil
 }
 
 func NewState(val string) NotificationsState {
