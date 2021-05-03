@@ -6,8 +6,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/argoproj/notifications-engine/pkg"
-
 	"github.com/spf13/cobra"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
@@ -40,7 +38,7 @@ func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
 
 # Render notification render generated notification in console
 %s template notify app-sync-succeeded guestbook
-`, cmdContext.CLIName, cmdContext.CLIName),
+`, cmdContext.cliName, cmdContext.cliName),
 		Short: "Generates notification using the specified template and send it to specified recipients",
 		RunE: func(c *cobra.Command, args []string) error {
 			cancel := withDebugLogs()
@@ -50,14 +48,7 @@ func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
 			}
 			name := args[0]
 			resourceName := args[1]
-
-			config, err := cmdContext.GetConfig()
-			if err != nil {
-				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to parse config: %v\n", err)
-				return nil
-			}
-
-			api, err := pkg.NewAPI(*config)
+			api, err := cmdContext.getAPI()
 			if err != nil {
 				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to create API: %v\n", err)
 				return nil
@@ -77,7 +68,7 @@ func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
 					dest.Recipient = parts[1]
 				}
 
-				if err := api.Send(cmdContext.createVars(res.Object, dest), []string{name}, dest); err != nil {
+				if err := api.Send(res.Object, []string{name}, dest); err != nil {
 					_, _ = fmt.Fprintf(cmdContext.stderr, "failed to notify '%s': %v\n", recipient, err)
 					return nil
 				}
@@ -102,7 +93,7 @@ func newTemplateGetCommand(cmdContext *commandContext) *cobra.Command {
 %s template get
 # print YAML formatted app-sync-succeeded template definition
 %s template get app-sync-succeeded -o=yaml
-`, cmdContext.CLIName, cmdContext.CLIName),
+`, cmdContext.cliName, cmdContext.cliName),
 		Short: "Prints information about configured templates",
 		RunE: func(c *cobra.Command, args []string) error {
 			var name string
@@ -111,12 +102,12 @@ func newTemplateGetCommand(cmdContext *commandContext) *cobra.Command {
 			}
 			items := map[string]services.Notification{}
 
-			config, err := cmdContext.GetConfig()
+			api, err := cmdContext.getAPI()
 			if err != nil {
-				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to parse config: %v\n", err)
+				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to get api: %v\n", err)
 				return nil
 			}
-			for n, template := range config.Templates {
+			for n, template := range api.GetConfig().Templates {
 				if n == name || name == "" {
 					items[n] = template
 				}

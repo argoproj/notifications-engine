@@ -1,4 +1,4 @@
-package pkg
+package api
 
 import (
 	"fmt"
@@ -6,46 +6,53 @@ import (
 	"strings"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 	"github.com/argoproj/notifications-engine/pkg/triggers"
 
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 	yaml3 "gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
 )
-
-// Subscriptions holds an information what explains when, where and how a notification should be sent
-type Subscriptions map[string][]services.Destination
-
-func (s Subscriptions) Merge(other Subscriptions) {
-	for k := range other {
-		s[k] = append(s[k], other[k]...)
-	}
-}
-
-func (s Subscriptions) Dedup() Subscriptions {
-	for k, v := range s {
-		set := map[services.Destination]bool{}
-		var dedup []services.Destination
-		for _, dest := range v {
-			if !set[dest] {
-				set[dest] = true
-				dedup = append(dedup, dest)
-			}
-		}
-		s[k] = dedup
-	}
-	return s
-}
 
 type ServiceFactory func() (services.NotificationService, error)
 
 // Config holds settings required to create new api
 type Config struct {
-	Services               map[string]ServiceFactory
-	Triggers               map[string][]triggers.Condition
+	Services  map[string]ServiceFactory
+	Triggers  map[string][]triggers.Condition
+	Templates map[string]services.Notification
+	// Subscriptions holds list of default application subscriptions
+	Subscriptions subscriptions.DefaultSubscriptions
+	// DefaultTriggers holds list of triggers that is used by default if subscriber don't specify trigger
+	DefaultTriggers []string
+	// ServiceDefaultTriggers holds list of default triggers per service
 	ServiceDefaultTriggers map[string][]string
-	Templates              map[string]services.Notification
+}
+
+// Returns list of destinations for the specified trigger
+func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Destinations {
+	dests := services.Destinations{}
+	for _, s := range cfg.Subscriptions {
+		triggers := s.Triggers
+		if len(triggers) == 0 {
+			triggers = cfg.DefaultTriggers
+		}
+		for _, trigger := range triggers {
+			if s.MatchesTrigger(trigger) && s.Selector.Matches(fields.Set(labels)) {
+				for _, recipient := range s.Recipients {
+					parts := strings.Split(recipient, ":")
+					dest := services.Destination{Service: parts[0]}
+					if len(parts) > 1 {
+						dest.Recipient = parts[1]
+					}
+					dests[trigger] = append(dests[trigger], dest)
+				}
+			}
+		}
+	}
+	return dests
 }
 
 var keyPattern = regexp.MustCompile(`[$][\w-_]+`)
@@ -70,6 +77,18 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 		ServiceDefaultTriggers: map[string][]string{},
 		Templates:              map[string]services.Notification{},
 	}
+	if subscriptionYaml, ok := configMap.Data["subscriptions"]; ok {
+		if err := yaml.Unmarshal([]byte(subscriptionYaml), &cfg.Subscriptions); err != nil {
+			return nil, err
+		}
+	}
+
+	if defaultTriggersYaml, ok := configMap.Data["defaultTriggers"]; ok {
+		if err := yaml.Unmarshal([]byte(defaultTriggersYaml), &cfg.DefaultTriggers); err != nil {
+			return nil, err
+		}
+	}
+
 	for k, v := range configMap.Data {
 		parts := strings.Split(k, ".")
 		switch {

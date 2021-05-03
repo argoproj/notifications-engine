@@ -6,8 +6,6 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"github.com/argoproj/notifications-engine/pkg"
-	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/triggers"
 	"github.com/argoproj/notifications-engine/pkg/util/misc"
 
@@ -38,22 +36,22 @@ func newTriggerRunCommand(cmdContext *commandContext) *cobra.Command {
 
 # Execute trigger using my-config-map.yaml instead of '%s' ConfigMap
 %s trigger run on-sync-status-unknown ./sample-app.yaml \
-    --config-map ./my-config-map.yaml`, cmdContext.CLIName, cmdContext.ConfigMapName, cmdContext.CLIName),
+    --config-map ./my-config-map.yaml`, cmdContext.cliName, cmdContext.ConfigMapName, cmdContext.cliName),
 		RunE: func(c *cobra.Command, args []string) error {
 			if len(args) < 2 {
 				return fmt.Errorf("expected two arguments, got %d", len(args))
 			}
 			name := args[0]
 			resourceName := args[1]
-			cfg, err := cmdContext.GetConfig()
+			api, err := cmdContext.getAPI()
 			if err != nil {
-				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to parse config: %v\n", err)
+				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to get api: %v\n", err)
 				return nil
 			}
-			_, ok := cfg.Triggers[name]
+			_, ok := api.GetConfig().Triggers[name]
 			if !ok {
 				var names []string
-				for name := range cfg.Triggers {
+				for name := range api.GetConfig().Triggers {
 					names = append(names, name)
 				}
 				_, _ = fmt.Fprintf(cmdContext.stderr,
@@ -65,13 +63,8 @@ func newTriggerRunCommand(cmdContext *commandContext) *cobra.Command {
 				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to load resource: %v\n", err)
 				return nil
 			}
-			api, err := pkg.NewAPI(*cfg)
-			if err != nil {
-				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to create API: %v\n", err)
-				return nil
-			}
 
-			res, err := api.RunTrigger(name, cmdContext.createVars(r.Object, services.Destination{}))
+			res, err := api.RunTrigger(name, r.Object)
 			if err != nil {
 				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to execute trigger %s: %v\n", name, err)
 				return nil
@@ -79,7 +72,7 @@ func newTriggerRunCommand(cmdContext *commandContext) *cobra.Command {
 			w := tabwriter.NewWriter(cmdContext.stdout, 5, 0, 2, ' ', 0)
 			_, _ = fmt.Fprintf(w, "CONDITION\tRESULT\n")
 			for i := range res {
-				_, _ = fmt.Fprintf(w, "%s\t%v\n", cfg.Triggers[name][i].When, res[i].Triggered)
+				_, _ = fmt.Fprintf(w, "%s\t%v\n", api.GetConfig().Triggers[name][i].When, res[i].Triggered)
 			}
 			_ = w.Flush()
 			return nil
@@ -100,7 +93,7 @@ func newTriggerGetCommand(cmdContext *commandContext) *cobra.Command {
 %s trigger get
 # print YAML formatted on-sync-failed trigger definition
 %s trigger get on-sync-failed -o=yaml
-`, cmdContext.CLIName, cmdContext.CLIName),
+`, cmdContext.cliName, cmdContext.cliName),
 		Short: "Prints information about configured triggers",
 		RunE: func(c *cobra.Command, args []string) error {
 			var name string
@@ -109,12 +102,12 @@ func newTriggerGetCommand(cmdContext *commandContext) *cobra.Command {
 			}
 			items := map[string][]triggers.Condition{}
 
-			config, err := cmdContext.GetConfig()
+			api, err := cmdContext.getAPI()
 			if err != nil {
-				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to parse config: %v\n", err)
+				_, _ = fmt.Fprintf(cmdContext.stderr, "failed to get api: %v\n", err)
 				return nil
 			}
-			for triggerName, trigger := range config.Triggers {
+			for triggerName, trigger := range api.GetConfig().Triggers {
 				if triggerName == name || name == "" {
 					items[triggerName] = trigger
 				}

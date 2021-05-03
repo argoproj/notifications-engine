@@ -23,6 +23,30 @@ type Notification struct {
 	GitHub     *GitHubNotification     `json:"github,omitempty"`
 }
 
+// Destinations holds notification destinations group by trigger
+type Destinations map[string][]Destination
+
+func (s Destinations) Merge(other Destinations) {
+	for k := range other {
+		s[k] = append(s[k], other[k]...)
+	}
+}
+
+func (s Destinations) Dedup() Destinations {
+	for k, v := range s {
+		set := map[Destination]bool{}
+		var dedup []Destination
+		for _, dest := range v {
+			if !set[dest] {
+				set[dest] = true
+				dedup = append(dedup, dest)
+			}
+		}
+		s[k] = dedup
+	}
+	return s
+}
+
 // Destination holds notification destination details
 type Destination struct {
 	Service   string `json:"service"`

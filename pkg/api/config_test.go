@@ -1,12 +1,14 @@
-package pkg
+package api
 
 import (
 	"testing"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
@@ -41,7 +43,7 @@ message: hello world
 	}, cfg.Templates)
 }
 
-func TestParseConfig_DefaultTriggers(t *testing.T) {
+func TestParseConfig_DefaultServiceTriggers(t *testing.T) {
 	cfg, err := ParseConfig(&v1.ConfigMap{Data: map[string]string{
 		"defaultTriggers.slack": `
 - trigger-a
@@ -154,4 +156,40 @@ installationID: 67890
 
 	assert.NoError(t, err)
 	assert.Equal(t, expected, string(result))
+}
+
+func TestParseConfig_DefaultTriggers(t *testing.T) {
+	cfg, err := ParseConfig(&v1.ConfigMap{
+		Data: map[string]string{
+			"defaultTriggers": `[trigger1, trigger2]`,
+		},
+	}, emptySecret)
+
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, []string{"trigger1", "trigger2"}, cfg.DefaultTriggers)
+}
+
+func TestParseConfig_Subscriptions(t *testing.T) {
+	cfg, err := ParseConfig(&v1.ConfigMap{
+		Data: map[string]string{
+			"subscriptions": `
+- selector: test=true
+  triggers:
+  - my-trigger2`,
+		},
+	}, emptySecret)
+
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	label, err := labels.Parse("test=true")
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, subscriptions.DefaultSubscriptions([]subscriptions.DefaultSubscription{
+		{Triggers: []string{"my-trigger2"}, Selector: label},
+	}), cfg.Subscriptions)
 }

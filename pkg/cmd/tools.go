@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/argoproj/notifications-engine/pkg/api"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -23,13 +26,15 @@ func addOutputFlags(cmd *cobra.Command, output *string) {
 	cmd.Flags().StringVarP(output, "output", "o", "wide", "Output format. One of:json|yaml|wide|name")
 }
 
-func NewToolsCommand(name string, cfg Config) *cobra.Command {
+func NewToolsCommand(name string, cliName string, resource schema.GroupVersionResource, settings api.Settings, opts ...func(cfg clientcmd.ClientConfig)) *cobra.Command {
 	var (
 		cmdContext = commandContext{
-			Config: cfg,
-			stdout: os.Stdout,
-			stderr: os.Stderr,
-			stdin:  os.Stdin,
+			Settings: settings,
+			resource: resource,
+			stdout:   os.Stdout,
+			stderr:   os.Stderr,
+			stdin:    os.Stdin,
+			cliName:  cliName,
 		}
 	)
 	var command = cobra.Command{
@@ -44,13 +49,27 @@ func NewToolsCommand(name string, cfg Config) *cobra.Command {
 	command.AddCommand(newTemplateCommand(&cmdContext))
 
 	command.PersistentFlags().StringVar(&cmdContext.configMapPath,
-		"config-map", "", fmt.Sprintf("%s.yaml file path", cfg.ConfigMapName))
+		"config-map", "", fmt.Sprintf("%s.yaml file path", settings.ConfigMapName))
 	command.PersistentFlags().StringVar(&cmdContext.secretPath,
-		"secret", "", fmt.Sprintf("%s.yaml file path. Use empty secret if provided value is ':empty'", cfg.SecretName))
+		"secret", "", fmt.Sprintf("%s.yaml file path. Use empty secret if provided value is ':empty'", settings.SecretName))
 	clientConfig := addK8SFlagsToCmd(&command)
-	cmdContext.getK8SClients = func() (kubernetes.Interface, dynamic.Interface, string, error) {
-		return getK8SClients(clientConfig)
-	}
+	cobra.OnInitialize(func() {
+		for i := range opts {
+			opts[i](clientConfig)
+		}
+		ns, _, err := clientConfig.Namespace()
+		if err != nil {
+			log.Fatalf("Failed to extract namespace: %v", err)
+		}
+		cmdContext.namespace = ns
+		config, err := clientConfig.ClientConfig()
+		if err != nil {
+			log.Fatalf("Failed to create k8s client: %v", err)
+		}
+
+		cmdContext.dynamicClient = dynamic.NewForConfigOrDie(config)
+		cmdContext.k8sClient = kubernetes.NewForConfigOrDie(config)
+	})
 	return &command
 }
 

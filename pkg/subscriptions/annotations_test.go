@@ -1,4 +1,4 @@
-package controller
+package subscriptions
 
 import (
 	"testing"
@@ -6,8 +6,6 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/argoproj/notifications-engine/pkg"
 )
 
 func TestIterate(t *testing.T) {
@@ -48,7 +46,7 @@ func TestIterate(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		a := Subscriptions(tt.annotations)
+		a := Annotations(tt.annotations)
 		a.iterate(func(trigger, service string, recipients []string, key string) {
 			assert.Equal(t, tt.trigger, trigger)
 			assert.Equal(t, tt.service, service)
@@ -58,19 +56,19 @@ func TestIterate(t *testing.T) {
 	}
 }
 
-func TestGetAll(t *testing.T) {
+func TestGetDestinations(t *testing.T) {
 	tests := []struct {
-		subscriptions         Subscriptions
+		subscriptions         Annotations
 		defaultTrigger        []string
 		serviceDefaultTrigger map[string][]string
-		result                pkg.Subscriptions
+		result                services.Destinations
 	}{
 		{
-			subscriptions: Subscriptions(map[string]string{
+			subscriptions: Annotations(map[string]string{
 				"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
 			}),
 			defaultTrigger: []string{},
-			result: pkg.Subscriptions{
+			result: services.Destinations{
 				"my-trigger": []services.Destination{{
 					Service:   "slack",
 					Recipient: "my-channel",
@@ -78,7 +76,7 @@ func TestGetAll(t *testing.T) {
 			},
 		},
 		{
-			subscriptions: Subscriptions(map[string]string{
+			subscriptions: Annotations(map[string]string{
 				"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
 			}),
 			defaultTrigger: []string{
@@ -86,7 +84,7 @@ func TestGetAll(t *testing.T) {
 				"trigger-b",
 				"trigger-c",
 			},
-			result: pkg.Subscriptions{
+			result: services.Destinations{
 				"my-trigger": []services.Destination{{
 					Service:   "slack",
 					Recipient: "my-channel",
@@ -94,7 +92,7 @@ func TestGetAll(t *testing.T) {
 			},
 		},
 		{
-			subscriptions: Subscriptions(map[string]string{
+			subscriptions: Annotations(map[string]string{
 				"notifications.argoproj.io/subscribe.slack": "my-channel",
 			}),
 			defaultTrigger: []string{
@@ -102,7 +100,7 @@ func TestGetAll(t *testing.T) {
 				"trigger-b",
 				"trigger-c",
 			},
-			result: pkg.Subscriptions{
+			result: services.Destinations{
 				"trigger-a": []services.Destination{{
 					Service:   "slack",
 					Recipient: "my-channel",
@@ -118,7 +116,7 @@ func TestGetAll(t *testing.T) {
 			},
 		},
 		{
-			subscriptions: Subscriptions(map[string]string{
+			subscriptions: Annotations(map[string]string{
 				"notifications.argoproj.io/subscribe.slack": "my-channel",
 			}),
 			defaultTrigger: []string{
@@ -132,7 +130,7 @@ func TestGetAll(t *testing.T) {
 					"trigger-e",
 				},
 			},
-			result: pkg.Subscriptions{
+			result: services.Destinations{
 				"trigger-d": []services.Destination{{
 					Service:   "slack",
 					Recipient: "my-channel",
@@ -146,20 +144,20 @@ func TestGetAll(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		subscriptions := tt.subscriptions.GetAll(tt.defaultTrigger, tt.serviceDefaultTrigger)
-		assert.Equal(t, tt.result, subscriptions)
+		dests := tt.subscriptions.GetDestinations(tt.defaultTrigger, tt.serviceDefaultTrigger)
+		assert.Equal(t, tt.result, dests)
 	}
 }
 
 func TestSubscribe(t *testing.T) {
-	a := Subscriptions(map[string]string{})
+	a := Annotations(map[string]string{})
 	a.Subscribe("my-trigger", "slack", "my-channel1")
 
 	assert.Equal(t, a["notifications.argoproj.io/subscribe.my-trigger.slack"], "my-channel1")
 }
 
 func TestSubscribe_AddSecondRecipient(t *testing.T) {
-	a := Subscriptions(map[string]string{
+	a := Annotations(map[string]string{
 		"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel1",
 	})
 	a.Subscribe("my-trigger", "slack", "my-channel2")
@@ -168,7 +166,7 @@ func TestSubscribe_AddSecondRecipient(t *testing.T) {
 }
 
 func TestUnsubscribe(t *testing.T) {
-	a := Subscriptions(map[string]string{
+	a := Annotations(map[string]string{
 		"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel1;my-channel2",
 	})
 	a.Unsubscribe("my-trigger", "slack", "my-channel1")

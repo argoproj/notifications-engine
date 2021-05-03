@@ -1,10 +1,9 @@
-package controller
+package subscriptions
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/argoproj/notifications-engine/pkg"
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
@@ -27,9 +26,9 @@ func SubscribeAnnotationKey(trigger string, service string) string {
 	return fmt.Sprintf("%s/subscribe.%s.%s", AnnotationPrefix, trigger, service)
 }
 
-type Subscriptions map[string]string
+type Annotations map[string]string
 
-func (a Subscriptions) iterate(callback func(trigger string, service string, recipients []string, key string)) {
+func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := AnnotationPrefix + "/subscribe."
 	for k, v := range a {
 		if !strings.HasPrefix(k, prefix) {
@@ -54,7 +53,7 @@ func (a Subscriptions) iterate(callback func(trigger string, service string, rec
 	}
 }
 
-func (a Subscriptions) Subscribe(trigger string, service string, recipients ...string) {
+func (a Annotations) Subscribe(trigger string, service string, recipients ...string) {
 	annotationKey := SubscribeAnnotationKey(trigger, service)
 	r := parseRecipients(a[annotationKey])
 	set := map[string]bool{}
@@ -70,7 +69,7 @@ func (a Subscriptions) Subscribe(trigger string, service string, recipients ...s
 	a[annotationKey] = strings.Join(r, ";")
 }
 
-func (a Subscriptions) Unsubscribe(trigger string, service string, recipient string) {
+func (a Annotations) Unsubscribe(trigger string, service string, recipient string) {
 	a.iterate(func(t string, s string, r []string, k string) {
 		if trigger != t || s != service {
 			return
@@ -89,7 +88,7 @@ func (a Subscriptions) Unsubscribe(trigger string, service string, recipient str
 	})
 }
 
-func (a Subscriptions) Has(service string, recipient string) bool {
+func (a Annotations) Has(service string, recipient string) bool {
 	has := false
 	a.iterate(func(t string, s string, r []string, k string) {
 		if s != service {
@@ -105,8 +104,8 @@ func (a Subscriptions) Has(service string, recipient string) bool {
 	return has
 }
 
-func (a Subscriptions) GetAll(defaultTriggers []string, serviceDefaultTriggers map[string][]string) pkg.Subscriptions {
-	subscriptions := pkg.Subscriptions{}
+func (a Annotations) GetDestinations(defaultTriggers []string, serviceDefaultTriggers map[string][]string) services.Destinations {
+	dests := services.Destinations{}
 	a.iterate(func(trigger string, service string, recipients []string, v string) {
 		for _, recipient := range recipients {
 			triggers := defaultTriggers
@@ -117,12 +116,12 @@ func (a Subscriptions) GetAll(defaultTriggers []string, serviceDefaultTriggers m
 			}
 
 			for i := range triggers {
-				subscriptions[triggers[i]] = append(subscriptions[triggers[i]], services.Destination{
+				dests[triggers[i]] = append(dests[triggers[i]], services.Destination{
 					Service:   service,
 					Recipient: recipient,
 				})
 			}
 		}
 	})
-	return subscriptions
+	return dests
 }

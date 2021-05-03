@@ -1,4 +1,4 @@
-package pkg
+package api
 
 import (
 	"fmt"
@@ -13,20 +13,29 @@ const (
 	recipientVarName   = "recipient"
 )
 
-//go:generate mockgen -destination=./mocks/mocks.go -package=mocks github.com/argoproj/notifications-engine/pkg API
+//go:generate mockgen -destination=../mocks/api.go -package=mocks github.com/argoproj/notifications-engine/pkg/api API
+
+type GetVars func(obj map[string]interface{}, dest services.Destination) map[string]interface{}
 
 // API provides high level interface to send notifications and manage notification services
 type API interface {
-	Send(vars map[string]interface{}, templates []string, dest services.Destination) error
+	Send(obj map[string]interface{}, templates []string, dest services.Destination) error
 	RunTrigger(triggerName string, vars map[string]interface{}) ([]triggers.ConditionResult, error)
 	AddNotificationService(name string, service services.NotificationService)
 	GetNotificationServices() map[string]services.NotificationService
+	GetConfig() Config
 }
 
 type api struct {
 	notificationServices map[string]services.NotificationService
 	templatesService     templates.Service
 	triggersService      triggers.Service
+	getVars              GetVars
+	config               Config
+}
+
+func (n *api) GetConfig() Config {
+	return n.config
 }
 
 // AddService adds new service with the specified name
@@ -40,11 +49,13 @@ func (n *api) GetNotificationServices() map[string]services.NotificationService 
 }
 
 // Send sends notification using specified service and template to the specified destination
-func (n *api) Send(vars map[string]interface{}, templates []string, dest services.Destination) error {
+func (n *api) Send(obj map[string]interface{}, templates []string, dest services.Destination) error {
 	notificationService, ok := n.notificationServices[dest.Service]
 	if !ok {
 		return fmt.Errorf("notification service '%s' is not supported", dest.Service)
 	}
+
+	vars := n.getVars(obj, dest)
 
 	in := make(map[string]interface{})
 	for k := range vars {
@@ -60,12 +71,13 @@ func (n *api) Send(vars map[string]interface{}, templates []string, dest service
 	return notificationService.Send(*notification, dest)
 }
 
-func (n *api) RunTrigger(triggerName string, vars map[string]interface{}) ([]triggers.ConditionResult, error) {
+func (n *api) RunTrigger(triggerName string, obj map[string]interface{}) ([]triggers.ConditionResult, error) {
+	vars := n.getVars(obj, services.Destination{})
 	return n.triggersService.Run(triggerName, vars)
 }
 
 // NewAPI creates new api instance using provided config
-func NewAPI(cfg Config) (*api, error) {
+func NewAPI(cfg Config, getVars GetVars) (*api, error) {
 	notificationServices := map[string]services.NotificationService{}
 	for k, v := range cfg.Services {
 		svc, err := v()
@@ -83,5 +95,5 @@ func NewAPI(cfg Config) (*api, error) {
 		return nil, err
 	}
 
-	return &api{notificationServices, templatesService, triggersService}, nil
+	return &api{notificationServices, templatesService, triggersService, getVars, cfg}, nil
 }
