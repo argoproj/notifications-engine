@@ -77,7 +77,11 @@ func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
 func (f *apiFactory) getConfigMapAndSecret() (*v1.ConfigMap, *v1.Secret, error) {
 	cm, err := f.cmLister.Get(f.ConfigMapName)
 	if err != nil {
-		return nil, nil, err
+		if errors.IsNotFound(err) {
+			cm = &v1.ConfigMap{}
+		} else {
+			return nil, nil, err
+		}
 	}
 
 	secret, err := f.secretLister.Get(f.SecretName)

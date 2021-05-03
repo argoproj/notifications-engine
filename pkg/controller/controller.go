@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"runtime/debug"
 	"time"
@@ -23,10 +24,16 @@ import (
 )
 
 type NotificationController interface {
-	Run(ctx context.Context, processors int)
+	Run(threadiness int, stopCh <-chan struct{})
 }
 
 type Opts func(ctrl *notificationController)
+
+func WithToUnstructured(f func(obj v1.Object) (*unstructured.Unstructured, error)) Opts {
+	return func(ctrl *notificationController) {
+		ctrl.toUnstructured = f
+	}
+}
 
 func WithMetricsRegistry(r *MetricsRegistry) Opts {
 	return func(ctrl *notificationController) {
@@ -34,20 +41,20 @@ func WithMetricsRegistry(r *MetricsRegistry) Opts {
 	}
 }
 
-func WithAdditionalDestinations(f func(obj *unstructured.Unstructured, cfg api.Config) services.Destinations) Opts {
+func WithAdditionalDestinations(f func(obj v1.Object, cfg api.Config) services.Destinations) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.additionalDestinations = f
 	}
 }
 
-func WithSkipProcessing(f func(obj *unstructured.Unstructured) (bool, string)) Opts {
+func WithSkipProcessing(f func(obj v1.Object) (bool, string)) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.skipProcessing = f
 	}
 }
 
 func NewController(
-	client dynamic.ResourceInterface,
+	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
 	apiFactory api.Factory,
 	opts ...Opts,
@@ -70,7 +77,20 @@ func NewController(
 		},
 	)
 
-	ctrl := &notificationController{client: client, informer: informer, queue: queue, metricsRegistry: NewMetricsRegistry(""), apiFactory: apiFactory}
+	ctrl := &notificationController{
+		client:          client,
+		informer:        informer,
+		queue:           queue,
+		metricsRegistry: NewMetricsRegistry(""),
+		apiFactory:      apiFactory,
+		toUnstructured: func(obj v1.Object) (*unstructured.Unstructured, error) {
+			res, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				return nil, fmt.Errorf("Object must be *unstructured.Unstructured but was: %v", res)
+			}
+			return res, nil
+		},
+	}
 	for i := range opts {
 		opts[i](ctrl)
 	}
@@ -78,39 +98,50 @@ func NewController(
 }
 
 type notificationController struct {
-	client                 dynamic.ResourceInterface
+	client                 dynamic.NamespaceableResourceInterface
 	informer               cache.SharedIndexInformer
 	queue                  workqueue.RateLimitingInterface
 	apiFactory             api.Factory
 	metricsRegistry        *MetricsRegistry
-	additionalDestinations func(obj *unstructured.Unstructured, cfg api.Config) services.Destinations
-	skipProcessing         func(obj *unstructured.Unstructured) (bool, string)
+	skipProcessing         func(obj v1.Object) (bool, string)
+	additionalDestinations func(obj v1.Object, cfg api.Config) services.Destinations
+	toUnstructured         func(obj v1.Object) (*unstructured.Unstructured, error)
 }
 
-func (c *notificationController) Run(ctx context.Context, processors int) {
+func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
 	defer runtimeutil.HandleCrash()
 	defer c.queue.ShutDown()
 
 	log.Warn("Controller is running.")
-	for i := 0; i < processors; i++ {
+	for i := 0; i < threadiness; i++ {
 		go wait.Until(func() {
 			for c.processQueueItem() {
 			}
-		}, time.Second, ctx.Done())
+		}, time.Second, stopCh)
 	}
-	<-ctx.Done()
+	<-stopCh
 	log.Warn("Controller has stopped.")
 }
 
-func (c *notificationController) processResource(resource *unstructured.Unstructured, logEntry *log.Entry) error {
+func (c *notificationController) processResource(resource v1.Object, logEntry *log.Entry) (map[string]string, error) {
 	notificationsState := NewStateFromRes(resource)
 	api, err := c.apiFactory.GetAPI()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for trigger, destinations := range c.getDestinations(resource, api.GetConfig()) {
-		res, err := api.RunTrigger(trigger, resource.Object)
+	destinations := c.getDestinations(resource, api.GetConfig())
+	if len(destinations) == 0 {
+		return resource.GetAnnotations(), nil
+	}
+
+	un, err := c.toUnstructured(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	for trigger, destinations := range destinations {
+		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
 			logEntry.Debugf("Failed to execute condition of trigger %s: %v", trigger, err)
 		}
@@ -131,7 +162,7 @@ func (c *notificationController) processResource(resource *unstructured.Unstruct
 					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v'", trigger, cr.Key, to)
 				} else {
 					logEntry.Infof("Sending notification about condition '%s.%s' to '%v'", trigger, cr.Key, to)
-					if err := api.Send(resource.Object, cr.Templates, to); err != nil {
+					if err := api.Send(un.Object, cr.Templates, to); err != nil {
 						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v",
 							to, resource.GetNamespace(), resource.GetName(), err)
 						notificationsState.SetAlreadyNotified(trigger, cr, to, false)
@@ -148,7 +179,7 @@ func (c *notificationController) processResource(resource *unstructured.Unstruct
 	return notificationsState.Persist(resource)
 }
 
-func (c *notificationController) getDestinations(resource *unstructured.Unstructured, cfg api.Config) services.Destinations {
+func (c *notificationController) getDestinations(resource v1.Object, cfg api.Config) services.Destinations {
 	res := cfg.GetGlobalDestinations(resource.GetLabels())
 	res.Merge(subscriptions.Annotations(resource.GetAnnotations()).GetDestinations(cfg.DefaultTriggers, cfg.ServiceDefaultTriggers))
 	if c.additionalDestinations != nil {
@@ -180,34 +211,34 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		// This happens after resource was deleted, but the work queue still had an entry for it.
 		return
 	}
-	resource, ok := obj.(*unstructured.Unstructured)
+	resource, ok := obj.(v1.Object)
 	if !ok {
 		log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
 		return
 	}
-	resourceCopy := resource.DeepCopy()
+
 	logEntry := log.WithField("resource", key)
 	logEntry.Info("Start processing")
 	if c.skipProcessing != nil {
-		if skipProcessing, reason := c.skipProcessing(resourceCopy); skipProcessing {
+		if skipProcessing, reason := c.skipProcessing(resource); skipProcessing {
 			logEntry.Infof("Processing skipped: %s", reason)
 			return
 		}
 	}
 
-	err = c.processResource(resourceCopy, logEntry)
+	annotations, err := c.processResource(resource, logEntry)
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 		return
 	}
 
-	if !mapsEqual(resource.GetAnnotations(), resourceCopy.GetAnnotations()) {
+	if !mapsEqual(resource.GetAnnotations(), annotations) {
 		annotationsPatch := make(map[string]interface{})
-		for k, v := range resourceCopy.GetAnnotations() {
+		for k, v := range annotations {
 			annotationsPatch[k] = v
 		}
 		for k := range resource.GetAnnotations() {
-			if _, ok = resourceCopy.GetAnnotations()[k]; !ok {
+			if _, ok = annotations[k]; !ok {
 				annotationsPatch[k] = nil
 			}
 		}
@@ -219,7 +250,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 			logEntry.Errorf("Failed to marshal resource patch: %v", err)
 			return
 		}
-		resource, err = c.client.Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
+		resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
 		if err != nil {
 			logEntry.Errorf("Failed to patch resource: %v", err)
 			return
