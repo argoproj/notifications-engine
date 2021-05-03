@@ -7,12 +7,9 @@ import (
 	"io"
 	"io/ioutil"
 	"path/filepath"
-
-	"github.com/argoproj/notifications-engine/pkg"
-	"github.com/argoproj/notifications-engine/pkg/services"
+	"time"
 
 	"github.com/ghodss/yaml"
-	log "github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -20,60 +17,25 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	kubeyaml "k8s.io/apimachinery/pkg/util/yaml"
 	"k8s.io/client-go/dynamic"
+	informersv1 "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/client-go/tools/cache"
+
+	"github.com/argoproj/notifications-engine/pkg/api"
 )
 
-// Config holds tool command settings
-type Config struct {
-	// Resource holds group version and name of a Kubernetes resource that produces notifications
-	Resource schema.GroupVersionResource
-	// CLIName holds command line binary name
-	CLIName string
-	// ConfigMapName holds Kubernetes ConfigName name that contains notifications settings
-	ConfigMapName string
-	// SecretName holds Kubernetes Secret name that contains sensitive information
-	SecretName string
-	// CreateVars is a function that produces notifications context variables
-	CreateVars func(obj map[string]interface{}, dest services.Destination, cmdContext CommandContext) (map[string]interface{}, error)
-}
-
-// CommandContext encapsulates access to Kubernetes resources and implements config parsing
-type CommandContext interface {
-	GetK8SClients() (kubernetes.Interface, dynamic.Interface, string, error)
-	GetConfig() (*pkg.Config, error)
-	GetSecret() (*v1.Secret, error)
-	GetConfigMap() (*v1.ConfigMap, error)
-}
-
 type commandContext struct {
-	Config
+	api.Settings
+	resource      schema.GroupVersionResource
+	dynamicClient dynamic.Interface
+	k8sClient     kubernetes.Interface
+	cliName       string
 	configMapPath string
 	secretPath    string
 	stdout        io.Writer
 	stdin         io.Reader
 	stderr        io.Writer
-	getK8SClients func() (kubernetes.Interface, dynamic.Interface, string, error)
-}
-
-func getK8SClients(clientConfig clientcmd.ClientConfig) (kubernetes.Interface, dynamic.Interface, string, error) {
-	ns, _, err := clientConfig.Namespace()
-	if err != nil {
-		return nil, nil, "", err
-	}
-	config, err := clientConfig.ClientConfig()
-	if err != nil {
-		return nil, nil, "", err
-	}
-	k8sClient, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	dynamicClient, err := dynamic.NewForConfig(config)
-	if err != nil {
-		return nil, nil, "", err
-	}
-	return k8sClient, dynamicClient, ns, nil
+	namespace     string
 }
 
 func splitYAML(yamlData []byte) ([]*unstructured.Unstructured, error) {
@@ -100,10 +62,6 @@ func splitYAML(yamlData []byte) ([]*unstructured.Unstructured, error) {
 	return objs, nil
 }
 
-func (c *commandContext) GetK8SClients() (kubernetes.Interface, dynamic.Interface, string, error) {
-	return c.getK8SClients()
-}
-
 func (c *commandContext) unmarshalFromFile(filePath string, name string, gk schema.GroupKind, result interface{}) error {
 	var err error
 	var data []byte
@@ -128,29 +86,29 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 	return fmt.Errorf("file '%s' does not have '%s/%s/%s'", filePath, gk.Group, gk.Kind, name)
 }
 
-func (c *commandContext) GetConfig() (*pkg.Config, error) {
-	configMap, err := c.GetConfigMap()
+func (c *commandContext) loadResource(name string) (*unstructured.Unstructured, error) {
+	if ext := filepath.Ext(name); ext != "" {
+		data, err := ioutil.ReadFile(name)
+		if err != nil {
+			return nil, err
+		}
+		var res unstructured.Unstructured
+		err = yaml.Unmarshal(data, &res)
+		return &res, err
+	}
+	res, err := c.dynamicClient.Resource(c.resource).Namespace(c.namespace).Get(context.Background(), name, metav1.GetOptions{})
 	if err != nil {
 		return nil, err
 	}
-
-	secret, err := c.GetSecret()
-	if err != nil {
-		return nil, err
-	}
-	return pkg.ParseConfig(configMap, secret)
+	return res, nil
 }
 
-func (c *commandContext) GetSecret() (*v1.Secret, error) {
+func (c *commandContext) getSecret() (*v1.Secret, error) {
 	var secret v1.Secret
 	if c.secretPath == ":empty" {
 		secret = v1.Secret{}
 	} else if c.secretPath == "" {
-		k8sClient, _, ns, err := c.getK8SClients()
-		if err != nil {
-			return nil, err
-		}
-		s, err := k8sClient.CoreV1().Secrets(ns).Get(context.Background(), c.SecretName, metav1.GetOptions{})
+		s, err := c.k8sClient.CoreV1().Secrets(c.namespace).Get(context.Background(), c.SecretName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -160,17 +118,15 @@ func (c *commandContext) GetSecret() (*v1.Secret, error) {
 			return nil, err
 		}
 	}
+	secret.Name = c.SecretName
+	secret.Namespace = c.namespace
 	return &secret, nil
 }
 
-func (c *commandContext) GetConfigMap() (*v1.ConfigMap, error) {
+func (c *commandContext) getConfigMap() (*v1.ConfigMap, error) {
 	var configMap v1.ConfigMap
 	if c.configMapPath == "" {
-		k8sClient, _, ns, err := c.getK8SClients()
-		if err != nil {
-			return nil, err
-		}
-		cm, err := k8sClient.CoreV1().ConfigMaps(ns).Get(context.Background(), c.ConfigMapName, metav1.GetOptions{})
+		cm, err := c.k8sClient.CoreV1().ConfigMaps(c.namespace).Get(context.Background(), c.ConfigMapName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -180,35 +136,28 @@ func (c *commandContext) GetConfigMap() (*v1.ConfigMap, error) {
 			return nil, err
 		}
 	}
+	configMap.Name = c.ConfigMapName
+	configMap.Namespace = c.namespace
 	return &configMap, nil
 }
 
-func (c *commandContext) loadResource(name string) (*unstructured.Unstructured, error) {
-	if ext := filepath.Ext(name); ext != "" {
-		data, err := ioutil.ReadFile(name)
-		if err != nil {
-			return nil, err
-		}
-		var app unstructured.Unstructured
-		err = yaml.Unmarshal(data, &app)
-		return &app, err
-	}
-	_, client, ns, err := c.getK8SClients()
+func (c *commandContext) getAPI() (api.API, error) {
+	secretInformer := informersv1.NewSecretInformer(c.k8sClient, c.namespace, time.Minute*3, cache.Indexers{})
+	s, err := c.getSecret()
 	if err != nil {
 		return nil, err
 	}
-	res, err := client.Resource(c.Resource).Namespace(ns).Get(context.Background(), name, metav1.GetOptions{})
+	if err := secretInformer.GetStore().Add(s); err != nil {
+		return nil, err
+	}
+	cm, err := c.getConfigMap()
 	if err != nil {
 		return nil, err
 	}
-	return res, nil
-}
+	cmInformer := informersv1.NewConfigMapInformer(c.k8sClient, c.namespace, time.Minute*3, cache.Indexers{})
+	if err := cmInformer.GetStore().Add(cm); err != nil {
+		return nil, err
+	}
 
-func (c *commandContext) createVars(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-	vars, err := c.CreateVars(obj, dest, c)
-	if err != nil {
-		log.Fatalf("Failed to create variables: %v", err)
-		return nil
-	}
-	return vars
+	return api.NewFactory(c.Settings, c.namespace, secretInformer, cmInformer).GetAPI()
 }

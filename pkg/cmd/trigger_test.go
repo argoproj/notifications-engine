@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/argoproj/notifications-engine/pkg/api"
 	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/ghodss/yaml"
@@ -17,9 +18,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 )
 
@@ -61,20 +60,21 @@ func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, 
 		stdin:         strings.NewReader(""),
 		secretPath:    ":empty",
 		configMapPath: tmpFile.Name(),
-		getK8SClients: func() (kubernetes.Interface, dynamic.Interface, string, error) {
-			dynamicClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
-				schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"}: "List",
-				schema.GroupVersionResource{Group: "argoproj.io", Resource: "appprojects", Version: "v1alpha1"}:  "List",
-			}, resources...)
-			return fake.NewSimpleClientset(), dynamicClient, "default", nil
-		},
-		Config: Config{
-			CLIName:       "argocd-notifications",
+		resource:      schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"},
+		dynamicClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+			schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"}: "List",
+			schema.GroupVersionResource{Group: "argoproj.io", Resource: "appprojects", Version: "v1alpha1"}:  "List",
+		}, resources...),
+		k8sClient: fake.NewSimpleClientset(),
+		namespace: "default",
+		cliName:   "argocd-notifications",
+		Settings: api.Settings{
 			ConfigMapName: "my-config-map",
 			SecretName:    "my-secret",
-			Resource:      schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"},
-			CreateVars: func(obj map[string]interface{}, _ services.Destination, _ CommandContext) (map[string]interface{}, error) {
-				return map[string]interface{}{"app": obj}, nil
+			InitGetVars: func(cfg *api.Config, configMap *v1.ConfigMap, secret *v1.Secret) (api.GetVars, error) {
+				return func(obj map[string]interface{}, _ services.Destination) map[string]interface{} {
+					return map[string]interface{}{"app": obj}
+				}, nil
 			},
 		},
 	}

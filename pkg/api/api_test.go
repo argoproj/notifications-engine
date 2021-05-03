@@ -1,4 +1,4 @@
-package pkg
+package api
 
 import (
 	"testing"
@@ -9,6 +9,10 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/services/mocks"
 )
+
+func getVars(in map[string]interface{}, _ services.Destination) map[string]interface{} {
+	return in
+}
 
 func getConfig(ctrl *gomock.Controller, opts ...func(service *mocks.MockNotificationService)) Config {
 	return Config{
@@ -39,7 +43,7 @@ func TestSend(t *testing.T) {
 			Service:   "slack",
 			Recipient: "my-channel",
 		}).Return(nil)
-	}))
+	}), getVars)
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -56,7 +60,7 @@ func TestAddService(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
-	api, err := NewAPI(getConfig(ctrl))
+	api, err := NewAPI(getConfig(ctrl), getVars)
 	if !assert.NoError(t, err) {
 		return
 	}

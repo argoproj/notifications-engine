@@ -9,12 +9,13 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 	"github.com/argoproj/notifications-engine/pkg/triggers"
 )
 
 const (
 	notifiedHistoryMaxSize = 100
-	NotifiedAnnotationKey  = "notified." + AnnotationPrefix
+	NotifiedAnnotationKey  = "notified." + subscriptions.AnnotationPrefix
 )
 
 func StateItemKey(trigger string, conditionResult triggers.ConditionResult, dest services.Destination) string {
