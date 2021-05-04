@@ -7,7 +7,7 @@ The project provides integration with dozen of services like Slack, MS Teams, Ma
 <img width="460" src="https://user-images.githubusercontent.com/426437/115815221-70139a00-a3ab-11eb-8dc9-3e15f6b17804.png">
 </p>
 
-## Who Should Use It?
+## Why Use It?
 
 The first class notifications support is often eschewed feature in Kubernetes controllers. This is challenging because
 notifications are very opinionated by nature. It is hard to predict what kind of events end-users want to be notified
@@ -29,7 +29,7 @@ The example below demonstrates the [Argo CD](https://github.com/argoproj/argo-cd
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: <config-map-name>
+  name: argocd-notifications-cm
 data:
   trigger.on-sync-status-unknown: |
     - when: app.status.sync.status == 'Unknown'
@@ -46,7 +46,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: <secret-name>
+  name: argocd-notifications-secret
 stringData:
   slack-token: <my-slack-token>
 ```
