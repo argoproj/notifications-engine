@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cert-manager-notifications-cm
+data:
+  trigger.on-cert-ready: |
+    - when: any(cert.status.conditions, {.reason == 'Ready' && .status == 'True'})
+      send: [cert-ready]
+
+  template.cert-ready: |
+    message: |
+      Certificate {{.cert.metadata.name}} is ready!
+
+  service.slack: |
+    token: $slack-token
