@@ -41,9 +41,9 @@ func WithMetricsRegistry(r *MetricsRegistry) Opts {
 	}
 }
 
-func WithAdditionalDestinations(f func(obj v1.Object, cfg api.Config) services.Destinations) Opts {
+func WithAlterDestinations(f func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations) Opts {
 	return func(ctrl *notificationController) {
-		ctrl.additionalDestinations = f
+		ctrl.alterDestinations = f
 	}
 }
 
@@ -98,14 +98,14 @@ func NewController(
 }
 
 type notificationController struct {
-	client                 dynamic.NamespaceableResourceInterface
-	informer               cache.SharedIndexInformer
-	queue                  workqueue.RateLimitingInterface
-	apiFactory             api.Factory
-	metricsRegistry        *MetricsRegistry
-	skipProcessing         func(obj v1.Object) (bool, string)
-	additionalDestinations func(obj v1.Object, cfg api.Config) services.Destinations
-	toUnstructured         func(obj v1.Object) (*unstructured.Unstructured, error)
+	client            dynamic.NamespaceableResourceInterface
+	informer          cache.SharedIndexInformer
+	queue             workqueue.RateLimitingInterface
+	apiFactory        api.Factory
+	metricsRegistry   *MetricsRegistry
+	skipProcessing    func(obj v1.Object) (bool, string)
+	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
+	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -182,8 +182,8 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 func (c *notificationController) getDestinations(resource v1.Object, cfg api.Config) services.Destinations {
 	res := cfg.GetGlobalDestinations(resource.GetLabels())
 	res.Merge(subscriptions.Annotations(resource.GetAnnotations()).GetDestinations(cfg.DefaultTriggers, cfg.ServiceDefaultTriggers))
-	if c.additionalDestinations != nil {
-		res.Merge(c.additionalDestinations(resource, cfg))
+	if c.alterDestinations != nil {
+		res = c.alterDestinations(resource, res, cfg)
 	}
 	return res.Dedup()
 }
