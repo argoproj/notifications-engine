@@ -41,6 +41,12 @@ func WithMetricsRegistry(r *MetricsRegistry) Opts {
 	}
 }
 
+func WithSkipFirstRun(r bool) Opts {
+	return func(ctrl *notificationController) {
+		ctrl.skipFirstRun = r
+	}
+}
+
 func WithAlterDestinations(f func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.alterDestinations = f
@@ -103,6 +109,7 @@ type notificationController struct {
 	queue             workqueue.RateLimitingInterface
 	apiFactory        api.Factory
 	metricsRegistry   *MetricsRegistry
+	skipFirstRun      bool
 	skipProcessing    func(obj v1.Object) (bool, string)
 	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
 	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
@@ -158,7 +165,9 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 			}
 
 			for _, to := range destinations {
-				if changed := notificationsState.SetAlreadyNotified(trigger, cr, to, true); !changed {
+				if notificationsState.SkipFirstRun(to) && c.skipFirstRun {
+					logEntry.Infof("Skip notification about destination '%v'", to)
+				} else if changed := notificationsState.SetAlreadyNotified(trigger, cr, to, true); !changed {
 					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v'", trigger, cr.Key, to)
 				} else {
 					logEntry.Infof("Sending notification about condition '%s.%s' to '%v'", trigger, cr.Key, to)
