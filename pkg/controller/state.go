@@ -70,11 +70,12 @@ func (s NotificationsState) SetAlreadyNotified(trigger string, result triggers.C
 
 // SkipFirstRun set the state of given destination and return if state hasn't set
 func (s NotificationsState) SkipFirstRun(dest services.Destination) bool {
-	if _, ok := s.ServiceState[dest.Service]; ok {
+	key := fmt.Sprintf("%s:%s", dest.Service, dest.Recipient)
+	if _, ok := s.ServiceState[key]; ok {
 		return false
 	}
 
-	s.ServiceState[dest.Service] = time.Now().Unix()
+	s.ServiceState[key] = time.Now().Unix()
 	return true
 }
 
