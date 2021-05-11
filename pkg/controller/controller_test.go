@@ -113,9 +113,11 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 		return true
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
 
-	_, err = ctrl.processResource(app, logEntry)
+	annotations, err := ctrl.processResource(app, logEntry)
 
 	assert.NoError(t, err)
+	assert.Contains(t, annotations, NotifiedAnnotationKey)
+	assert.Contains(t, annotations, ServiceAnnotationKey)
 
 	state := NewStateFromRes(app)
 	assert.NotNil(t, state.NotifiedState[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
@@ -175,6 +177,7 @@ func TestDoesNotSendNotificationIfSkipFirstRun(t *testing.T) {
 	annotations2, err := ctrl.processResource(app, logEntry)
 	assert.NoError(t, err)
 
+	assert.Equal(t, app.Object, receivedObj)
 	assert.Contains(t, annotations2, NotifiedAnnotationKey)
 	assert.Equal(t, annotations[ServiceAnnotationKey], annotations2[ServiceAnnotationKey])
 }
