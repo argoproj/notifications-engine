@@ -1,3 +1,16 @@
+# Rocket.Chat
+
+## Parameters
+
+The Rocket.Chat notification service configuration includes following settings:
+
+* `email` - the Rocker.Chat user's email
+* `password` - the Rocker.Chat user's password
+* `alias` - optional alias that should be used to post message
+* `icon` - optional message icon
+* `avatar` - optional message avatar
+* `serverUrl` - optional Rocket.Chat server url
+
 ## Configuration
 
 1. Login to your RocketChat instance
@@ -33,15 +46,11 @@ metadata:
   name: <config-map-name>
 data:
   service.rocketchat: |
-    alias: <alias>          # Username alias
     email: $rocketchat-email
     password: $rocketchat-password
-    icon: <emoji>           # Emoji for using as avatar
-    avatar: <avatarUrl>     # optional
-    serverUrl: <url>        # Your RocketChat instance URL
 ```
 
-9. Create a subscription for your Slack integration:
+9. Create a subscription for your Rocket.Chat integration:
 
 *Note: channel, team or user must be prefixed with # or @ elsewhere we will be interpretative destination as a room ID*
 
