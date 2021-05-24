@@ -53,7 +53,7 @@ func NewToolsCommand(name string, cliName string, resource schema.GroupVersionRe
 	command.PersistentFlags().StringVar(&cmdContext.secretPath,
 		"secret", "", fmt.Sprintf("%s.yaml file path. Use empty secret if provided value is ':empty'", settings.SecretName))
 	clientConfig := addK8SFlagsToCmd(&command)
-	cobra.OnInitialize(func() {
+	command.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		for i := range opts {
 			opts[i](clientConfig)
 		}
@@ -69,7 +69,7 @@ func NewToolsCommand(name string, cliName string, resource schema.GroupVersionRe
 
 		cmdContext.dynamicClient = dynamic.NewForConfigOrDie(config)
 		cmdContext.k8sClient = kubernetes.NewForConfigOrDie(config)
-	})
+	}
 	return &command
 }
 
