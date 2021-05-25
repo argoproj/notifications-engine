@@ -1,4 +1,8 @@
-// +build tools
+package services
 
-// This existence of this package allows vendoring of the assets in this directory by go 1.13+.
-package tools
+import (
+	"embed"
+)
+
+//go:embed *.md
+var Docs embed.FS
