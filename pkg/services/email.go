@@ -56,6 +56,7 @@ type EmailOptions struct {
 	Username           string `json:"username"`
 	Password           string `json:"password"`
 	From               string `json:"from"`
+	Html               bool   `json:"html"`
 }
 
 type emailService struct {
@@ -73,12 +74,18 @@ func (s *emailService) Send(notification Notification, dest Destination) error {
 		subject = notification.Email.Subject
 		body = text.Coalesce(notification.Email.Body, body)
 	}
-	return smtp.New(smtp.Options{
+	email := smtp.New(smtp.Options{
 		From:               s.opts.From,
 		Host:               s.opts.Host,
 		Port:               s.opts.Port,
 		InsecureSkipVerify: s.opts.InsecureSkipVerify,
 		Password:           s.opts.Password,
 		Username:           s.opts.Username,
-	}).WithSubject(subject).WithBody(body).To(dest.Recipient).Send()
+	}).WithSubject(subject).WithBody(body).To(dest.Recipient)
+
+	if s.opts.Html {
+		return email.SendHtml()
+	} else {
+		return email.Send()
+	}
 }
