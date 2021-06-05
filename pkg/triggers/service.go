@@ -9,6 +9,7 @@ import (
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
+	log "github.com/sirupsen/logrus"
 )
 
 // Condition holds expression and template that must be used to create notification is expression is returns true
@@ -83,14 +84,18 @@ func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]Cond
 
 		if prog, ok := svc.compiledConditions[condition.When]; !ok {
 			return nil, fmt.Errorf("trigger configiration has changed after initialization")
-		} else if val, err := expr.Run(prog, vars); err == nil { // ignore execution error and treat and false result
+		} else if val, err := expr.Run(prog, vars); err == nil {
 			boolRes, ok := val.(bool)
 			conditionResult.Triggered = ok && boolRes
+		} else {
+			log.Errorf("failed to execute when condition: %+v", err)
 		}
 
 		if prog, ok := svc.compiledOncePer[condition.OncePer]; ok {
-			if val, err := expr.Run(prog, vars); err == nil { // ignore execution error and treat and false result
+			if val, err := expr.Run(prog, vars); err == nil {
 				conditionResult.OncePer = fmt.Sprintf("%v", val)
+			} else {
+				log.Errorf("failed to execute oncePer condition: %+v", err)
 			}
 		}
 
