@@ -1,6 +1,6 @@
 # Cert Manager Notifications
 
-The example demonstrates how Notifications Engine can be used to implement notificatios for [Cert-Manager](https://cert-manager.io/) Certificate CRD.
+The example demonstrates how Notifications Engine can be used to implement notifications for [Cert-Manager](https://cert-manager.io/) Certificate CRD.
 
 ## Controller
 
