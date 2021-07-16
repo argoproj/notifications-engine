@@ -65,7 +65,7 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 		}
 		notification.Alertmanager.StartsAt = time.Now()
 
-		tmplGeneratorURL := notification.Alertmanager.GeneratorURL
+		tmplGeneratorURL := n.GeneratorURL
 		if tmplGeneratorURL == "" {
 			tmplGeneratorURL = "{{.app.spec.source.repoURL}}"
 		}
