@@ -24,8 +24,10 @@ func TestValidIconURL(t *testing.T) {
 func TestGetTemplater_Slack(t *testing.T) {
 	n := Notification{
 		Slack: &SlackNotification{
-			Attachments: "{{.foo}}",
-			Blocks:      "{{.bar}}",
+			Attachments:     "{{.foo}}",
+			Blocks:          "{{.bar}}",
+			GroupingKey:     "{{.foo}}-{{.bar}}",
+			NotifyBroadcast: true,
 		},
 	}
 	templater, err := n.GetTemplater("", template.FuncMap{})
@@ -46,4 +48,6 @@ func TestGetTemplater_Slack(t *testing.T) {
 
 	assert.Equal(t, "hello", notification.Slack.Attachments)
 	assert.Equal(t, "world", notification.Slack.Blocks)
+	assert.Equal(t, "hello-world", notification.Slack.GroupingKey)
+	assert.Equal(t, true, notification.Slack.NotifyBroadcast)
 }
