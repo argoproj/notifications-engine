@@ -138,7 +138,7 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		msgOptions = append(msgOptions, slack.MsgOptionBroadcast())
 	}
 
-	if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; ok && lastTs != "" {
+	if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; ok && lastTs != "" && notification.Slack.GroupingKey != "" {
 		msgOptions = append(msgOptions, slack.MsgOptionTS(lastTs))
 	}
 
