@@ -28,6 +28,14 @@ func SubscribeAnnotationKey(trigger string, service string) string {
 
 type Annotations map[string]string
 
+func NewAnnotations(annotations map[string]string) Annotations {
+	if annotations == nil {
+		return Annotations(map[string]string{})
+	}
+
+	return Annotations(annotations)
+}
+
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := AnnotationPrefix + "/subscribe."
 	for k, v := range a {
