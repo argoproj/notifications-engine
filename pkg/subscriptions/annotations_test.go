@@ -8,6 +8,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewAnnotations(t *testing.T) {
+	a := NewAnnotations(map[string]string{})
+	assert.NotNil(t, a)
+
+	b := NewAnnotations(nil)
+	assert.NotNil(t, b)
+}
+
 func TestIterate(t *testing.T) {
 	tests := []struct {
 		annotations map[string]string
