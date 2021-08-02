@@ -181,7 +181,7 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 
 func (c *notificationController) getDestinations(resource v1.Object, cfg api.Config) services.Destinations {
 	res := cfg.GetGlobalDestinations(resource.GetLabels())
-	res.Merge(subscriptions.Annotations(resource.GetAnnotations()).GetDestinations(cfg.DefaultTriggers, cfg.ServiceDefaultTriggers))
+	res.Merge(subscriptions.NewAnnotations(resource.GetAnnotations()).GetDestinations(cfg.DefaultTriggers, cfg.ServiceDefaultTriggers))
 	if c.alterDestinations != nil {
 		res = c.alterDestinations(resource, res, cfg)
 	}
