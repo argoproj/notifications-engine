@@ -44,5 +44,6 @@ func (s *service) FormatNotification(vars map[string]interface{}, templates ...s
 			return nil, err
 		}
 	}
+
 	return &notification, nil
 }

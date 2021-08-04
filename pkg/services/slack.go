@@ -19,10 +19,13 @@ import (
 
 // No rate limit unless Slack requests it (allows for Slack to control bursting)
 var rateLimiter = rate.NewLimiter(rate.Inf, 1)
+var threadTSs = map[string]map[string]string{}
 
 type SlackNotification struct {
-	Attachments string `json:"attachments,omitempty"`
-	Blocks      string `json:"blocks,omitempty"`
+	Attachments     string `json:"attachments,omitempty"`
+	Blocks          string `json:"blocks,omitempty"`
+	GroupingKey     string `json:"groupingKey"`
+	NotifyBroadcast bool   `json:"notifyBroadcast"`
 }
 
 func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -34,6 +37,11 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 	if err != nil {
 		return nil, err
 	}
+	groupingKey, err := texttemplate.New(name).Funcs(f).Parse(n.GroupingKey)
+	if err != nil {
+		return nil, err
+	}
+
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.Slack == nil {
 			notification.Slack = &SlackNotification{}
@@ -42,13 +50,21 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		if err := slackAttachments.Execute(&slackAttachmentsData, vars); err != nil {
 			return err
 		}
-
 		notification.Slack.Attachments = slackAttachmentsData.String()
+
 		var slackBlocksData bytes.Buffer
 		if err := slackBlocks.Execute(&slackBlocksData, vars); err != nil {
 			return err
 		}
 		notification.Slack.Blocks = slackBlocksData.String()
+
+		var groupingKeyData bytes.Buffer
+		if err := groupingKey.Execute(&groupingKeyData, vars); err != nil {
+			return err
+		}
+		notification.Slack.GroupingKey = groupingKeyData.String()
+
+		notification.Slack.NotifyBroadcast = n.NotifyBroadcast
 		return nil
 	}, nil
 }
@@ -114,6 +130,18 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
 	}
 
+	if _, ok := threadTSs[dest.Recipient]; !ok {
+		threadTSs[dest.Recipient] = map[string]string{}
+	}
+
+	if notification.Slack.NotifyBroadcast {
+		msgOptions = append(msgOptions, slack.MsgOptionBroadcast())
+	}
+
+	if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; ok && lastTs != "" && notification.Slack.GroupingKey != "" {
+		msgOptions = append(msgOptions, slack.MsgOptionTS(lastTs))
+	}
+
 	ctx := context.TODO()
 	var err error
 	for {
@@ -121,7 +149,7 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		if err != nil {
 			break
 		}
-		_, _, err = sl.PostMessageContext(ctx, dest.Recipient, msgOptions...)
+		_, ts, err := sl.PostMessageContext(ctx, dest.Recipient, msgOptions...)
 		if err != nil {
 			if rateLimitedError, ok := err.(*slack.RateLimitedError); ok {
 				rateLimiter.SetLimit(rate.Every(rateLimitedError.RetryAfter))
@@ -129,6 +157,9 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 				break
 			}
 		} else {
+			if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; !ok || lastTs == "" {
+				threadTSs[dest.Recipient][notification.Slack.GroupingKey] = ts
+			}
 			// No error, so remove rate limit
 			rateLimiter.SetLimit(rate.Inf)
 			break
