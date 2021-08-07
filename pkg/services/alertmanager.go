@@ -182,8 +182,7 @@ func (s alertmanagerService) sendOneTarget(target string, rawBody []byte) error 
 
 	if s.opts.BasicAuth != nil {
 		req.SetBasicAuth(s.opts.BasicAuth.Username, s.opts.BasicAuth.Password)
-	}
-	if s.opts.BearerToken != "" {
+	} else if s.opts.BearerToken != "" {
 		req.Header.Add("Authorization", fmt.Sprintf("Bearer %v", s.opts.BearerToken))
 	}
 
@@ -191,18 +190,18 @@ func (s alertmanagerService) sendOneTarget(target string, rawBody []byte) error 
 	if err != nil {
 		return err
 	}
-
-	if response.StatusCode != http.StatusOK {
-		data, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			data = []byte(fmt.Sprintf("unable to read response data: %v", err))
-		}
-		return fmt.Errorf("request to %s has failed with error code %d : %s", rawURL, response.StatusCode, string(data))
-	}
-
 	defer func() {
 		_ = response.Body.Close()
 	}()
+
+	data, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read response data: %v", err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("request to %s has failed with error code %d : %s", rawURL, response.StatusCode, string(data))
+	}
 
 	return nil
 }
