@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"testing"
 	"text/template"
 
@@ -87,4 +88,21 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 
 		assert.Equal(t, "argocd-notifications", notification.Alertmanager.GeneratorURL)
 	})
+}
+
+func TestSend_Alertmanager(t *testing.T) {
+	opt := AlertmanagerOptions{
+		Targets: []string{
+			"127.0.0.1:9093",
+		},
+		Scheme:  "http",
+		APIPath: "/api/v2/alerts",
+		BasicAuth: &BasicAuth{
+			Username: "user",
+			Password: "pass",
+		},
+	}
+
+	assert.Equal(t, "http://127.0.0.1:9093/api/v2/alerts", fmt.Sprintf("%v://%v%v", opt.Scheme, opt.Targets[0], opt.APIPath))
+	assert.Equal(t, "user:pass", fmt.Sprintf("%v:%v", opt.BasicAuth.Username, opt.BasicAuth.Password))
 }

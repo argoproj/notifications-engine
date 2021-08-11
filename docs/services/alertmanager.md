@@ -149,3 +149,15 @@ template.app-deployed: |
 ```
 
 You can do targeted push on [Alertmanager](https://github.com/prometheus/alertmanager) according to labels.
+
+```yaml
+template.app-deployed: |
+  message: Application {{.app.metadata.name}} has been healthy.
+  alertmanager:
+    labels:
+      alertname: app-deployed
+      fault_priority: "P5"
+      event_bucket: "deploy"
+```
+
+There is a special label `alertname`. If you don’t set its value, it will be equal to the template name by default.

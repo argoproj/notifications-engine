@@ -10,8 +10,9 @@ import (
 	texttemplate "text/template"
 	"time"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	log "github.com/sirupsen/logrus"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 const (
@@ -24,7 +25,6 @@ type AlertmanagerNotification struct {
 	Annotations  map[string]string `json:"annotations"`
 	GeneratorURL string            `json:"generatorURL"`
 	StartsAt     time.Time         `json:"startsAt"`
-	EndsAt       time.Time         `json:"endsAt"`
 }
 
 // AlertmanagerOptions cluster configuration
