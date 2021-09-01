@@ -68,7 +68,7 @@ Ready to add notifications to your project? Check out sample notifications for [
 ## Users
 
 * [Argo CD](https://github.com/argoproj/argo-cd) (implemented by [argocd-notifications](https://github.com/argoproj-labs/argocd-notifications))
-* [Argo Rollouts](https://github.com/argoproj/argo-rollouts) (👷 work in progress...)
+* [Argo Rollouts](https://github.com/argoproj/argo-rollouts)
 
 # Additional Resources
 
