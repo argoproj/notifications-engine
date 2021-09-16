@@ -68,7 +68,7 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 	if filePath == "-" {
 		data, err = ioutil.ReadAll(c.stdin)
 	} else {
-		data, err = ioutil.ReadFile(c.configMapPath)
+		data, err = ioutil.ReadFile(filePath)
 	}
 	if err != nil {
 		return err
