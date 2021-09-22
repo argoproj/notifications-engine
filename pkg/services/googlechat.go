@@ -8,9 +8,10 @@ import (
 	"net/http"
 	texttemplate "text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 type GoogleChatNotification struct {

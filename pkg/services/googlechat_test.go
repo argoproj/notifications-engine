@@ -22,7 +22,7 @@ func TestTextMessage_GoogleChat(t *testing.T) {
 
 	notification := Notification{}
 
-	templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]interface{}{
 		"value": "value",
 	})
 
@@ -66,7 +66,7 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 
 	notification := Notification{}
 
-	templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]interface{}{
 		"text":     "text",
 		"topLabel": "topLabel",
 		"imageUrl": "imageUrl",
@@ -140,7 +140,10 @@ func TestSendMessage_NoError(t *testing.T) {
 	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		called = true
 		res.WriteHeader(http.StatusOK)
-		res.Write([]byte("{}"))
+		_, err := res.Write([]byte("{}"))
+		if err != nil {
+			t.Fatal("error on write response body")
+		}
 	}))
 	defer func() { testServer.Close() }()
 
