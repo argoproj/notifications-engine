@@ -88,26 +88,31 @@ type webhookError struct {
 	Status  string `json:"status"`
 }
 
-func (s googleChatService) Send(notification Notification, dest Destination) error {
-	webhookUrl, ok := s.opts.WebhookUrls[dest.Recipient]
+func (s googleChatService) getClient(recipient string) (*googlechatClient, error) {
+	webhookUrl, ok := s.opts.WebhookUrls[recipient]
 	if !ok {
-		return fmt.Errorf("no Google chat webhook configured for recipient %s", dest.Recipient)
+		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
 	transport := httputil.NewTransport(webhookUrl, false)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "googlechat")),
 	}
-	message, err := googleChatNotificationToMessage(notification)
-	if err != nil {
-		return err
-	}
+	return &googlechatClient{httpClient: client, url: webhookUrl}, nil
+}
+
+type googlechatClient struct {
+	httpClient *http.Client
+	url        string
+}
+
+func (c *googlechatClient) sendMessage(message *googleChatMessage) (*webhookReturn, error) {
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	response, err := client.Post(webhookUrl, "application/json", bytes.NewReader(jsonMessage))
+	response, err := c.httpClient.Post(c.url, "application/json", bytes.NewReader(jsonMessage))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer func() {
@@ -116,13 +121,30 @@ func (s googleChatService) Send(notification Notification, dest Destination) err
 
 	bodyBytes, err := ioutil.ReadAll(response.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	body := webhookReturn{}
 	err = json.Unmarshal(bodyBytes, &body)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	return &body, nil
+}
+
+func (s googleChatService) Send(notification Notification, dest Destination) error {
+	client, err := s.getClient(dest.Recipient)
+	if err != nil {
+		return fmt.Errorf("error creating client to webhook: %s", err)
+	}
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		return fmt.Errorf("cannot create message: %s", err)
+	}
+
+	body, err := client.sendMessage(message)
+	if err != nil {
+		return fmt.Errorf("cannot create message: %s", err)
 	}
 	if body.Error != nil {
 		return fmt.Errorf("error with message: code=%d status=%s message=%s", body.Error.Code, body.Error.Status, body.Error.Message)

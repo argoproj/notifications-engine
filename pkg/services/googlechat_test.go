@@ -1,6 +1,8 @@
 package services
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"text/template"
 
@@ -114,4 +116,39 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestCreateClient_NoError(t *testing.T) {
+	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": "testUrl"}}
+	service := NewGoogleChatService(opts).(*googleChatService)
+	client, err := service.getClient("test")
+	assert.Nil(t, err)
+	assert.NotNil(t, client)
+	assert.Equal(t, "testUrl", client.url)
+}
+
+func TestCreateClient_Error(t *testing.T) {
+	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": "testUrl"}}
+	service := NewGoogleChatService(opts).(*googleChatService)
+	client, err := service.getClient("another")
+	assert.NotNil(t, err)
+	assert.Nil(t, client)
+}
+
+func TestSendMessage_NoError(t *testing.T) {
+	called := false
+	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		called = true
+		res.WriteHeader(http.StatusOK)
+		res.Write([]byte("{}"))
+	}))
+	defer func() { testServer.Close() }()
+
+	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": testServer.URL}}
+	service := NewGoogleChatService(opts).(*googleChatService)
+	notification := Notification{Message: ""}
+	destination := Destination{Recipient: "test"}
+	err := service.Send(notification, destination)
+	assert.Nil(t, err)
+	assert.True(t, called)
 }
