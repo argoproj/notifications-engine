@@ -19,7 +19,7 @@ The Google Chat notification service send message notifications to a google chat
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: argocd-notifications-cm
+  name: <config-map-name>
 data:
   service.googlechat: |
     webhooks:
@@ -30,7 +30,7 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: argocd-notification-secret
+  name: <secret-name>
 stringData:
   space-webhook-url: https://chat.googleapis.com/v1/spaces/<space_id>/messages?key=<key>&token=<token>  
 ```
@@ -42,7 +42,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   annotations:
-    notifications.argoproj.io/subscribe.on-sync-succeeded.googlechat: channelName
+    notifications.argoproj.io/subscribe.on-sync-succeeded.googlechat: spaceName
 ```
 
 ## Templates
