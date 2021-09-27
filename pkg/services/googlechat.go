@@ -136,16 +136,16 @@ func (c *googlechatClient) sendMessage(message *googleChatMessage) (*webhookRetu
 func (s googleChatService) Send(notification Notification, dest Destination) error {
 	client, err := s.getClient(dest.Recipient)
 	if err != nil {
-		return fmt.Errorf("error creating client to webhook: %s", err)
+		return fmt.Errorf("error creating client to webhook: %w", err)
 	}
 	message, err := googleChatNotificationToMessage(notification)
 	if err != nil {
-		return fmt.Errorf("cannot create message: %s", err)
+		return fmt.Errorf("cannot create message: %w", err)
 	}
 
 	body, err := client.sendMessage(message)
 	if err != nil {
-		return fmt.Errorf("cannot create message: %s", err)
+		return fmt.Errorf("cannot send message: %w", err)
 	}
 	if body.Error != nil {
 		return fmt.Errorf("error with message: code=%d status=%s message=%s", body.Error.Code, body.Error.Status, body.Error.Message)
