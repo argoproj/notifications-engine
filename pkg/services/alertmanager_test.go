@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"testing"
 	"text/template"
 
@@ -90,10 +89,12 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 	})
 }
 
-func TestSend_Alertmanager(t *testing.T) {
+func TestSend_AlertmanagerCluster(t *testing.T) {
 	opt := AlertmanagerOptions{
 		Targets: []string{
-			"127.0.0.1:9093",
+			"127.0.0.1:19093",
+			"127.0.0.1:29093",
+			"127.0.0.1:39093",
 		},
 		Scheme:  "http",
 		APIPath: "/api/v2/alerts",
@@ -101,8 +102,19 @@ func TestSend_Alertmanager(t *testing.T) {
 			Username: "user",
 			Password: "pass",
 		},
+		Timeout: 2,
 	}
 
-	assert.Equal(t, "http://127.0.0.1:9093/api/v2/alerts", fmt.Sprintf("%v://%v%v", opt.Scheme, opt.Targets[0], opt.APIPath))
-	assert.Equal(t, "user:pass", fmt.Sprintf("%v:%v", opt.BasicAuth.Username, opt.BasicAuth.Password))
+	notification := Notification{
+		Alertmanager: &AlertmanagerNotification{
+			Labels: map[string]string{
+				"alertname": "TestSend",
+			},
+		},
+	}
+
+	s := NewAlertmanagerService(opt)
+	if err := s.Send(notification, Destination{}); err != nil {
+		assert.EqualError(t, err, "no events were successfully received by alertmanager")
+	}
 }

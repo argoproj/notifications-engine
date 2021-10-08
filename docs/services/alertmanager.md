@@ -10,6 +10,7 @@ The notification service is used to push events to [Alertmanager](https://github
 * `insecureSkipVerify` - optional, default is "false", when scheme is https whether to skip the verification of ca
 * `basicAuth` - optional, server auth
 * `bearerToken` - optional, server auth
+* `timeout` - optional, the timeout in seconds used when sending alerts, default is "3 seconds"
 
 `basicAuth` or `bearerToken` is used for authentication, you can choose one. If the two are set at the same time, `basicAuth` takes precedence over `bearerToken`.
 
@@ -124,7 +125,7 @@ data:
 
 ## Templates
 
-* `labels` - implement different notification strategies according to alertmanager routing
+* `labels` - at least one label pair required, implement different notification strategies according to alertmanager routing
 * `annotations` - optional, specifies a set of information labels, which can be used to store longer additional information, but only for display
 * `generatorURL` - optional, default is '{{.app.spec.source.repoURL}}', backlink used to identify the entity that caused this alert in the client
 

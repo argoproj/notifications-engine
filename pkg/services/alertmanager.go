@@ -2,11 +2,14 @@ package services
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"sync"
+	"sync/atomic"
 	texttemplate "text/template"
 	"time"
 
@@ -35,6 +38,7 @@ type AlertmanagerOptions struct {
 	BasicAuth          *BasicAuth `json:"basicAuth"`
 	BearerToken        string     `json:"bearerToken"`
 	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
+	Timeout            int        `json:"timeout"`
 }
 
 // NewAlertmanagerService new service
@@ -47,6 +51,9 @@ func NewAlertmanagerService(opts AlertmanagerOptions) NotificationService {
 	}
 	if opts.APIPath == "" {
 		opts.APIPath = "/api/v2/alerts"
+	}
+	if opts.Timeout == 0 {
+		opts.Timeout = 3
 	}
 
 	return &alertmanagerService{entry: log.WithField("service", "alertmanager"), opts: opts}
@@ -85,11 +92,13 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 			return err
 		}
 
-		if len(n.Labels) > 0 {
-			notification.Alertmanager.Labels = n.Labels
-			if err := notification.Alertmanager.parseLabels(name, f, vars); err != nil {
-				return err
-			}
+		if len(n.Labels) <= 0 {
+			return fmt.Errorf("at least one label pair required")
+		}
+
+		notification.Alertmanager.Labels = n.Labels
+		if err := notification.Alertmanager.parseLabels(name, f, vars); err != nil {
+			return err
 		}
 		if len(n.Annotations) > 0 {
 			notification.Alertmanager.Annotations = n.Annotations
@@ -150,23 +159,48 @@ func (n *AlertmanagerNotification) parseLabels(name string, f texttemplate.FuncM
 
 // Send using create alertmanager events
 func (s alertmanagerService) Send(notification Notification, dest Destination) error {
+	if notification.Alertmanager == nil {
+		return fmt.Errorf("notification alertmanager no config")
+	}
+	if len(notification.Alertmanager.Labels) == 0 {
+		return fmt.Errorf("alertmanager at least one label pair required")
+	}
+
 	rawBody, err := json.Marshal([]*AlertmanagerNotification{notification.Alertmanager})
 	if err != nil {
 		return err
 	}
 
+	var wg sync.WaitGroup
+	var numSuccess uint32
+
 	for _, target := range s.opts.Targets {
+		wg.Add(1)
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(s.opts.Timeout)*time.Second)
+		defer cancel()
+
 		go func(target string) {
-			if err := s.sendOneTarget(target, rawBody); err != nil {
+			if err := s.sendOneTarget(ctx, target, rawBody); err != nil {
 				s.entry.Errorf("alertmanager sent target: %v", err)
+			} else {
+				atomic.AddUint32(&numSuccess, 1)
 			}
+
+			wg.Done()
 		}(target)
+	}
+
+	wg.Wait()
+
+	if numSuccess == 0 {
+		return fmt.Errorf("no events were successfully received by alertmanager")
 	}
 
 	return nil
 }
 
-func (s alertmanagerService) sendOneTarget(target string, rawBody []byte) error {
+func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
 	transport := httputil.NewTransport(rawURL, s.opts.InsecureSkipVerify)
@@ -174,7 +208,7 @@ func (s alertmanagerService) sendOneTarget(target string, rawBody []byte) error 
 		Transport: httputil.NewLoggingRoundTripper(transport, s.entry),
 	}
 
-	req, err := http.NewRequest(http.MethodPost, rawURL, bytes.NewReader(rawBody))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(rawBody))
 	if err != nil {
 		return err
 	}
