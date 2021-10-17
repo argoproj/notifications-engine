@@ -48,3 +48,4 @@ metadata:
 * [Telegram](./telegram.md)
 * [Teams](./teams.md)
 * [Rocket.Chat](./rocketchat.md)
+* [Pushover](./pushover.md)
