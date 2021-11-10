@@ -118,3 +118,19 @@ func TestSend_AlertmanagerCluster(t *testing.T) {
 		assert.EqualError(t, err, "no events were successfully received by alertmanager")
 	}
 }
+
+func Test_AlertManagerNotExist(t *testing.T) {
+	n := Notification{}
+	svc := NewAlertmanagerService(AlertmanagerOptions{})
+	err := svc.Send(n, Destination{})
+	assert.EqualError(t, err, "notification alertmanager no config")
+}
+
+func Test_AlertManagerNoLabels(t *testing.T) {
+	n := Notification{
+		Alertmanager: &AlertmanagerNotification{},
+	}
+	svc := NewAlertmanagerService(AlertmanagerOptions{})
+	err := svc.Send(n, Destination{})
+	assert.EqualError(t, err, "alertmanager at least one label pair required")
+}
