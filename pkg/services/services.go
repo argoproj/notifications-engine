@@ -158,6 +158,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewTeamsService(opts), nil
+	case "pushover":
+		var opts PushoverOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewPushoverService(opts), nil
 	case "alertmanager":
 		var opts AlertmanagerOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
