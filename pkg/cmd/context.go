@@ -68,7 +68,14 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 	if filePath == "-" {
 		data, err = ioutil.ReadAll(c.stdin)
 	} else {
-		data, err = ioutil.ReadFile(c.configMapPath)
+		switch gk.Kind {
+		case "ConfigMap":
+			data, err = ioutil.ReadFile(c.configMapPath)
+		case "Secret":
+			data, err = ioutil.ReadFile(c.secretPath)
+		default:
+			err = fmt.Errorf("Error: %s", "file must be Secret or ConfigMap")
+		}
 	}
 	if err != nil {
 		return err
