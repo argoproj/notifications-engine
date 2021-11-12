@@ -68,7 +68,7 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 	if filePath == "-" {
 		data, err = ioutil.ReadAll(c.stdin)
 	} else {
-		data, err = ioutil.ReadFile(c.configMapPath)
+		data, err = ioutil.ReadFile(filePath)
 	}
 	if err != nil {
 		return err
@@ -116,6 +116,12 @@ func (c *commandContext) getSecret() (*v1.Secret, error) {
 	} else {
 		if err := c.unmarshalFromFile(c.secretPath, c.SecretName, schema.GroupKind{Kind: "Secret"}, &secret); err != nil {
 			return nil, err
+		}
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
+		}
+		for k, v := range secret.StringData {
+			secret.Data[k] = []byte(v)
 		}
 	}
 	secret.Name = c.SecretName

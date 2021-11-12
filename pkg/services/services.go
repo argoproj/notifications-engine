@@ -22,6 +22,7 @@ type Notification struct {
 	Opsgenie     *OpsgenieNotification     `json:"opsgenie,omitempty"`
 	GitHub       *GitHubNotification       `json:"github,omitempty"`
 	Alertmanager *AlertmanagerNotification `json:"alertmanager,omitempty"`
+	GoogleChat   *GoogleChatNotification   `json:"googlechat,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -84,6 +85,10 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.Alertmanager != nil {
 		sources = append(sources, n.Alertmanager)
+	}
+
+	if n.GoogleChat != nil {
+		sources = append(sources, n.GoogleChat)
 	}
 
 	return n.getTemplater(name, f, sources)
@@ -158,6 +163,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewTeamsService(opts), nil
+	case "googlechat":
+		var opts GoogleChatOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewGoogleChatService(opts), nil
 	case "pushover":
 		var opts PushoverOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
