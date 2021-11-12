@@ -49,3 +49,4 @@ metadata:
 * [Teams](./teams.md)
 * [Rocket.Chat](./rocketchat.md)
 * [Pushover](./pushover.md)
+* [Alertmanager](./alertmanager.md)

@@ -12,15 +12,16 @@ import (
 )
 
 type Notification struct {
-	Message    string                  `json:"message,omitempty"`
-	Email      *EmailNotification      `json:"email,omitempty"`
-	Slack      *SlackNotification      `json:"slack,omitempty"`
-	Mattermost *MattermostNotification `json:"mattermost,omitempty"`
-	RocketChat *RocketChatNotification `json:"rocketchat,omitempty"`
-	Teams      *TeamsNotification      `json:"teams,omitempty"`
-	Webhook    WebhookNotifications    `json:"webhook,omitempty"`
-	Opsgenie   *OpsgenieNotification   `json:"opsgenie,omitempty"`
-	GitHub     *GitHubNotification     `json:"github,omitempty"`
+	Message      string                    `json:"message,omitempty"`
+	Email        *EmailNotification        `json:"email,omitempty"`
+	Slack        *SlackNotification        `json:"slack,omitempty"`
+	Mattermost   *MattermostNotification   `json:"mattermost,omitempty"`
+	RocketChat   *RocketChatNotification   `json:"rocketchat,omitempty"`
+	Teams        *TeamsNotification        `json:"teams,omitempty"`
+	Webhook      WebhookNotifications      `json:"webhook,omitempty"`
+	Opsgenie     *OpsgenieNotification     `json:"opsgenie,omitempty"`
+	GitHub       *GitHubNotification       `json:"github,omitempty"`
+	Alertmanager *AlertmanagerNotification `json:"alertmanager,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -80,6 +81,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 
 	if n.Teams != nil {
 		sources = append(sources, n.Teams)
+	}
+	if n.Alertmanager != nil {
+		sources = append(sources, n.Alertmanager)
 	}
 
 	return n.getTemplater(name, f, sources)
@@ -160,6 +164,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewPushoverService(opts), nil
+	case "alertmanager":
+		var opts AlertmanagerOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewAlertmanagerService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
