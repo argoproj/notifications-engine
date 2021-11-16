@@ -25,18 +25,27 @@ func (s telegramService) Send(notification Notification, dest Destination) error
 		return err
 	}
 
+
 	if strings.HasPrefix(dest.Recipient, "-") {
 		chatID, err := strconv.ParseInt(dest.Recipient, 10, 64)
 		if err != nil {
 			return err
 		}
 
-		_, err = bot.Send(tgbotapi.NewMessage(chatID, notification.Message))
+		// Init message with ParseMode is 'Markdown'
+		msg := tgbotapi.NewMessage(chatID, notification.Message)
+		msg.ParseMode = "Markdown"
+
+		_, err = bot.Send(msg)
 		if err != nil {
 			return err
 		}
 	} else {
-		_, err := bot.Send(tgbotapi.NewMessageToChannel("@"+dest.Recipient, notification.Message))
+		// Init message with ParseMode is 'Markdown'
+		msg := tgbotapi.NewMessageToChannel("@"+dest.Recipient, notification.Message)
+		msg.ParseMode = "Markdown"
+
+		_, err := bot.Send(msg)
 		if err != nil {
 			return err
 		}
