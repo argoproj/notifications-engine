@@ -14,6 +14,7 @@ require (
 	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
 	github.com/golang/mock v1.4.4
 	github.com/google/go-github/v33 v33.0.0
+	github.com/gregdel/pushover v1.1.0
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
 	github.com/mitchellh/copystructure v1.0.0 // indirect
