@@ -6,6 +6,8 @@ import (
 	"testing"
 	"text/template"
 
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,15 +59,17 @@ func TestGetTemplater_Slack(t *testing.T) {
 func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
 	n := Notification{}
 
-	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{})
+	sn, opts, err := buildMessageOptions(n, Destination{}, SlackOptions{})
 	assert.NoError(t, err)
 	assert.Len(t, opts, 1)
+	assert.Empty(t, sn.GroupingKey)
+	assert.Equal(t, slackutil.Post, sn.DeliveryPolicy)
 }
 
 func TestBuildMessageOptionsUsername(t *testing.T) {
 	n := Notification{}
 
-	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Username: "test-username"})
+	_, opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Username: "test-username"})
 	assert.NoError(t, err)
 	assert.Len(t, opts, 2)
 
@@ -78,7 +82,7 @@ func TestBuildMessageOptionsUsername(t *testing.T) {
 func TestBuildMessageOptionsIcon(t *testing.T) {
 	n := Notification{}
 
-	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Icon: ":+1:"})
+	_, opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Icon: ":+1:"})
 	assert.NoError(t, err)
 	assert.Len(t, opts, 2)
 
@@ -86,19 +90,4 @@ func TestBuildMessageOptionsIcon(t *testing.T) {
 
 	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
 	assert.Contains(t, val, "MsgOptionIconEmoji")
-}
-
-func TestBuildMessageOptionsNotifyBroadcast(t *testing.T) {
-	n := Notification{Slack: &SlackNotification{
-		NotifyBroadcast: true,
-	}}
-
-	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{})
-	assert.NoError(t, err)
-	assert.Len(t, opts, 4)
-
-	usernameOption := opts[3]
-
-	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
-	assert.Contains(t, val, "MsgOptionBroadcast")
 }
