@@ -89,6 +89,55 @@ func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
 }
 
+func buildMessageOptions(notification Notification, dest Destination, opts SlackOptions) ([]slack.MsgOption, error) {
+	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
+	if opts.Username != "" {
+		msgOptions = append(msgOptions, slack.MsgOptionUsername(opts.Username))
+	}
+	if opts.Icon != "" {
+		if validIconEmoji.MatchString(opts.Icon) {
+			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(opts.Icon))
+		} else if isValidIconURL(opts.Icon) {
+			msgOptions = append(msgOptions, slack.MsgOptionIconURL(opts.Icon))
+		} else {
+			log.Warnf("Icon reference '%v' is not a valid emoij or url", opts.Icon)
+		}
+	}
+
+	if notification.Slack != nil {
+		attachments := make([]slack.Attachment, 0)
+		if notification.Slack.Attachments != "" {
+			if err := json.Unmarshal([]byte(notification.Slack.Attachments), &attachments); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Slack.Attachments, err)
+			}
+		}
+
+		blocks := slack.Blocks{}
+		if notification.Slack.Blocks != "" {
+			if err := json.Unmarshal([]byte(notification.Slack.Blocks), &blocks); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal blocks '%s' : %v", notification.Slack.Blocks, err)
+			}
+		}
+		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
+	}
+
+	if _, ok := threadTSs[dest.Recipient]; !ok {
+		threadTSs[dest.Recipient] = map[string]string{}
+	}
+
+	if notification.Slack != nil {
+		if notification.Slack.NotifyBroadcast {
+			msgOptions = append(msgOptions, slack.MsgOptionBroadcast())
+		}
+
+		if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; ok && lastTs != "" && notification.Slack.GroupingKey != "" {
+			msgOptions = append(msgOptions, slack.MsgOptionTS(lastTs))
+		}
+	}
+
+	return msgOptions, nil
+}
+
 func (s *slackService) Send(notification Notification, dest Destination) error {
 	apiURL := slack.APIURL
 	if s.opts.ApiURL != "" {
@@ -99,51 +148,13 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
 	}
 	sl := slack.New(s.opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
-	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
-	if s.opts.Username != "" {
-		msgOptions = append(msgOptions, slack.MsgOptionUsername(s.opts.Username))
-	}
-	if s.opts.Icon != "" {
-		if validIconEmoji.MatchString(s.opts.Icon) {
-			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(s.opts.Icon))
-		} else if isValidIconURL(s.opts.Icon) {
-			msgOptions = append(msgOptions, slack.MsgOptionIconURL(s.opts.Icon))
-		} else {
-			log.Warnf("Icon reference '%v' is not a valid emoij or url", s.opts.Icon)
-		}
-	}
 
-	if notification.Slack != nil {
-		attachments := make([]slack.Attachment, 0)
-		if notification.Slack.Attachments != "" {
-			if err := json.Unmarshal([]byte(notification.Slack.Attachments), &attachments); err != nil {
-				return fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Slack.Attachments, err)
-			}
-		}
-
-		blocks := slack.Blocks{}
-		if notification.Slack.Blocks != "" {
-			if err := json.Unmarshal([]byte(notification.Slack.Blocks), &blocks); err != nil {
-				return fmt.Errorf("failed to unmarshal blocks '%s' : %v", notification.Slack.Blocks, err)
-			}
-		}
-		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
-	}
-
-	if _, ok := threadTSs[dest.Recipient]; !ok {
-		threadTSs[dest.Recipient] = map[string]string{}
-	}
-
-	if notification.Slack.NotifyBroadcast {
-		msgOptions = append(msgOptions, slack.MsgOptionBroadcast())
-	}
-
-	if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; ok && lastTs != "" && notification.Slack.GroupingKey != "" {
-		msgOptions = append(msgOptions, slack.MsgOptionTS(lastTs))
+	msgOptions, err := buildMessageOptions(notification, dest, s.opts)
+	if err != nil {
+		return err
 	}
 
 	ctx := context.TODO()
-	var err error
 	for {
 		err = rateLimiter.Wait(ctx)
 		if err != nil {
@@ -157,8 +168,10 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 				break
 			}
 		} else {
-			if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; !ok || lastTs == "" {
-				threadTSs[dest.Recipient][notification.Slack.GroupingKey] = ts
+			if notification.Slack != nil {
+				if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; !ok || lastTs == "" {
+					threadTSs[dest.Recipient][notification.Slack.GroupingKey] = ts
+				}
 			}
 			// No error, so remove rate limit
 			rateLimiter.SetLimit(rate.Inf)

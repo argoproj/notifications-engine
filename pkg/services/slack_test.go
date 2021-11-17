@@ -51,3 +51,11 @@ func TestGetTemplater_Slack(t *testing.T) {
 	assert.Equal(t, "hello-world", notification.Slack.GroupingKey)
 	assert.Equal(t, true, notification.Slack.NotifyBroadcast)
 }
+
+func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
+	n := Notification{}
+
+	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 1)
+}
