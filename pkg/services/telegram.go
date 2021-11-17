@@ -25,7 +25,6 @@ func (s telegramService) Send(notification Notification, dest Destination) error
 		return err
 	}
 
-
 	if strings.HasPrefix(dest.Recipient, "-") {
 		chatID, err := strconv.ParseInt(dest.Recipient, 10, 64)
 		if err != nil {
