@@ -1,6 +1,8 @@
 package services
 
 import (
+	"reflect"
+	"runtime"
 	"testing"
 	"text/template"
 
@@ -50,4 +52,53 @@ func TestGetTemplater_Slack(t *testing.T) {
 	assert.Equal(t, "world", notification.Slack.Blocks)
 	assert.Equal(t, "hello-world", notification.Slack.GroupingKey)
 	assert.Equal(t, true, notification.Slack.NotifyBroadcast)
+}
+
+func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
+	n := Notification{}
+
+	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 1)
+}
+
+func TestBuildMessageOptionsUsername(t *testing.T) {
+	n := Notification{}
+
+	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Username: "test-username"})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 2)
+
+	usernameOption := opts[1]
+
+	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
+	assert.Contains(t, val, "MsgOptionUsername")
+}
+
+func TestBuildMessageOptionsIcon(t *testing.T) {
+	n := Notification{}
+
+	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Icon: ":+1:"})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 2)
+
+	usernameOption := opts[1]
+
+	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
+	assert.Contains(t, val, "MsgOptionIconEmoji")
+}
+
+func TestBuildMessageOptionsNotifyBroadcast(t *testing.T) {
+	n := Notification{Slack: &SlackNotification{
+		NotifyBroadcast: true,
+	}}
+
+	opts, err := buildMessageOptions(n, Destination{}, SlackOptions{})
+	assert.NoError(t, err)
+	assert.Len(t, opts, 4)
+
+	usernameOption := opts[3]
+
+	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
+	assert.Contains(t, val, "MsgOptionBroadcast")
 }
