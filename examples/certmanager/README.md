@@ -100,11 +100,30 @@ kubectl create secret generic cert-manager-notification-secret --from-literal sl
 Finally annotate the certificate to subscribe to the `on-cert-ready` trigger and get the notification:
 
 ```yaml
+cat <<EOF | kubectl apply -f -
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}
+---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
+  name: notification-test
   annotations:
     notifications.argoproj.io/subscribe.on-cert-ready.slack: <CHANNEL>
+spec:
+  dnsNames:
+    - notification.test
+  duration: 438000h0m0s
+  issuerRef:
+    kind: Issuer
+    name: selfsigned-issuer
+  renewBefore: 4320h0m0s
+  secretName: notification-test
+EOF
 ```
 
 ## Debugging Tools
