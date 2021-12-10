@@ -11,7 +11,7 @@ require (
 	github.com/bradleyfalzon/ghinstallation v1.1.1
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v0.3.0 // indirect
-	github.com/go-telegram-bot-api/telegram-bot-api v4.6.4+incompatible
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.4.0
 	github.com/golang/mock v1.4.4
 	github.com/google/go-github/v33 v33.0.0
 	github.com/gregdel/pushover v1.1.0
@@ -24,7 +24,6 @@ require (
 	github.com/slack-go/slack v0.6.6
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.6.1
-	github.com/technoweenie/multipartstreamer v1.0.1 // indirect
 	github.com/whilp/git-urls v0.0.0-20191001220047-6db9661140c0
 	golang.org/x/time v0.0.0-20210220033141-f8bda1e9f3ba
 	gomodules.xyz/notify v0.1.0
