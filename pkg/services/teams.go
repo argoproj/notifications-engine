@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	texttemplate "text/template"
 
 	log "github.com/sirupsen/logrus"
@@ -151,7 +152,13 @@ func NewTeamsService(opts TeamsOptions) NotificationService {
 }
 
 func (s teamsService) Send(notification Notification, dest Destination) error {
-	webhookUrl, ok := s.opts.RecipientUrls[dest.Recipient]
+
+	_, err := url.ParseRequestURI(dest.Recipient)
+	webhookUrl := dest.Recipient
+	ok := true
+	if err != nil {
+		webhookUrl, ok = s.opts.RecipientUrls[dest.Recipient]
+	}
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}

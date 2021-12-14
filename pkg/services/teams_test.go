@@ -89,6 +89,40 @@ func TestTeams_DefaultMessage(t *testing.T) {
 	assert.Equal(t, receivedBody.Text, notification.Message)
 }
 
+func TestTeams_MessageToURLSubscriber(t *testing.T) {
+	var receivedBody teamsMessage
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		data, err := ioutil.ReadAll(request.Body)
+		assert.NoError(t, err)
+
+		err = json.Unmarshal(data, &receivedBody)
+		assert.NoError(t, err)
+
+		_, err = writer.Write([]byte("1"))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{},
+	})
+
+	notification := Notification{
+		Message: "simple message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: server.URL,
+			Service:   "",
+		},
+	)
+
+	assert.NoError(t, err)
+
+	assert.Equal(t, receivedBody.Text, notification.Message)
+}
+
 func TestTeams_TemplateMessage(t *testing.T) {
 	var receivedBody string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {

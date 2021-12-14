@@ -44,6 +44,17 @@ metadata:
     notifications.argoproj.io/subscribe.on-sync-succeeded.teams: channelName
 ```
 
+Alternatively you can define teams url straight into subscription annotation
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.teams: https://example.com
+```
+
+
 ## Templates
 
 ![](https://user-images.githubusercontent.com/18019529/114271500-9d2b8880-9a4c-11eb-85c1-f6935f0431d5.png)
