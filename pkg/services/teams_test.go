@@ -104,7 +104,8 @@ func TestTeams_MessageToURLSubscriber(t *testing.T) {
 	defer server.Close()
 
 	service := NewTeamsService(TeamsOptions{
-		RecipientUrls: map[string]string{},
+		RecipientUrls:         map[string]string{},
+		AnnotationUrlsAllowed: true,
 	})
 
 	notification := Notification{

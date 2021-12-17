@@ -140,7 +140,8 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type TeamsOptions struct {
-	RecipientUrls map[string]string `json:"recipientUrls"`
+	RecipientUrls         map[string]string `json:"recipientUrls"`
+	AnnotationUrlsAllowed bool              `json:"annotationUrlsAllowed"`
 }
 
 type teamsService struct {
@@ -153,12 +154,17 @@ func NewTeamsService(opts TeamsOptions) NotificationService {
 
 func (s teamsService) Send(notification Notification, dest Destination) error {
 
-	_, err := url.ParseRequestURI(dest.Recipient)
-	webhookUrl := dest.Recipient
-	ok := true
-	if err != nil {
-		webhookUrl, ok = s.opts.RecipientUrls[dest.Recipient]
+	webhookUrl, ok := s.opts.RecipientUrls[dest.Recipient]
+
+	if s.opts.AnnotationUrlsAllowed && !ok {
+		_, err := url.ParseRequestURI(dest.Recipient)
+
+		if err == nil {
+			ok = true
+			webhookUrl = dest.Recipient
+		}
 	}
+
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}

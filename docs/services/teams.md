@@ -23,6 +23,7 @@ data:
   service.teams: |
     recipientUrls:
       channelName: $channel-teams-url
+      AnnotationUrlsAllowed: false
 ```
 
 ```yaml
@@ -44,7 +45,7 @@ metadata:
     notifications.argoproj.io/subscribe.on-sync-succeeded.teams: channelName
 ```
 
-Alternatively you can define teams url straight into subscription annotation
+Alternatively you can define teams url straight into subscription annotation, this feature should be enabled separetely in teams service config
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
