@@ -10,8 +10,8 @@ import (
 	texttemplate "text/template"
 	"unicode/utf8"
 
-	"github.com/bradleyfalzon/ghinstallation"
-	"github.com/google/go-github/v33/github"
+	"github.com/bradleyfalzon/ghinstallation/v2"
+	"github.com/google/go-github/v41/github"
 	log "github.com/sirupsen/logrus"
 	giturls "github.com/whilp/git-urls"
 
