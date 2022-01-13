@@ -8,12 +8,12 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/RocketChat/Rocket.Chat.Go.SDK v0.0.0-20210112200207-10ab4d695d60
 	github.com/antonmedv/expr v1.8.9
-	github.com/bradleyfalzon/ghinstallation v1.1.1
+	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-logr/logr v0.3.0 // indirect
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.4.0
 	github.com/golang/mock v1.4.4
-	github.com/google/go-github/v33 v33.0.0
+	github.com/google/go-github/v41 v41.0.0
 	github.com/gregdel/pushover v1.1.0
 	github.com/huandu/xstrings v1.3.0 // indirect
 	github.com/imdario/mergo v0.3.8 // indirect
