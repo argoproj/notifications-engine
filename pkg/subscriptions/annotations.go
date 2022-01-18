@@ -38,26 +38,36 @@ func NewAnnotations(annotations map[string]string) Annotations {
 
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := AnnotationPrefix + "/subscribe."
+	var recipients []string
 	for k, v := range a {
 		if !strings.HasPrefix(k, prefix) {
 			continue
 		}
 		parts := strings.Split(k[len(prefix):], ".")
-		trigger := parts[0]
+		triggers := parts[0]
 		service := ""
+		triggerList := strings.Split(triggers, ",")
 		if len(parts) >= 2 {
 			service = parts[1]
+			for _, trigger := range triggerList {
+				if v == "" {
+					recipients = []string{""}
+				} else {
+					recipients = parseRecipients(v)
+				}
+				callback(trigger, service, recipients, k)
+			}
 		} else {
 			service = parts[0]
-			trigger = ""
+			trigger := ""
+			if v == "" {
+				recipients = []string{""}
+			} else {
+				recipients = parseRecipients(v)
+			}
+			callback(trigger, service, recipients, k)
 		}
-		var recipients []string
-		if v == "" {
-			recipients = []string{""}
-		} else {
-			recipients = parseRecipients(v)
-		}
-		callback(trigger, service, recipients, k)
+
 	}
 }
 

@@ -19,7 +19,7 @@ func TestNewAnnotations(t *testing.T) {
 func TestIterate(t *testing.T) {
 	tests := []struct {
 		annotations map[string]string
-		trigger     string
+		triggerList []string
 		service     string
 		recipients  []string
 		key         string
@@ -28,38 +28,53 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
 			},
-			trigger:    "my-trigger",
-			service:    "slack",
-			recipients: []string{"my-channel"},
-			key:        "notifications.argoproj.io/subscribe.my-trigger.slack",
+			triggerList: []string{"my-trigger"},
+			service:     "slack",
+			recipients:  []string{"my-channel"},
+			key:         "notifications.argoproj.io/subscribe.my-trigger.slack",
 		},
 		{
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe..slack": "my-channel",
 			},
-			trigger:    "",
-			service:    "slack",
-			recipients: []string{"my-channel"},
-			key:        "notifications.argoproj.io/subscribe..slack",
+			triggerList: []string{},
+			service:     "slack",
+			recipients:  []string{"my-channel"},
+			key:         "notifications.argoproj.io/subscribe..slack",
 		},
 		{
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.slack": "my-channel",
 			},
-			trigger:    "",
-			service:    "slack",
-			recipients: []string{"my-channel"},
-			key:        "notifications.argoproj.io/subscribe.slack",
+			triggerList: []string{},
+			service:     "slack",
+			recipients:  []string{"my-channel"},
+			key:         "notifications.argoproj.io/subscribe.slack",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscribe.my-trigger,my-trigger-2,my-trigger-3.slack": "my-channel",
+			},
+			triggerList: []string{"my-trigger", "my-trigger-2", "my-trigger-3"},
+			service:     "slack",
+			recipients:  []string{"my-channel"},
+			key:         "notifications.argoproj.io/subscribe.my-trigger,my-trigger-2,my-trigger-3.slack",
 		},
 	}
 
 	for _, tt := range tests {
 		a := Annotations(tt.annotations)
 		a.iterate(func(trigger, service string, recipients []string, key string) {
-			assert.Equal(t, tt.trigger, trigger)
-			assert.Equal(t, tt.service, service)
-			assert.Equal(t, tt.recipients, recipients)
-			assert.Equal(t, tt.key, key)
+			for _, v := range tt.triggerList {
+				if trigger == v {
+					assert.Equal(t, v, trigger)
+					assert.Equal(t, tt.service, service)
+					assert.Equal(t, tt.recipients, recipients)
+					assert.Equal(t, tt.key, key)
+				} else {
+					continue
+				}
+			}
 		})
 	}
 }
