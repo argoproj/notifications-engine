@@ -18,3 +18,8 @@ tools:
 .PHONY: generate
 generate: tools
 	go generate ./...
+
+.PHONY: trivy
+trivy:
+	@trivy fs --clear-cache
+	@trivy fs .
