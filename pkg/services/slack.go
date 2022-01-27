@@ -107,7 +107,6 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 			log.Warnf("Icon reference '%v' is not a valid emoij or url", opts.Icon)
 		}
 	}
-
 	if notification.Slack != nil {
 		attachments := make([]slack.Attachment, 0)
 		if notification.Slack.Attachments != "" {

@@ -21,7 +21,7 @@ require (
 	github.com/opsgenie/opsgenie-go-sdk-v2 v1.0.5
 	github.com/prometheus/client_golang v0.9.3
 	github.com/sirupsen/logrus v1.6.0
-	github.com/slack-go/slack v0.6.6
+	github.com/slack-go/slack v0.10.1
 	github.com/spf13/cobra v1.1.3
 	github.com/stretchr/testify v1.6.1
 	github.com/whilp/git-urls v0.0.0-20191001220047-6db9661140c0
