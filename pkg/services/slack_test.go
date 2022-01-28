@@ -1,8 +1,6 @@
 package services
 
 import (
-	"reflect"
-	"runtime"
 	"testing"
 	"text/template"
 
@@ -64,30 +62,4 @@ func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
 	assert.Len(t, opts, 1)
 	assert.Empty(t, sn.GroupingKey)
 	assert.Equal(t, slackutil.Post, sn.DeliveryPolicy)
-}
-
-func TestBuildMessageOptionsUsername(t *testing.T) {
-	n := Notification{}
-
-	_, opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Username: "test-username"})
-	assert.NoError(t, err)
-	assert.Len(t, opts, 2)
-
-	usernameOption := opts[1]
-
-	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
-	assert.Contains(t, val, "MsgOptionUsername")
-}
-
-func TestBuildMessageOptionsIcon(t *testing.T) {
-	n := Notification{}
-
-	_, opts, err := buildMessageOptions(n, Destination{}, SlackOptions{Icon: ":+1:"})
-	assert.NoError(t, err)
-	assert.Len(t, opts, 2)
-
-	usernameOption := opts[1]
-
-	val := runtime.FuncForPC(reflect.ValueOf(usernameOption).Pointer()).Name()
-	assert.Contains(t, val, "MsgOptionIconEmoji")
 }
