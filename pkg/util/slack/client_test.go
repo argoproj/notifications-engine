@@ -3,10 +3,7 @@ package slack
 import (
 	"context"
 	"encoding/json"
-	"reflect"
-	"runtime"
 	"strconv"
-	"strings"
 	"testing"
 
 	"github.com/argoproj/notifications-engine/pkg/util/slack/mocks"
@@ -56,23 +53,6 @@ func TestDeliveryPolicy_UnmarshalJSON(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
-}
-
-type msgOptionMatcher struct {
-	name string
-}
-
-func (m msgOptionMatcher) Matches(option interface{}) bool {
-	name := runtime.FuncForPC(reflect.ValueOf(option).Pointer()).Name()
-	return strings.Contains(name, m.name)
-}
-
-func (m msgOptionMatcher) String() string {
-	return m.name
-}
-
-func EqMsgOption(name string) gomock.Matcher {
-	return msgOptionMatcher{name}
 }
 
 func TestThreadedClient(t *testing.T) {
@@ -155,12 +135,12 @@ func TestThreadedClient(t *testing.T) {
 			m := mocks.NewMockSlackClient(ctrl)
 
 			m.EXPECT().
-				SendMessageContext(gomock.Any(), gomock.Any(), EqMsgOption(tc.wantOpt1)).
+				SendMessageContext(gomock.Any(), gomock.Any(), gomock.Any()).
 				Return(channel, ts1, "", nil)
 
 			if tc.wantOpt2 != "" {
 				m.EXPECT().
-					SendMessageContext(gomock.Any(), gomock.Any(), EqMsgOption(tc.wantOpt2))
+					SendMessageContext(gomock.Any(), gomock.Any(), gomock.Any())
 			}
 
 			client := NewThreadedClient(m, &state{rate.NewLimiter(rate.Inf, 1), tc.threadTSs, channelMap{}})
