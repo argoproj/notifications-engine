@@ -94,8 +94,8 @@ headers:
 
 	expected := `url: https://example.com
 headers:
-  - name: Authorization
-    value: Bearer token
+    - name: Authorization
+      value: Bearer token
 `
 
 	result, err := replaceServiceConfigSecrets(input, &secrets)
