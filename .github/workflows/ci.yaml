@@ -33,7 +33,7 @@ jobs:
             ${{ runner.os }}-go-
       - uses: actions/setup-go@v1
         with:
-          go-version: '1.16.2'
+          go-version: '1.17.3'
       - name: Add ~/go/bin to PATH
         run: |
           echo "/home/runner/go/bin" >> $GITHUB_PATH
