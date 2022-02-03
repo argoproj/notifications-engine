@@ -2,9 +2,10 @@ package subscriptions
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
-	"strings"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
