@@ -62,4 +62,8 @@ func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
 	assert.Len(t, opts, 1)
 	assert.Empty(t, sn.GroupingKey)
 	assert.Equal(t, slackutil.Post, sn.DeliveryPolicy)
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> ac48363 (chore: drop reflection based slack client tests (#74))
