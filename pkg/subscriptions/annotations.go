@@ -39,13 +39,13 @@ func NewAnnotations(annotations map[string]string) Annotations {
 }
 
 type Subscription struct {
-	Trigger []string
+	Trigger      []string
 	Destinations []Destination
 }
 
 // Destination holds notification destination details
 type Destination struct {
-	Service   string `json:"service"`
+	Service    string   `json:"service"`
 	Recipients []string `json:"recipients"`
 }
 
@@ -79,7 +79,7 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 				log.Errorf("error: %v", err)
 				callback("", "", recipients, k)
 			}
-			for _,v := range subscriptions {
+			for _, v := range subscriptions {
 				if len(v.Trigger) == 0 {
 					log.Printf("Triggers are not configured")
 				}
@@ -88,7 +88,7 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 				}
 				triggers := v.Trigger
 				destinations := v.Destinations
-				for _,trigger := range triggers{
+				for _, trigger := range triggers {
 					for _, destination := range destinations {
 						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
 						callback(trigger, destination.Service, destination.Recipients, k)
