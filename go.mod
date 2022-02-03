@@ -21,9 +21,14 @@ require (
 	github.com/prometheus/client_golang v1.4.0
 	github.com/sirupsen/logrus v1.6.0
 	github.com/slack-go/slack v0.10.1
+<<<<<<< HEAD
 	github.com/spf13/cobra v1.3.0
 	github.com/stretchr/objx v0.2.0 // indirect
 	github.com/stretchr/testify v1.7.0
+=======
+	github.com/spf13/cobra v1.1.3
+	github.com/stretchr/testify v1.6.1
+>>>>>>> 91deed2 (feat: update slack version to latest (#68))
 	github.com/whilp/git-urls v0.0.0-20191001220047-6db9661140c0
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gomodules.xyz/notify v0.1.0
