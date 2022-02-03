@@ -17,6 +17,18 @@ var data = `
        - recipient-2
 `
 
+var data_without_trigger = `
+ - trigger: []
+   destinations:
+    - service: slack
+      recipients:
+       - recipient-1
+       - recipient-2
+`
+var data_without_destinations = `
+ - trigger: [my-trigger1, my-trigger2, my-trigger3]
+`
+
 func TestNewAnnotations(t *testing.T) {
 	a := NewAnnotations(map[string]string{})
 	assert.NotNil(t, a)
@@ -68,6 +80,42 @@ func TestIterate(t *testing.T) {
 			service:    []string{"slack"},
 			recipients: []string{"recipient-1", "recipient-2"},
 			key:        "notifications.argoproj.io/subscribe_yaml",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscribe_yaml": data_without_trigger,
+			},
+			triggers:   []string{},
+			service:    []string{"slack"},
+			recipients: []string{"recipient-1", "recipient-2"},
+			key:        "notifications.argoproj.io/subscribe_yaml",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscribe_yaml": data_without_destinations,
+			},
+			triggers:   []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
+			service:    []string{},
+			recipients: []string{},
+			key:        "notifications.argoproj.io/subscribe_yaml",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/random": "my-channel",
+			},
+			triggers:   []string{},
+			service:    []string{},
+			recipients: []string{"my-channel"},
+			key:        "notifications.argoproj.io/random",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/random": "",
+			},
+			triggers:   []string{},
+			service:    []string{},
+			recipients: []string{},
+			key:        "notifications.argoproj.io/random",
 		},
 	}
 

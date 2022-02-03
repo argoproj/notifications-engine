@@ -74,25 +74,48 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 			callback(trigger, service, recipients, k)
 		case strings.HasPrefix(k, altPrefix):
 			var subscriptions []Subscription
-			source := []byte(v)
+			var source []byte
+			if v != "" {
+				source = []byte(v)
+			} else {
+				log.Errorf("Subscription is not defined")
+				callback("", "", recipients, k)
+			}
 			err := yaml.Unmarshal(source, &subscriptions)
 			if err != nil {
-				log.Errorf("error: %v", err)
+				log.Errorf("Notification subscription unrmashal error: %v", err)
 				callback("", "", recipients, k)
 			}
 			for _, v := range subscriptions {
-				if len(v.Trigger) == 0 {
-					log.Printf("Triggers are not configured")
-				}
-				if len(v.Destinations) == 0 {
-					log.Printf("Destinaitons are not configured")
-				}
 				triggers := v.Trigger
 				destinations := v.Destinations
-				for _, trigger := range triggers {
+				if len(triggers) == 0 && len(destinations) == 0 {
+					trigger := ""
+					destination := ""
+					recipients = []string{}
+					log.Printf("Notification triggers and destinations are not configured")
+					callback(trigger, destination, recipients, k)
+				} else if len(triggers) == 0 && len(destinations) != 0 {
+					trigger := ""
+					log.Printf("Notification triggers are not configured")
 					for _, destination := range destinations {
 						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
 						callback(trigger, destination.Service, destination.Recipients, k)
+					}
+				} else if len(triggers) != 0 && len(destinations) == 0 {
+					service := ""
+					recipients = []string{}
+					log.Printf("Notification destinations are not configured")
+					for _, trigger := range triggers {
+						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, service, recipients)
+						callback(trigger, service, recipients, k)
+					}
+				} else {
+					for _, trigger := range triggers {
+						for _, destination := range destinations {
+							log.Printf("Notification trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
+							callback(trigger, destination.Service, destination.Recipients, k)
+						}
 					}
 				}
 			}
