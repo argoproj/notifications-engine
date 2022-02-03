@@ -2,6 +2,8 @@ package subscriptions
 
 import (
 	"fmt"
+	"github.com/ghodss/yaml"
+	log "github.com/sirupsen/logrus"
 	"strings"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
@@ -36,38 +38,66 @@ func NewAnnotations(annotations map[string]string) Annotations {
 	return Annotations(annotations)
 }
 
+type Subscription struct {
+	Trigger []string
+	Destinations []Destination
+}
+
+// Destination holds notification destination details
+type Destination struct {
+	Service   string `json:"service"`
+	Recipients []string `json:"recipients"`
+}
+
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := AnnotationPrefix + "/subscribe."
+	altPrefix := AnnotationPrefix + "/subscribe_yaml"
 	var recipients []string
 	for k, v := range a {
-		if !strings.HasPrefix(k, prefix) {
-			continue
-		}
-		parts := strings.Split(k[len(prefix):], ".")
-		triggers := parts[0]
-		service := ""
-		triggerList := strings.Split(triggers, ",")
-		if len(parts) >= 2 {
-			service = parts[1]
-			for _, trigger := range triggerList {
-				if v == "" {
-					recipients = []string{""}
-				} else {
-					recipients = parseRecipients(v)
-				}
-				callback(trigger, service, recipients, k)
+		switch {
+		case strings.HasPrefix(k, prefix):
+			parts := strings.Split(k[len(prefix):], ".")
+			trigger := parts[0]
+			service := ""
+			if len(parts) >= 2 {
+				service = parts[1]
+			} else {
+				service = parts[0]
+				trigger = ""
 			}
-		} else {
-			service = parts[0]
-			trigger := ""
 			if v == "" {
 				recipients = []string{""}
 			} else {
 				recipients = parseRecipients(v)
 			}
 			callback(trigger, service, recipients, k)
+		case strings.HasPrefix(k, altPrefix):
+			var subscriptions []Subscription
+			source := []byte(v)
+			err := yaml.Unmarshal(source, &subscriptions)
+			if err != nil {
+				log.Errorf("error: %v", err)
+				callback("", "", recipients, k)
+			}
+			for _,v := range subscriptions {
+				if len(v.Trigger) == 0 {
+					log.Printf("Triggers are not configured")
+				}
+				if len(v.Destinations) == 0 {
+					log.Printf("Destinaitons are not configured")
+				}
+				triggers := v.Trigger
+				destinations := v.Destinations
+				for _,trigger := range triggers{
+					for _, destination := range destinations {
+						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
+						callback(trigger, destination.Service, destination.Recipients, k)
+					}
+				}
+			}
+		default:
+			callback("", "", recipients, k)
 		}
-
 	}
 }
 

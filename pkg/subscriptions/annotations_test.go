@@ -7,6 +7,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+var data = `
+ - trigger: [my-trigger1, my-trigger2, my-trigger3]
+   destinations:
+    - service: slack
+      recipients:
+       - recipient-1
+       - recipient-2
+`
 
 func TestNewAnnotations(t *testing.T) {
 	a := NewAnnotations(map[string]string{})
@@ -19,8 +27,8 @@ func TestNewAnnotations(t *testing.T) {
 func TestIterate(t *testing.T) {
 	tests := []struct {
 		annotations map[string]string
-		triggerList []string
-		service     string
+		triggers    []string
+		service     []string
 		recipients  []string
 		key         string
 	}{
@@ -28,8 +36,8 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
 			},
-			triggerList: []string{"my-trigger"},
-			service:     "slack",
+			triggers: []string{"my-trigger"},
+			service:     []string{"slack"},
 			recipients:  []string{"my-channel"},
 			key:         "notifications.argoproj.io/subscribe.my-trigger.slack",
 		},
@@ -37,8 +45,8 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe..slack": "my-channel",
 			},
-			triggerList: []string{},
-			service:     "slack",
+			triggers: []string{},
+			service:     []string{"slack"},
 			recipients:  []string{"my-channel"},
 			key:         "notifications.argoproj.io/subscribe..slack",
 		},
@@ -46,33 +54,35 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.slack": "my-channel",
 			},
-			triggerList: []string{},
-			service:     "slack",
+			triggers: []string{},
+			service:     []string{"slack"},
 			recipients:  []string{"my-channel"},
 			key:         "notifications.argoproj.io/subscribe.slack",
 		},
 		{
 			annotations: map[string]string{
-				"notifications.argoproj.io/subscribe.my-trigger,my-trigger-2,my-trigger-3.slack": "my-channel",
+				"notifications.argoproj.io/subscribe_yaml": data,
 			},
-			triggerList: []string{"my-trigger", "my-trigger-2", "my-trigger-3"},
-			service:     "slack",
-			recipients:  []string{"my-channel"},
-			key:         "notifications.argoproj.io/subscribe.my-trigger,my-trigger-2,my-trigger-3.slack",
+			triggers: []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
+			service:     []string{"slack"},
+			recipients:  []string{"recipient-1","recipient-2"},
+			key:         "notifications.argoproj.io/subscribe_yaml",
 		},
 	}
 
 	for _, tt := range tests {
 		a := Annotations(tt.annotations)
 		a.iterate(func(trigger, service string, recipients []string, key string) {
-			for _, v := range tt.triggerList {
-				if trigger == v {
-					assert.Equal(t, v, trigger)
-					assert.Equal(t, tt.service, service)
-					assert.Equal(t, tt.recipients, recipients)
-					assert.Equal(t, tt.key, key)
-				} else {
-					continue
+			for _, v := range tt.triggers {
+				for _, serv := range tt.service {
+					if trigger == v {
+						assert.Equal(t, v, trigger)
+						assert.Equal(t, serv, service)
+						assert.Equal(t, tt.recipients, recipients)
+						assert.Equal(t, tt.key, key)
+					} else {
+						continue
+					}
 				}
 			}
 		})
