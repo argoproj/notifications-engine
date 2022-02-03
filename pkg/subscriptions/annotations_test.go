@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 )
+
 var data = `
  - trigger: [my-trigger1, my-trigger2, my-trigger3]
    destinations:
@@ -36,37 +37,37 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
 			},
-			triggers: []string{"my-trigger"},
-			service:     []string{"slack"},
-			recipients:  []string{"my-channel"},
-			key:         "notifications.argoproj.io/subscribe.my-trigger.slack",
+			triggers:   []string{"my-trigger"},
+			service:    []string{"slack"},
+			recipients: []string{"my-channel"},
+			key:        "notifications.argoproj.io/subscribe.my-trigger.slack",
 		},
 		{
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe..slack": "my-channel",
 			},
-			triggers: []string{},
-			service:     []string{"slack"},
-			recipients:  []string{"my-channel"},
-			key:         "notifications.argoproj.io/subscribe..slack",
+			triggers:   []string{},
+			service:    []string{"slack"},
+			recipients: []string{"my-channel"},
+			key:        "notifications.argoproj.io/subscribe..slack",
 		},
 		{
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.slack": "my-channel",
 			},
-			triggers: []string{},
-			service:     []string{"slack"},
-			recipients:  []string{"my-channel"},
-			key:         "notifications.argoproj.io/subscribe.slack",
+			triggers:   []string{},
+			service:    []string{"slack"},
+			recipients: []string{"my-channel"},
+			key:        "notifications.argoproj.io/subscribe.slack",
 		},
 		{
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe_yaml": data,
 			},
-			triggers: []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
-			service:     []string{"slack"},
-			recipients:  []string{"recipient-1","recipient-2"},
-			key:         "notifications.argoproj.io/subscribe_yaml",
+			triggers:   []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
+			service:    []string{"slack"},
+			recipients: []string{"recipient-1", "recipient-2"},
+			key:        "notifications.argoproj.io/subscribe_yaml",
 		},
 	}
 
