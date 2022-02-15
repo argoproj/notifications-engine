@@ -74,30 +74,30 @@ func TestIterate(t *testing.T) {
 		},
 		{
 			annotations: map[string]string{
-				"notifications.argoproj.io/subscribe_yaml": data,
+				"notifications.argoproj.io/subscriptions": data,
 			},
 			triggers:   []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
 			service:    []string{"slack"},
 			recipients: []string{"recipient-1", "recipient-2"},
-			key:        "notifications.argoproj.io/subscribe_yaml",
+			key:        "notifications.argoproj.io/subscriptions",
 		},
 		{
 			annotations: map[string]string{
-				"notifications.argoproj.io/subscribe_yaml": data_without_trigger,
+				"notifications.argoproj.io/subscriptions": data_without_trigger,
 			},
 			triggers:   []string{},
 			service:    []string{"slack"},
 			recipients: []string{"recipient-1", "recipient-2"},
-			key:        "notifications.argoproj.io/subscribe_yaml",
+			key:        "notifications.argoproj.io/subscriptions",
 		},
 		{
 			annotations: map[string]string{
-				"notifications.argoproj.io/subscribe_yaml": data_without_destinations,
+				"notifications.argoproj.io/subscriptions": data_without_destinations,
 			},
 			triggers:   []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
 			service:    []string{},
 			recipients: []string{},
-			key:        "notifications.argoproj.io/subscribe_yaml",
+			key:        "notifications.argoproj.io/subscriptions",
 		},
 		{
 			annotations: map[string]string{

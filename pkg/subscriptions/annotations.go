@@ -52,7 +52,7 @@ type Destination struct {
 
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := AnnotationPrefix + "/subscribe."
-	altPrefix := AnnotationPrefix + "/subscribe_yaml"
+	altPrefix := AnnotationPrefix + "/subscriptions"
 	var recipients []string
 	for k, v := range a {
 		switch {
