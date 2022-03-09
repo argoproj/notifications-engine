@@ -17,13 +17,13 @@ type PagerDutyNotification struct {
 }
 
 type PagerdutyOptions struct {
-	Token              string `json:"token"`
-	From               string `json:"from,omitempty"`
-	ServiceID          string `json:"serviceID"`
-	EscalationPolicyID string `json:"escalationPolicyID,omitempty"`
+	Token              string   `json:"token"`
+	From               string   `json:"from,omitempty"`
+	ServiceID          string   `json:"serviceID"`
+	EscalationPolicyID string   `json:"escalationPolicyID,omitempty"`
 	Assignments        []string `json:"assignments,omitempty"`
-	ConferenceNumber   string `json:"conferenceBridgeNumber,omitempty"`
-	ConferenceUrl      string `json:"conferenceBridgeUrl,omitempty"`
+	ConferenceNumber   string   `json:"conferenceBridgeNumber,omitempty"`
+	ConferenceUrl      string   `json:"conferenceBridgeUrl,omitempty"`
 }
 
 func (p *PagerDutyNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -95,12 +95,12 @@ func (p pagerdutyService) Send(notification Notification, dest Destination) erro
 
 	if p.opts.EscalationPolicyID != "" {
 		input1 = &pagerduty.CreateIncidentOptions{
-			Type:             "incident",
-			Service:          &pagerduty.APIReference{ID: p.opts.ServiceID, Type: "service_reference"},
-			Priority:         &pagerduty.APIReference{ID: PriorityID, Type: "priority"},
-			Title:            Title,
-			Urgency:          Urgency,
-			Body:             &pagerduty.APIDetails{Type: "incident_details	", Details: Body},
+			Type:     "incident",
+			Service:  &pagerduty.APIReference{ID: p.opts.ServiceID, Type: "service_reference"},
+			Priority: &pagerduty.APIReference{ID: PriorityID, Type: "priority"},
+			Title:    Title,
+			Urgency:  Urgency,
+			Body: &pagerduty.APIDetails{Type: "incident_details	", Details: Body},
 			EscalationPolicy: &pagerduty.APIReference{Type: "escalation_policy_reference", ID: p.opts.EscalationPolicyID},
 			ConferenceBridge: &pagerduty.ConferenceBridge{ConferenceNumber: p.opts.ConferenceNumber, ConferenceURL: p.opts.ConferenceUrl},
 		}
@@ -108,7 +108,7 @@ func (p pagerdutyService) Send(notification Notification, dest Destination) erro
 		var Assignees []pagerduty.Assignee
 		for _, i := range p.opts.Assignments {
 			Assignees = append(Assignees, pagerduty.Assignee{Assignee: pagerduty.APIObject{
-				ID: i,
+				ID:   i,
 				Type: "user_reference",
 			}})
 		}
@@ -132,4 +132,3 @@ func (p pagerdutyService) Send(notification Notification, dest Destination) erro
 	log.Infof("Incident Number: %v, IncidentKey:%v, incident.ID: %v, incident.Title: %v", incident.IncidentNumber, incident.IncidentKey, incident.ID, incident.Title)
 	return nil
 }
-

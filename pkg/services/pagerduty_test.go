@@ -1,18 +1,17 @@
 package services
 
 import (
-	_ "github.com/golang/mock/mockgen/model"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"text/template"
 
+	_ "github.com/golang/mock/mockgen/model"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestGetTemplater_PagerDuty(t *testing.T) {
 	n := Notification{
 		Pagerduty: &PagerDutyNotification{
 			Title: "{{.title}}", Body: "{{.body}}", Urgency: "{{.urg}}", PriorityID: "{{.prid}}",
-
 		},
 	}
 
@@ -25,9 +24,9 @@ func TestGetTemplater_PagerDuty(t *testing.T) {
 
 	err = templater(&notification, map[string]interface{}{
 		"title": "hello",
-		"body": "world",
-		"urg": "high",
-		"prid": "PE456Y",
+		"body":  "world",
+		"urg":   "high",
+		"prid":  "PE456Y",
 	})
 
 	if !assert.NoError(t, err) {
