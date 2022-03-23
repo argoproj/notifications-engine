@@ -63,7 +63,7 @@ func newResource(name string, modifiers ...func(app *unstructured.Unstructured))
 	return &app
 }
 
-func newController(t *testing.T, ctx context.Context, client dynamic.Interface) (*notificationController, *mocks.MockAPI, error) {
+func newController(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, *mocks.MockAPI, error) {
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -88,7 +88,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface) 
 
 	go informer.Run(ctx.Done())
 
-	c := NewController(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI})
+	c := NewController(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, nil, errors.New("failed to sync informers")
 	}
@@ -116,20 +116,23 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	annotations, err := ctrl.processResource(app, logEntry)
 
 	assert.NoError(t, err)
+	assert.Contains(t, annotations, NotifiedAnnotationKey)
+	assert.Contains(t, annotations, ServiceAnnotationKey)
 
-	state := NewState(annotations[NotifiedAnnotationKey])
-	assert.NotNil(t, state[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
+	state := NewStateFromRes(app)
+	assert.NotNil(t, state.NotifiedState[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
 
 func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
-	state := NotificationsState{}
+	state := emptyNotificationsState()
 	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-		NotifiedAnnotationKey: mustToJson(state),
+		NotifiedAnnotationKey: mustToJson(state.NotifiedState),
+		ServiceAnnotationKey:  mustToJson(state.ServiceState),
 	}))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	assert.NoError(t, err)
@@ -141,15 +144,54 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestDoesNotSendNotificationIfSkipFirstRun(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+	}))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app), WithSkipFirstRun(true))
+	assert.NoError(t, err)
+
+	receivedObj := map[string]interface{}{}
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
+	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+		receivedObj = obj
+		return true
+	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
+
+	annotations, err := ctrl.processResource(app, logEntry)
+	assert.NoError(t, err)
+
+	assert.NotContains(t, annotations, NotifiedAnnotationKey)
+	assert.Contains(t, annotations, ServiceAnnotationKey)
+	assert.Equal(t, map[string]interface{}{}, receivedObj)
+
+	app.SetAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+		NotifiedAnnotationKey: annotations[NotifiedAnnotationKey],
+		ServiceAnnotationKey:  annotations[ServiceAnnotationKey],
+	})
+
+	annotations2, err := ctrl.processResource(app, logEntry)
+	assert.NoError(t, err)
+
+	assert.Equal(t, app.Object, receivedObj)
+	assert.Contains(t, annotations2, NotifiedAnnotationKey)
+	assert.Equal(t, annotations[ServiceAnnotationKey], annotations2[ServiceAnnotationKey])
+}
+
 func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	state := NotificationsState{}
+	state := emptyNotificationsState()
 	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-		NotifiedAnnotationKey: mustToJson(state),
+		NotifiedAnnotationKey: mustToJson(state.NotifiedState),
+		ServiceAnnotationKey:  mustToJson(state.ServiceState),
 	}))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	assert.NoError(t, err)
@@ -157,22 +199,26 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
 	annotations, err := ctrl.processResource(app, logEntry)
+	app.SetAnnotations(map[string]string{
+		NotifiedAnnotationKey: mustToJson(annotations[NotifiedAnnotationKey]),
+		ServiceAnnotationKey:  mustToJson(annotations[ServiceAnnotationKey]),
+	})
 
 	assert.NoError(t, err)
-	state = NewState(annotations[NotifiedAnnotationKey])
-	assert.Empty(t, state)
+	state = NewStateFromRes(app)
+	assert.Equal(t, emptyNotificationsState(), state)
 }
 
 func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	state := NotificationsState{}
+	state := emptyNotificationsState()
 	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-		NotifiedAnnotationKey: mustToJson(state),
+		NotifiedAnnotationKey: mustToJson(state.NotifiedState),
 	}))
 
 	patchCh := make(chan []byte)
