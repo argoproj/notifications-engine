@@ -31,13 +31,11 @@ data:
   service.pagerduty: |
     token: $pagerduty-token
     from: <emailid>
-    serviceID: <serviceID of PagerDuty>
-    escalationPolicyID: <escalationPolicyID of pagerduty channel>
 ```
 
 ## Template
 
-Notification templates support specifying subject for email notifications:
+Notification templates support specifying subject for pagerduty notifications:
 
 ```yaml
 apiVersion: v1
@@ -55,3 +53,14 @@ data:
 ```
 
 NOTE: A Priority is a label representing the importance and impact of an incident. This is only available on Standard and Enterprise plans of pagerduty.
+
+## Annotation
+
+Annotation sample for pagerduty notifications:
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.on-rollout-completed.pagerduty: "<serviceID for Pagerduty>"
+```
