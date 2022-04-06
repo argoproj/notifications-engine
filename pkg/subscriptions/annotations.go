@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ghodss/yaml"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
@@ -36,28 +39,89 @@ func NewAnnotations(annotations map[string]string) Annotations {
 	return Annotations(annotations)
 }
 
+type Subscription struct {
+	Trigger      []string
+	Destinations []Destination
+}
+
+// Destination holds notification destination details
+type Destination struct {
+	Service    string   `json:"service"`
+	Recipients []string `json:"recipients"`
+}
+
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := AnnotationPrefix + "/subscribe."
+	altPrefix := AnnotationPrefix + "/subscriptions"
+	var recipients []string
 	for k, v := range a {
-		if !strings.HasPrefix(k, prefix) {
-			continue
+		switch {
+		case strings.HasPrefix(k, prefix):
+			parts := strings.Split(k[len(prefix):], ".")
+			trigger := parts[0]
+			service := ""
+			if len(parts) >= 2 {
+				service = parts[1]
+			} else {
+				service = parts[0]
+				trigger = ""
+			}
+			if v == "" {
+				recipients = []string{""}
+			} else {
+				recipients = parseRecipients(v)
+			}
+			callback(trigger, service, recipients, k)
+		case strings.HasPrefix(k, altPrefix):
+			var subscriptions []Subscription
+			var source []byte
+			if v != "" {
+				source = []byte(v)
+			} else {
+				log.Errorf("Subscription is not defined")
+				callback("", "", recipients, k)
+			}
+			err := yaml.Unmarshal(source, &subscriptions)
+			if err != nil {
+				log.Errorf("Notification subscription unrmashal error: %v", err)
+				callback("", "", recipients, k)
+			}
+			for _, v := range subscriptions {
+				triggers := v.Trigger
+				destinations := v.Destinations
+				if len(triggers) == 0 && len(destinations) == 0 {
+					trigger := ""
+					destination := ""
+					recipients = []string{}
+					log.Printf("Notification triggers and destinations are not configured")
+					callback(trigger, destination, recipients, k)
+				} else if len(triggers) == 0 && len(destinations) != 0 {
+					trigger := ""
+					log.Printf("Notification triggers are not configured")
+					for _, destination := range destinations {
+						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
+						callback(trigger, destination.Service, destination.Recipients, k)
+					}
+				} else if len(triggers) != 0 && len(destinations) == 0 {
+					service := ""
+					recipients = []string{}
+					log.Printf("Notification destinations are not configured")
+					for _, trigger := range triggers {
+						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, service, recipients)
+						callback(trigger, service, recipients, k)
+					}
+				} else {
+					for _, trigger := range triggers {
+						for _, destination := range destinations {
+							log.Printf("Notification trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
+							callback(trigger, destination.Service, destination.Recipients, k)
+						}
+					}
+				}
+			}
+		default:
+			callback("", "", recipients, k)
 		}
-		parts := strings.Split(k[len(prefix):], ".")
-		trigger := parts[0]
-		service := ""
-		if len(parts) >= 2 {
-			service = parts[1]
-		} else {
-			service = parts[0]
-			trigger = ""
-		}
-		var recipients []string
-		if v == "" {
-			recipients = []string{""}
-		} else {
-			recipients = parseRecipients(v)
-		}
-		callback(trigger, service, recipients, k)
 	}
 }
 
