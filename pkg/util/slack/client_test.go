@@ -55,10 +55,45 @@ func TestDeliveryPolicy_UnmarshalJSON(t *testing.T) {
 	}
 }
 
+// Checks what api method a slack API call will use.
+//
+// https://api.slack.com/methods/chat.postMessage
+// https://api.slack.com/methods/chat.update
+type slackAPIMethodMatcher struct {
+	wantAPIMethod string
+}
+
+func (m slackAPIMethodMatcher) Matches(maybeMsgOption interface{}) bool {
+	msgOption, ok := maybeMsgOption.(slack.MsgOption)
+	if !ok {
+		return false
+	}
+	// Use utility function for debugging/testing chat requests. Specify an
+	// empty apiurl so we only get the endpoint method.
+	endpoint, _, err := slack.UnsafeApplyMsgOptions("token", "channel", "", msgOption)
+	if err != nil {
+		return false
+	}
+	return m.wantAPIMethod == endpoint
+}
+
+func (m slackAPIMethodMatcher) String() string {
+	return "MsgOption for " + m.wantAPIMethod
+}
+
+func EqChatUpdate() gomock.Matcher {
+	return slackAPIMethodMatcher{"chat.update"}
+}
+
+func EqChatPost() gomock.Matcher {
+	return slackAPIMethodMatcher{"chat.postMessage"}
+}
+
 func TestThreadedClient(t *testing.T) {
 	const (
 		groupingKey string = "group"
 		channel     string = "channel"
+		channelID   string = "channel-ID"
 		ts1         string = "1"
 		ts2         string = "2"
 	)
@@ -67,64 +102,58 @@ func TestThreadedClient(t *testing.T) {
 		threadTSs     timestampMap
 		groupingKey   string
 		policy        DeliveryPolicy
-		wantOpt1      string
-		wantOpt2      string
+		wantPostType1 gomock.Matcher
+		wantPostType2 gomock.Matcher
 		wantthreadTSs timestampMap
 	}{
 		"Post, basic": {
 			threadTSs:     timestampMap{},
 			groupingKey:   "",
 			policy:        Post,
-			wantOpt1:      "MsgOptionPost",
-			wantOpt2:      "",
+			wantPostType1: EqChatPost(),
 			wantthreadTSs: timestampMap{},
 		},
 		"Post, no parent, with grouping": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        Post,
-			wantOpt1:      "MsgOptionPost",
-			wantOpt2:      "",
+			wantPostType1: EqChatPost(),
 			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"Post, with parent, with grouping": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        Post,
-			wantOpt1:      "MsgOptionPost",
-			wantOpt2:      "",
+			wantPostType1: EqChatPost(),
 			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 		"PostAndUpdate, no parent. First post should not be updated": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        PostAndUpdate,
-			wantOpt1:      "MsgOptionPost",
-			wantOpt2:      "",
+			wantPostType1: EqChatPost(),
 			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"PostAndUpdate, with parent. First post should be updated": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        PostAndUpdate,
-			wantOpt1:      "MsgOptionPost",
-			wantOpt2:      "MsgOptionUpdate",
+			wantPostType1: EqChatPost(),
+			wantPostType2: EqChatUpdate(),
 			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 		"Update, no parent. Only call should be post": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        Update,
-			wantOpt1:      "MsgOptionPost",
-			wantOpt2:      "",
+			wantPostType1: EqChatPost(),
 			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"Update, with parent. Only call should be update": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        Update,
-			wantOpt1:      "MsgOptionUpdate",
-			wantOpt2:      "",
+			wantPostType1: EqChatUpdate(),
 			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 	}
@@ -135,12 +164,12 @@ func TestThreadedClient(t *testing.T) {
 			m := mocks.NewMockSlackClient(ctrl)
 
 			m.EXPECT().
-				SendMessageContext(gomock.Any(), gomock.Any(), gomock.Any()).
-				Return(channel, ts1, "", nil)
+				SendMessageContext(gomock.Any(), gomock.Eq(channel), tc.wantPostType1).
+				Return(channelID, ts1, "", nil)
 
-			if tc.wantOpt2 != "" {
+			if tc.wantPostType2 != nil {
 				m.EXPECT().
-					SendMessageContext(gomock.Any(), gomock.Any(), gomock.Any())
+					SendMessageContext(gomock.Any(), gomock.Eq(channelID), tc.wantPostType2)
 			}
 
 			client := NewThreadedClient(m, &state{rate.NewLimiter(rate.Inf, 1), tc.threadTSs, channelMap{}})
