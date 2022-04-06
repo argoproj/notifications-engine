@@ -61,6 +61,21 @@ metadata:
     notifications.argoproj.io/subscribe.on-sync-succeeded.slack: my-channel1;my-channel2
 ```
 
+If there is more than one trigger and multiple destinations you can configure the annotation as given below.
+
+```yaml
+notifications.argoproj.io/subscriptions: |
+  - trigger: [on-scaling-replica-set, on-rollout-updated, on-rollout-step-completed]
+    destinations:
+      - service: slack
+        recipients: [my-channel-1, my-channel-2]
+      - service: email
+        recipients: [recipient-1, recipient-2, recipient-3 ]
+  - trigger: [on-rollout-aborted, on-analysis-run-failed, on-analysis-run-error]
+    destinations:
+      - service: slack
+        recipients: [my-channel-21, my-channel-22]
+```
 ## Getting Started
 
 Ready to add notifications to your project? Check out sample notifications for [cert-manager](./examples/certmanager/README.md)

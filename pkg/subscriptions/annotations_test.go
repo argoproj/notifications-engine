@@ -8,6 +8,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var data = `
+ - trigger: [my-trigger1, my-trigger2, my-trigger3]
+   destinations:
+    - service: slack
+      recipients:
+       - recipient-1
+       - recipient-2
+`
+
+var data_without_trigger = `
+ - trigger: []
+   destinations:
+    - service: slack
+      recipients:
+       - recipient-1
+       - recipient-2
+`
+var data_without_destinations = `
+ - trigger: [my-trigger1, my-trigger2, my-trigger3]
+`
+
 func TestNewAnnotations(t *testing.T) {
 	a := NewAnnotations(map[string]string{})
 	assert.NotNil(t, a)
@@ -19,8 +40,8 @@ func TestNewAnnotations(t *testing.T) {
 func TestIterate(t *testing.T) {
 	tests := []struct {
 		annotations map[string]string
-		trigger     string
-		service     string
+		triggers    []string
+		service     []string
 		recipients  []string
 		key         string
 	}{
@@ -28,8 +49,8 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
 			},
-			trigger:    "my-trigger",
-			service:    "slack",
+			triggers:   []string{"my-trigger"},
+			service:    []string{"slack"},
 			recipients: []string{"my-channel"},
 			key:        "notifications.argoproj.io/subscribe.my-trigger.slack",
 		},
@@ -37,8 +58,8 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe..slack": "my-channel",
 			},
-			trigger:    "",
-			service:    "slack",
+			triggers:   []string{},
+			service:    []string{"slack"},
 			recipients: []string{"my-channel"},
 			key:        "notifications.argoproj.io/subscribe..slack",
 		},
@@ -46,20 +67,73 @@ func TestIterate(t *testing.T) {
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscribe.slack": "my-channel",
 			},
-			trigger:    "",
-			service:    "slack",
+			triggers:   []string{},
+			service:    []string{"slack"},
 			recipients: []string{"my-channel"},
 			key:        "notifications.argoproj.io/subscribe.slack",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscriptions": data,
+			},
+			triggers:   []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
+			service:    []string{"slack"},
+			recipients: []string{"recipient-1", "recipient-2"},
+			key:        "notifications.argoproj.io/subscriptions",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscriptions": data_without_trigger,
+			},
+			triggers:   []string{},
+			service:    []string{"slack"},
+			recipients: []string{"recipient-1", "recipient-2"},
+			key:        "notifications.argoproj.io/subscriptions",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscriptions": data_without_destinations,
+			},
+			triggers:   []string{"my-trigger1", "my-trigger-2", "my-trigger-3"},
+			service:    []string{},
+			recipients: []string{},
+			key:        "notifications.argoproj.io/subscriptions",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/random": "my-channel",
+			},
+			triggers:   []string{},
+			service:    []string{},
+			recipients: []string{"my-channel"},
+			key:        "notifications.argoproj.io/random",
+		},
+		{
+			annotations: map[string]string{
+				"notifications.argoproj.io/random": "",
+			},
+			triggers:   []string{},
+			service:    []string{},
+			recipients: []string{},
+			key:        "notifications.argoproj.io/random",
 		},
 	}
 
 	for _, tt := range tests {
 		a := Annotations(tt.annotations)
 		a.iterate(func(trigger, service string, recipients []string, key string) {
-			assert.Equal(t, tt.trigger, trigger)
-			assert.Equal(t, tt.service, service)
-			assert.Equal(t, tt.recipients, recipients)
-			assert.Equal(t, tt.key, key)
+			for _, v := range tt.triggers {
+				for _, serv := range tt.service {
+					if trigger == v {
+						assert.Equal(t, v, trigger)
+						assert.Equal(t, serv, service)
+						assert.Equal(t, tt.recipients, recipients)
+						assert.Equal(t, tt.key, key)
+					} else {
+						continue
+					}
+				}
+			}
 		})
 	}
 }
