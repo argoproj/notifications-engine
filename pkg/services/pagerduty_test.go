@@ -4,7 +4,6 @@ import (
 	"testing"
 	"text/template"
 
-	_ "github.com/golang/mock/mockgen/model"
 	"github.com/stretchr/testify/assert"
 )
 

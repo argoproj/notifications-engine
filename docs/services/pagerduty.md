@@ -4,7 +4,7 @@
 
 The Pagerduty notification service is used to create pagerduty incidents and requires specifying the following settings:
 
-* `pagerduty-token` - the pagerduty auth token
+* `pagerdutyToken` - the pagerduty auth token
 * `from` - email address of a valid user associated with the account making the request.
 * `serviceID` - The ID of the resource.
 
@@ -19,7 +19,7 @@ kind: Secret
 metadata:
   name: <secret-name>
 stringData:
-  pagerduty-token: <pd-api-token>
+  pagerdutyToken: <pd-api-token>
 ```
 
 ```yaml
@@ -29,7 +29,7 @@ metadata:
   name: <config-map-name>
 data:
   service.pagerduty: |
-    token: $pagerduty-token
+    token: $pagerdutyToken
     from: <emailid>
 ```
 
