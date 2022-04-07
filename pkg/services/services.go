@@ -8,8 +8,6 @@ import (
 	texttemplate "text/template"
 	_ "time/tzdata"
 
-	_ "github.com/golang/mock/mockgen/model"
-
 	"github.com/ghodss/yaml"
 )
 
