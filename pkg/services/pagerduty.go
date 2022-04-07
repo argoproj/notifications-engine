@@ -13,13 +13,13 @@ type PagerDutyNotification struct {
 	Title      string `json:"title"`
 	Body       string `json:"body,omitempty"`
 	Urgency    string `json:"urgency,omitempty"`
-	PriorityID string `json:"priorityID,omitempty"`
+	PriorityId string `json:"priorityId,omitempty"`
 }
 
 type PagerdutyOptions struct {
 	Token     string `json:"token"`
 	From      string `json:"from,omitempty"`
-	ServiceID string `json:"serviceID"`
+	ServiceID string `json:"serviceId"`
 }
 
 func (p *PagerDutyNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -35,7 +35,7 @@ func (p *PagerDutyNotification) GetTemplater(name string, f texttemplate.FuncMap
 	if err != nil {
 		return nil, err
 	}
-	priorityID, err := texttemplate.New(name).Funcs(f).Parse(p.PriorityID)
+	priorityId, err := texttemplate.New(name).Funcs(f).Parse(p.PriorityId)
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +63,10 @@ func (p *PagerDutyNotification) GetTemplater(name string, f texttemplate.FuncMap
 		notification.Pagerduty.Urgency = pdUrgencyData.String()
 
 		var pdPriorityIDData bytes.Buffer
-		if err := priorityID.Execute(&pdPriorityIDData, vars); err != nil {
+		if err := priorityId.Execute(&pdPriorityIDData, vars); err != nil {
 			return err
 		}
-		notification.Pagerduty.PriorityID = pdPriorityIDData.String()
+		notification.Pagerduty.PriorityId = pdPriorityIDData.String()
 
 		return nil
 	}, nil
@@ -84,7 +84,7 @@ func (p pagerdutyService) Send(notification Notification, dest Destination) erro
 	title := notification.Pagerduty.Title
 	body := notification.Pagerduty.Body
 	urgency := notification.Pagerduty.Urgency
-	priorityID := notification.Pagerduty.PriorityID
+	priorityID := notification.Pagerduty.PriorityId
 
 	pagerDutyClient := pagerduty.NewClient(p.opts.Token)
 	input := &pagerduty.CreateIncidentOptions{

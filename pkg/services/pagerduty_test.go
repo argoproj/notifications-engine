@@ -10,7 +10,7 @@ import (
 func TestGetTemplater_PagerDuty(t *testing.T) {
 	n := Notification{
 		Pagerduty: &PagerDutyNotification{
-			Title: "{{.title}}", Body: "{{.body}}", Urgency: "{{.urg}}", PriorityID: "{{.prid}}",
+			Title: "{{.title}}", Body: "{{.body}}", Urgency: "{{.urg}}", PriorityId: "{{.prid}}",
 		},
 	}
 
@@ -35,5 +35,5 @@ func TestGetTemplater_PagerDuty(t *testing.T) {
 	assert.Equal(t, "hello", notification.Pagerduty.Title)
 	assert.Equal(t, "world", notification.Pagerduty.Body)
 	assert.Equal(t, "high", notification.Pagerduty.Urgency)
-	assert.Equal(t, "PE456Y", notification.Pagerduty.PriorityID)
+	assert.Equal(t, "PE456Y", notification.Pagerduty.PriorityId)
 }
