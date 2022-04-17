@@ -1,5 +1,12 @@
 # Pagerduty
 
+The [PagerDuty Events API v2](https://developer.pagerduty.com/docs/ZG9jOjExMDI5NTgw-events-api-v2-overview#events-api-v2-overview) is a highly available asynchronous API that routes events sent to a [PagerDuty service](https://support.pagerduty.com/docs/services-and-integrations) for processing. can ingest multiple types of events. Each event type is described below
+
+| API | Type | Description | Example |
+|---|---|---|---|
+| PagerDuty v2 Events API | Alert Event | A problem in a machine monitored system.   Follow up events can be sent to acknowledge or resolve an existing alert. | - High error rate - CPU usage exceeded limit - Deployment failed |
+| PagerDuty v2 Events API | Change Event | A change in a system that does not represent a problem. | Pull request merged   Secret successfully rotated   Configuration update applied |
+
 ## Parameters
 
 The Pagerduty notification service is used to create pagerduty incidents and requires specifying the following settings:
