@@ -39,8 +39,10 @@ func TestGetTemplater_GitHub(t *testing.T) {
 				},
 			},
 			"status": map[string]interface{}{
-				"sync": map[string]interface{}{
-					"revision": "0123456789",
+				"operationState": map[string]interface{}{
+					"syncResult": map[string]interface{}{
+						"revision": "0123456789",
+					},
 				},
 			},
 		},
