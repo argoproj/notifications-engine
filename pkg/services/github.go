@@ -44,7 +44,7 @@ type GitHubStatus struct {
 
 const (
 	repoURLtemplate  = "{{.app.spec.source.repoURL}}"
-	revisionTemplate = "{{.app.status.sync.revision}}"
+	revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
 )
 
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
