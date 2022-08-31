@@ -31,49 +31,51 @@ type GitHubOptions struct {
 }
 
 type GitHubNotification struct {
-	repoURL  string
-	revision string
-	Status   *GitHubStatus `json:"status,omitempty"`
-}
-
-type GitHubStatus struct {
 	State     string `json:"state,omitempty"`
 	Label     string `json:"label,omitempty"`
 	TargetURL string `json:"targetURL,omitempty"`
+	RepoURL   string `json:"repoURL,omitempty"`
+	Revision  string `json:"revision,omitempty"`
 }
 
 const (
-	repoURLtemplate  = "{{.app.spec.source.repoURL}}"
-	revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
+	defaultRepoURLtemplate  = "{{.app.spec.source.repoURL}}"
+	defaultRevisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
 )
 
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+
+	repoURLtemplate := defaultRepoURLtemplate
+	if g.RepoURL != "" {
+		repoURLtemplate = g.RepoURL
+	}
 	repoURL, err := texttemplate.New(name).Funcs(f).Parse(repoURLtemplate)
 	if err != nil {
 		return nil, err
 	}
 
+	revisionTemplate := defaultRevisionTemplate
+	if g.Revision != "" {
+		revisionTemplate = g.Revision
+	}
 	revision, err := texttemplate.New(name).Funcs(f).Parse(revisionTemplate)
 	if err != nil {
 		return nil, err
 	}
 
-	var state, label, targetURL *texttemplate.Template
-	if g.Status != nil {
-		state, err = texttemplate.New(name).Funcs(f).Parse(g.Status.State)
-		if err != nil {
-			return nil, err
-		}
+	state, err := texttemplate.New(name).Funcs(f).Parse(g.State)
+	if err != nil {
+		return nil, err
+	}
 
-		label, err = texttemplate.New(name).Funcs(f).Parse(g.Status.Label)
-		if err != nil {
-			return nil, err
-		}
+	label, err := texttemplate.New(name).Funcs(f).Parse(g.Label)
+	if err != nil {
+		return nil, err
+	}
 
-		targetURL, err = texttemplate.New(name).Funcs(f).Parse(g.Status.TargetURL)
-		if err != nil {
-			return nil, err
-		}
+	targetURL, err := texttemplate.New(name).Funcs(f).Parse(g.TargetURL)
+	if err != nil {
+		return nil, err
 	}
 
 	return func(notification *Notification, vars map[string]interface{}) error {
@@ -85,37 +87,31 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		if err := repoURL.Execute(&repoData, vars); err != nil {
 			return err
 		}
-		notification.GitHub.repoURL = repoData.String()
+		notification.GitHub.RepoURL = repoData.String()
 
 		var revisionData bytes.Buffer
 		if err := revision.Execute(&revisionData, vars); err != nil {
 			return err
 		}
-		notification.GitHub.revision = revisionData.String()
+		notification.GitHub.Revision = revisionData.String()
 
-		if g.Status != nil {
-			if notification.GitHub.Status == nil {
-				notification.GitHub.Status = &GitHubStatus{}
-			}
-
-			var stateData bytes.Buffer
-			if err := state.Execute(&stateData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Status.State = stateData.String()
-
-			var labelData bytes.Buffer
-			if err := label.Execute(&labelData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Status.Label = labelData.String()
-
-			var targetData bytes.Buffer
-			if err := targetURL.Execute(&targetData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Status.TargetURL = targetData.String()
+		var stateData bytes.Buffer
+		if err := state.Execute(&stateData, vars); err != nil {
+			return err
 		}
+		notification.GitHub.State = stateData.String()
+
+		var labelData bytes.Buffer
+		if err := label.Execute(&labelData, vars); err != nil {
+			return err
+		}
+		notification.GitHub.Label = labelData.String()
+
+		var targetData bytes.Buffer
+		if err := targetURL.Execute(&targetData, vars); err != nil {
+			return err
+		}
+		notification.GitHub.TargetURL = targetData.String()
 
 		return nil
 	}, nil
@@ -183,25 +179,23 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		return fmt.Errorf("config is empty")
 	}
 
-	if notification.GitHub.Status != nil {
-		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
-		// maximum is 140 characters
-		description := trunc(notification.Message, 140)
-		_, _, err := g.client.Repositories.CreateStatus(
-			context.Background(),
-			u[0],
-			u[1],
-			notification.GitHub.revision,
-			&github.RepoStatus{
-				State:       &notification.GitHub.Status.State,
-				Description: &description,
-				Context:     &notification.GitHub.Status.Label,
-				TargetURL:   &notification.GitHub.Status.TargetURL,
-			},
-		)
-		if err != nil {
-			return err
-		}
+	u := strings.Split(fullNameByRepoURL(notification.GitHub.RepoURL), "/")
+	// maximum is 140 characters
+	description := trunc(notification.Message, 140)
+	_, _, err := g.client.Repositories.CreateStatus(
+		context.Background(),
+		u[0],
+		u[1],
+		notification.GitHub.Revision,
+		&github.RepoStatus{
+			State:       &notification.GitHub.State,
+			Description: &description,
+			Context:     &notification.GitHub.Label,
+			TargetURL:   &notification.GitHub.TargetURL,
+		},
+	)
+	if err != nil {
+		return err
 	}
 
 	return nil
