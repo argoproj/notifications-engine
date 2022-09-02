@@ -23,6 +23,7 @@ type Notification struct {
 	GitHub       *GitHubNotification       `json:"github,omitempty"`
 	Alertmanager *AlertmanagerNotification `json:"alertmanager,omitempty"`
 	GoogleChat   *GoogleChatNotification   `json:"googlechat,omitempty"`
+	Pagerduty    *PagerDutyNotification    `json:"pagerduty,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -89,6 +90,10 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 
 	if n.GoogleChat != nil {
 		sources = append(sources, n.GoogleChat)
+	}
+
+	if n.Pagerduty != nil {
+		sources = append(sources, n.Pagerduty)
 	}
 
 	return n.getTemplater(name, f, sources)
@@ -181,6 +186,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewAlertmanagerService(opts), nil
+	case "pagerduty":
+		var opts PagerdutyOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewPagerdutyService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}

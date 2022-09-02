@@ -114,6 +114,9 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
 
 	annotations, err := ctrl.processResource(app, logEntry)
+	if err != nil {
+		logEntry.Errorf("Failed to process: %v", err)
+	}
 
 	assert.NoError(t, err)
 
@@ -137,7 +140,9 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 
 	_, err = ctrl.processResource(app, logEntry)
-
+	if err != nil {
+		logEntry.Errorf("Failed to process: %v", err)
+	}
 	assert.NoError(t, err)
 }
 
@@ -157,7 +162,9 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
 	annotations, err := ctrl.processResource(app, logEntry)
-
+	if err != nil {
+		logEntry.Errorf("Failed to process: %v", err)
+	}
 	assert.NoError(t, err)
 	state = NewState(annotations[NotifiedAnnotationKey])
 	assert.Empty(t, state)

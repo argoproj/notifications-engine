@@ -11,6 +11,7 @@ import (
 	texttemplate "text/template"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
@@ -18,14 +19,14 @@ import (
 )
 
 // No rate limit unless Slack requests it (allows for Slack to control bursting)
-var rateLimiter = rate.NewLimiter(rate.Inf, 1)
-var threadTSs = map[string]map[string]string{}
+var slackState = slackutil.NewState(rate.NewLimiter(rate.Inf, 1))
 
 type SlackNotification struct {
-	Attachments     string `json:"attachments,omitempty"`
-	Blocks          string `json:"blocks,omitempty"`
-	GroupingKey     string `json:"groupingKey"`
-	NotifyBroadcast bool   `json:"notifyBroadcast"`
+	Attachments     string                   `json:"attachments,omitempty"`
+	Blocks          string                   `json:"blocks,omitempty"`
+	GroupingKey     string                   `json:"groupingKey"`
+	NotifyBroadcast bool                     `json:"notifyBroadcast"`
+	DeliveryPolicy  slackutil.DeliveryPolicy `json:"deliveryPolicy"`
 }
 
 func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -65,6 +66,7 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		notification.Slack.GroupingKey = groupingKeyData.String()
 
 		notification.Slack.NotifyBroadcast = n.NotifyBroadcast
+		notification.Slack.DeliveryPolicy = n.DeliveryPolicy
 		return nil
 	}, nil
 }
@@ -89,8 +91,10 @@ func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
 }
 
-func buildMessageOptions(notification Notification, dest Destination, opts SlackOptions) ([]slack.MsgOption, error) {
+func buildMessageOptions(notification Notification, dest Destination, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
+	slackNotification := &SlackNotification{}
+
 	if opts.Username != "" {
 		msgOptions = append(msgOptions, slack.MsgOptionUsername(opts.Username))
 	}
@@ -103,87 +107,60 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 			log.Warnf("Icon reference '%v' is not a valid emoij or url", opts.Icon)
 		}
 	}
-
 	if notification.Slack != nil {
 		attachments := make([]slack.Attachment, 0)
 		if notification.Slack.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.Slack.Attachments), &attachments); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Slack.Attachments, err)
+				return nil, nil, fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Slack.Attachments, err)
 			}
 		}
 
 		blocks := slack.Blocks{}
 		if notification.Slack.Blocks != "" {
 			if err := json.Unmarshal([]byte(notification.Slack.Blocks), &blocks); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal blocks '%s' : %v", notification.Slack.Blocks, err)
+				return nil, nil, fmt.Errorf("failed to unmarshal blocks '%s' : %v", notification.Slack.Blocks, err)
 			}
 		}
 		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
+		slackNotification = notification.Slack
 	}
 
-	if _, ok := threadTSs[dest.Recipient]; !ok {
-		threadTSs[dest.Recipient] = map[string]string{}
-	}
-
-	if notification.Slack != nil {
-		if notification.Slack.NotifyBroadcast {
-			msgOptions = append(msgOptions, slack.MsgOptionBroadcast())
-		}
-
-		if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; ok && lastTs != "" && notification.Slack.GroupingKey != "" {
-			msgOptions = append(msgOptions, slack.MsgOptionTS(lastTs))
-		}
-	}
-
-	return msgOptions, nil
+	return slackNotification, msgOptions, nil
 }
 
 func (s *slackService) Send(notification Notification, dest Destination) error {
-	apiURL := slack.APIURL
-	if s.opts.ApiURL != "" {
-		apiURL = s.opts.ApiURL
-	}
-	transport := httputil.NewTransport(apiURL, s.opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
-	}
-	sl := slack.New(s.opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
-
-	msgOptions, err := buildMessageOptions(notification, dest, s.opts)
+	slackNotification, msgOptions, err := buildMessageOptions(notification, dest, s.opts)
 	if err != nil {
 		return err
 	}
-
-	ctx := context.TODO()
-	for {
-		err = rateLimiter.Wait(ctx)
-		if err != nil {
-			break
-		}
-		_, ts, err := sl.PostMessageContext(ctx, dest.Recipient, msgOptions...)
-		if err != nil {
-			if rateLimitedError, ok := err.(*slack.RateLimitedError); ok {
-				rateLimiter.SetLimit(rate.Every(rateLimitedError.RetryAfter))
-			} else {
-				break
-			}
-		} else {
-			if notification.Slack != nil {
-				if lastTs, ok := threadTSs[dest.Recipient][notification.Slack.GroupingKey]; !ok || lastTs == "" {
-					threadTSs[dest.Recipient][notification.Slack.GroupingKey] = ts
-				}
-			}
-			// No error, so remove rate limit
-			rateLimiter.SetLimit(rate.Inf)
-			break
-		}
-	}
-	return err
+	return slackutil.NewThreadedClient(
+		newSlackClient(s.opts),
+		slackState,
+	).SendMessage(
+		context.TODO(),
+		dest.Recipient,
+		slackNotification.GroupingKey,
+		slackNotification.NotifyBroadcast,
+		slackNotification.DeliveryPolicy,
+		msgOptions,
+	)
 }
 
 // GetSigningSecret exposes signing secret for slack bot
 func (s *slackService) GetSigningSecret() string {
 	return s.opts.SigningSecret
+}
+
+func newSlackClient(opts SlackOptions) *slack.Client {
+	apiURL := slack.APIURL
+	if opts.ApiURL != "" {
+		apiURL = opts.ApiURL
+	}
+	transport := httputil.NewTransport(apiURL, opts.InsecureSkipVerify)
+	client := &http.Client{
+		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
+	}
+	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
 }
 
 func isValidIconURL(iconURL string) bool {

@@ -9,17 +9,25 @@ on:
     branches:
       - 'master'
 
+env:
+  # Golang version to use across CI steps
+  GOLANG_VERSION: '1.17'
+
 jobs:
   lint-go:
     name: Lint Go code
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v2
+      - name: Set up Go
+        uses: actions/setup-go@v3
         with:
-          version: v1.38.0
+          go-version: ${{ env.GOLANG_VERSION }}
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.45.2
           args: --timeout 5m
   test:
     runs-on: ubuntu-latest
@@ -31,9 +39,9 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - uses: actions/setup-go@v1
+      - uses: actions/setup-go@v3
         with:
-          go-version: '1.16.2'
+          go-version: ${{ env.GOLANG_VERSION }}
       - name: Add ~/go/bin to PATH
         run: |
           echo "/home/runner/go/bin" >> $GITHUB_PATH
