@@ -63,7 +63,12 @@ func (s *matrixService) Send(notification Notification, dest Destination) error 
 			return fmt.Errorf("couldn't resolve room alias '%s': %w", dest.Recipient, err)
 		}
 		roomID = resp.RoomID
-		_, serverName, _ = strings.Cut(roomAlias.String(), ":")
+		roomAliasStr := roomAlias.String()
+		if i := strings.Index(roomAliasStr, ":"); i >= 0 {
+			serverName = roomAliasStr[i+1:]
+		} else {
+			serverName = ""
+		}
 	}
 
 	markdownContent := format.RenderMarkdown(notification.Message, true, true)
