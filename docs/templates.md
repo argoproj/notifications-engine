@@ -2,7 +2,8 @@
 
 **Templates**
 
-The notification template is a stateless function that generates the notification content. The templates are leveraging [html/template](https://golang.org/pkg/html/template/) Golang package
+The notification template is a stateless function that generates the notification content. The templates leverage the [text/template](https://golang.org/pkg/text/template/)
+and [Masterminds/Sprig](https://pkg.go.dev/github.com/masterminds/sprig) Golang packages
 and allow you to customize notification messages. Templates are meant to be reusable and can be referenced by multiple triggers:
 
 ```yaml
