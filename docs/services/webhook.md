@@ -5,7 +5,7 @@ Using Webhook you might trigger a Jenkins job, update Github commit status.
 
 Use the following steps to configure webhook:
 
-1 Register webhook in `argocd-notifications-cm` ConfigMap:
+1 Register webhook in `argo-rollouts-notification-configmap`:
 
 ```yaml
 apiVersion: v1
@@ -51,6 +51,17 @@ kind: Application
 metadata:
   annotations:
     notifications.argoproj.io/subscribe.<trigger-name>.<webhook-name>: ""
+```
+
+4 It is required to create the secret `argo-rollouts-notification-secret` even if your webhook does not require any secret:
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: argo-rollouts-notification-secret
+stringData:
+  slack-token: <my-slack-token>
 ```
 
 ## Examples
