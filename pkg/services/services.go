@@ -15,6 +15,7 @@ type Notification struct {
 	Message      string                    `json:"message,omitempty"`
 	Email        *EmailNotification        `json:"email,omitempty"`
 	Slack        *SlackNotification        `json:"slack,omitempty"`
+	AwsSqs       *AwsSqsNotification       `json:"awssqs,omitempty"`
 	Mattermost   *MattermostNotification   `json:"mattermost,omitempty"`
 	RocketChat   *RocketChatNotification   `json:"rocketchat,omitempty"`
 	Teams        *TeamsNotification        `json:"teams,omitempty"`
@@ -73,29 +74,24 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	if n.Webhook != nil {
 		sources = append(sources, n.Webhook)
 	}
-
 	if n.Opsgenie != nil {
 		sources = append(sources, n.Opsgenie)
 	}
 	if n.GitHub != nil {
 		sources = append(sources, n.GitHub)
 	}
-
 	if n.Teams != nil {
 		sources = append(sources, n.Teams)
 	}
 	if n.Alertmanager != nil {
 		sources = append(sources, n.Alertmanager)
 	}
-
 	if n.GoogleChat != nil {
 		sources = append(sources, n.GoogleChat)
 	}
-
 	if n.Pagerduty != nil {
 		sources = append(sources, n.Pagerduty)
 	}
-
 	return n.getTemplater(name, f, sources)
 }
 
@@ -120,6 +116,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewSlackService(opts), nil
+	case "awssqs":
+		var opts AwsSqsOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewAwsSqsService(opts), nil
 	case "mattermost":
 		var opts MattermostOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
