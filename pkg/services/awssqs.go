@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
@@ -17,9 +18,10 @@ type AwsSqsNotification struct {
 }
 
 type AwsSqsOptions struct {
-	Queue   string `json:"queue"`
-	Account string `json:"account"`
-	Region  string `json:"region"`
+	Queue       string `json:"queue"`
+	Account     string `json:"account"`
+	Region      string `json:"region"`
+	EndpointUrl string `json:"endpointUrl,omitempty"`
 	AwsAccess
 }
 
@@ -53,6 +55,26 @@ func (s awsSqservice) Send(notification Notification, dest Destination) error {
 	// Fill Region from configuration
 	if s.opts.Region != "" {
 		options = append(options, config.WithRegion(s.opts.Region))
+	}
+
+	// Usefull for testing with localstack
+	if s.opts.EndpointUrl != "" {
+		endpointRegion := os.Getenv("AWS_DEFAULT_REGION")
+		if s.opts.Region != "" {
+			endpointRegion = s.opts.Region
+		}
+		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+			if service == sqs.ServiceID {
+				return aws.Endpoint{
+					PartitionID:   "aws",
+					URL:           s.opts.EndpointUrl,
+					SigningRegion: endpointRegion,
+				}, nil
+			}
+			// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
+			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		})
+		options = append(options, config.WithEndpointResolverWithOptions(customResolver))
 	}
 
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
