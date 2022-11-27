@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
@@ -44,6 +45,10 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 		Text:     notification.Message,
 	}
 
+	if notification.Message == "" {
+		log.Warnf("Message is an empty string or not provided in the notifications template")
+	}
+
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
 			httputil.NewTransport(s.opts.ApiUrl, s.opts.InsecureSkipVerify), log.WithField("service", "grafana")),
@@ -66,6 +71,22 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.opts.ApiKey))
 
-	_, err = client.Do(req)
+	response, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
+	data, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("unable to read response data: %v", err)
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("request to %s has failed with error code %d : %s", s.opts.ApiUrl, response.StatusCode, string(data))
+	}
+
 	return err
 }
