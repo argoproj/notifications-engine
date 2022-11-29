@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	texttemplate "text/template"
 
 	"github.com/ghodss/yaml"
@@ -15,7 +16,8 @@ import (
 )
 
 type GoogleChatNotification struct {
-	Cards string `json:"cards"`
+	Cards     string `json:"cards"`
+	ThreadKey string `json:"threadKey,omitempty"`
 }
 
 type googleChatMessage struct {
@@ -52,6 +54,12 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' googlechat.cards : %w", name, err)
 	}
+
+	threadKey, err := texttemplate.New(name).Funcs(f).Parse(n.ThreadKey)
+	if err != nil {
+		return nil, fmt.Errorf("error in '%s' googlechat.threadKey : %w", name, err)
+	}
+
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.GoogleChat == nil {
 			notification.GoogleChat = &GoogleChatNotification{}
@@ -63,6 +71,15 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 		if val := cardsBuff.String(); val != "" {
 			notification.GoogleChat.Cards = val
 		}
+
+		var threadKeyBuff bytes.Buffer
+		if err := threadKey.Execute(&threadKeyBuff, vars); err != nil {
+			return err
+		}
+		if val := threadKeyBuff.String(); val != "" {
+			notification.GoogleChat.ThreadKey = val
+		}
+
 		return nil
 	}, nil
 }
@@ -106,12 +123,22 @@ type googlechatClient struct {
 	url        string
 }
 
-func (c *googlechatClient) sendMessage(message *googleChatMessage) (*webhookReturn, error) {
+func (c *googlechatClient) sendMessage(message *googleChatMessage, threadKey string) (*webhookReturn, error) {
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
 		return nil, err
 	}
-	response, err := c.httpClient.Post(c.url, "application/json", bytes.NewReader(jsonMessage))
+
+	u, err := url.Parse(c.url)
+	if err != nil {
+		return nil, err
+	}
+	if threadKey != "" {
+		q := u.Query()
+		q.Add("threadKey", threadKey)
+		u.RawQuery = q.Encode()
+	}
+	response, err := c.httpClient.Post(u.String(), "application/json", bytes.NewReader(jsonMessage))
 	if err != nil {
 		return nil, err
 	}
@@ -143,7 +170,12 @@ func (s googleChatService) Send(notification Notification, dest Destination) err
 		return fmt.Errorf("cannot create message: %w", err)
 	}
 
-	body, err := client.sendMessage(message)
+	var threadKey string
+	if notification.GoogleChat != nil {
+		threadKey = notification.GoogleChat.ThreadKey
+	}
+
+	body, err := client.sendMessage(message, threadKey)
 	if err != nil {
 		return fmt.Errorf("cannot send message: %w", err)
 	}
