@@ -36,11 +36,17 @@ func (n *NewrelicNotification) GetTemplater(name string, f texttemplate.FuncMap)
 	if err != nil {
 		return nil, err
 	}
-	changelog, err := texttemplate.New(name).Funcs(f).Parse(n.Changelog)
+	description, err := texttemplate.New(name).Funcs(f).Parse(n.Description)
 	if err != nil {
 		return nil, err
 	}
-	description, err := texttemplate.New(name).Funcs(f).Parse(n.Description)
+
+	changelogTemplate := n.Changelog
+	if changelogTemplate == "" {
+		changelogTemplate = "{{(call .repo.GetCommitMetadata .app.status.sync.revision).Message}}"
+	}
+
+	changelog, err := texttemplate.New(name).Funcs(f).Parse(changelogTemplate)
 	if err != nil {
 		return nil, err
 	}

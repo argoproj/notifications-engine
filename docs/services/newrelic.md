@@ -16,7 +16,7 @@ kind: ConfigMap
 metadata:
   name: <config-map-name>
 data:
-  service.mattermost: |
+  service.newrelic: |
     apiURL: <api-url>
     apiKey: $newrelic-apiKey
 ```
@@ -43,16 +43,19 @@ metadata:
 
 ## Templates
 
-* `description` - A high-level description of this deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/monitoring/apm-overview-page) page and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select an individual deployment. Defaults to `message`
-* `changelog` - optional, A summary of what changed in this deployment, visible in the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select (selected deployment) > Change log
+* `description` - __optional__, high-level description of this deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/monitoring/apm-overview-page) page and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select an individual deployment.
+  * Defaults to `message`
+* `changelog` - __optional__, A summary of what changed in this deployment, visible in the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select (selected deployment) > Change log.
+  * Defaults to `{{(call .repo.GetCommitMetadata .app.status.sync.revision).Message}}`
+* `user` - __optional__, A username to associate with the deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page).
+  * Defaults to `{{(call .repo.GetCommitMetadata .app.status.sync.revision).Author}}`
 
 ```yaml
 context: |
   argocdUrl: https://example.com/argocd
 
 template.app-deployed: |
-  message: Application {{.app.metadata.name}} has been healthy.
+  message: Application {{.app.metadata.name}} has successfully deployed.
   newrelic:
-    description: Application {{.app.metadata.name}} has been healthy
-    changelog: "{{(call .repo.GetCommitMetadata .app.status.sync.revision).Message}}"
+    description: Application {{.app.metadata.name}} has successfully deployed
 ```
