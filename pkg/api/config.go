@@ -42,10 +42,10 @@ func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Desti
 		for _, trigger := range triggers {
 			if s.MatchesTrigger(trigger) && s.Selector.Matches(fields.Set(labels)) {
 				for _, recipient := range s.Recipients {
-					parts := strings.Split(recipient, ":")
-					dest := services.Destination{Service: parts[0]}
-					if len(parts) > 1 {
-						dest.Recipient = parts[1]
+					before, after, _ := strings.Cut(recipient, ":")
+					dest := services.Destination{Service: before}
+					if len(after) > 0 {
+						dest.Recipient = after
 					}
 					dests[trigger] = append(dests[trigger], dest)
 				}

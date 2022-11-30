@@ -41,6 +41,7 @@ metadata:
 * [Email](./email.md)
 * [GitHub](./github.md)
 * [Slack](./slack.md)
+* [Matrix](./matrix.md)
 * [Mattermost](./mattermost.md)
 * [Opsgenie](./opsgenie.md)
 * [Grafana](./grafana.md)
