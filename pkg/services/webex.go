@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"regexp"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -14,7 +15,8 @@ import (
 )
 
 type WebexOptions struct {
-	Token string `json:"token"`
+	Token  string `json:"token"`
+	ApiURL string `json:"apiURL"`
 }
 
 type webexService struct {
@@ -28,13 +30,18 @@ type webexMessage struct {
 }
 
 func NewWebexService(opts WebexOptions) NotificationService {
+	if opts.ApiURL == "" {
+		opts.ApiURL = "https://webexapis.com"
+	} else {
+		opts.ApiURL = strings.TrimSuffix(opts.ApiURL, "/")
+	}
 	return &webexService{opts: opts}
 }
 
 var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 
 func (w webexService) Send(notification Notification, dest Destination) error {
-	requestURL := "https://webexapis.com/v1/messages"
+	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
