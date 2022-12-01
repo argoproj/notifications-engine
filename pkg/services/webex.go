@@ -79,6 +79,10 @@ func (w webexService) Send(notification Notification, dest Destination) error {
 		return err
 	}
 
+	defer func() {
+		_ = response.Body.Close()
+	}()
+
 	data, err := ioutil.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("unable to read response data: %v", err)
