@@ -9,7 +9,7 @@ require (
 	github.com/antonmedv/expr v1.9.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.0.4
 	github.com/ghodss/yaml v1.0.0
-	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.4.0
+	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v41 v41.0.0
 	github.com/gregdel/pushover v1.1.0
