@@ -77,9 +77,10 @@ type BasicAuth struct {
 }
 
 type WebhookOptions struct {
-	URL       string     `json:"url"`
-	Headers   []Header   `json:"headers"`
-	BasicAuth *BasicAuth `json:"basicAuth"`
+	URL                string     `json:"url"`
+	Headers            []Header   `json:"headers"`
+	BasicAuth          *BasicAuth `json:"basicAuth"`
+	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
 }
 
 func NewWebhookService(opts WebhookOptions) NotificationService {
@@ -154,7 +155,7 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 
 	client := http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(r.url, false),
+			httputil.NewTransport(r.url, service.opts.InsecureSkipVerify),
 			log.WithField("service", r.destService)),
 	}
 
