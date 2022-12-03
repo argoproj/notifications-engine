@@ -23,9 +23,10 @@ func TestWebhook_SuccessfullySendsNotification(t *testing.T) {
 	defer server.Close()
 
 	service := NewWebhookService(WebhookOptions{
-		BasicAuth: &BasicAuth{Username: "testUsername", Password: "testPassword"},
-		URL:       server.URL,
-		Headers:   []Header{{Name: "testHeader", Value: "testHeaderValue"}},
+		BasicAuth:          &BasicAuth{Username: "testUsername", Password: "testPassword"},
+		URL:                server.URL,
+		Headers:            []Header{{Name: "testHeader", Value: "testHeaderValue"}},
+		InsecureSkipVerify: true,
 	})
 	err := service.Send(
 		Notification{
