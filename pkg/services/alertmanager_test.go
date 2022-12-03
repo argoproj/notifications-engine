@@ -87,6 +87,31 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 
 		assert.Equal(t, "argocd-notifications", notification.Alertmanager.GeneratorURL)
 	})
+
+	t.Run("test_git_format_GeneratorURL", func(t *testing.T) {
+		n.Alertmanager.GeneratorURL = "{{.app.spec.source.repoURL}}"
+
+		templater, err := n.GetTemplater("", template.FuncMap{})
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		var notification Notification
+		_ = templater(&notification, map[string]interface{}{
+			"app": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "argocd-notifications",
+				},
+				"spec": map[string]interface{}{
+					"source": map[string]interface{}{
+						"repoURL": "git@github.com:argoproj-labs/argocd-notifications.git",
+					},
+				},
+			},
+		})
+
+		assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.Alertmanager.GeneratorURL)
+	})
 }
 
 func TestSend_AlertmanagerCluster(t *testing.T) {

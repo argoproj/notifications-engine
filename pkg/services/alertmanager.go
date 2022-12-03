@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	texttemplate "text/template"
@@ -87,6 +88,9 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 		if val := tempData.String(); val != "" {
 			notification.Alertmanager.GeneratorURL = val
 		}
+
+		notification.Alertmanager.GeneratorURL = convertGitURLtoHTTP(notification.Alertmanager.GeneratorURL)
+
 		// generatorURL must url format
 		if _, err := url.Parse(notification.Alertmanager.GeneratorURL); err != nil {
 			return err
@@ -238,4 +242,17 @@ func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, r
 	}
 
 	return nil
+}
+
+func convertGitURLtoHTTP(url string) string {
+	if !strings.HasPrefix(url, "git@") {
+		return url
+	}
+
+	url = strings.TrimPrefix(url, "git@")
+
+	// replace host:org/repo to host/org/repo
+	url = strings.Replace(url, ":", "/", 1)
+
+	return "https://" + url
 }
