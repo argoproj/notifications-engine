@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"path/filepath"
+	"os"
 	"time"
 
 	"github.com/ghodss/yaml"
@@ -87,7 +87,7 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 }
 
 func (c *commandContext) loadResource(name string) (*unstructured.Unstructured, error) {
-	if ext := filepath.Ext(name); ext != "" {
+	if fileinfo, err := os.Stat(name); err == nil && !fileinfo.IsDir() {
 		data, err := ioutil.ReadFile(name)
 		if err != nil {
 			return nil, err

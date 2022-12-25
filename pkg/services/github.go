@@ -31,9 +31,11 @@ type GitHubOptions struct {
 }
 
 type GitHubNotification struct {
-	repoURL  string
-	revision string
-	Status   *GitHubStatus `json:"status,omitempty"`
+	repoURL      string
+	revision     string
+	Status       *GitHubStatus `json:"status,omitempty"`
+	RepoURLPath  string        `json:"repoURLPath,omitempty"`
+	RevisionPath string        `json:"revisionPath,omitempty"`
 }
 
 type GitHubStatus struct {
@@ -48,12 +50,19 @@ const (
 )
 
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
-	repoURL, err := texttemplate.New(name).Funcs(f).Parse(repoURLtemplate)
+	if g.RepoURLPath == "" {
+		g.RepoURLPath = repoURLtemplate
+	}
+	if g.RevisionPath == "" {
+		g.RevisionPath = revisionTemplate
+	}
+
+	repoURL, err := texttemplate.New(name).Funcs(f).Parse(g.RepoURLPath)
 	if err != nil {
 		return nil, err
 	}
 
-	revision, err := texttemplate.New(name).Funcs(f).Parse(revisionTemplate)
+	revision, err := texttemplate.New(name).Funcs(f).Parse(g.RevisionPath)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +87,10 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.GitHub == nil {
-			notification.GitHub = &GitHubNotification{}
+			notification.GitHub = &GitHubNotification{
+				RepoURLPath:  g.RepoURLPath,
+				RevisionPath: g.RevisionPath,
+			}
 		}
 
 		var repoData bytes.Buffer
