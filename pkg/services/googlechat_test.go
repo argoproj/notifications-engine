@@ -31,6 +31,47 @@ func TestTextMessage_GoogleChat(t *testing.T) {
 		return
 	}
 
+	assert.Nil(t, notification.GoogleChat)
+
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assert.NotNil(t, message)
+	assert.Equal(t, message.Text, "message value")
+}
+
+func TestTextMessageWithThreadKey_GoogleChat(t *testing.T) {
+	notificationTemplate := Notification{
+		Message: "message {{.value}}",
+		GoogleChat: &GoogleChatNotification{
+			ThreadKey: "{{.threadKey}}",
+		},
+	}
+
+	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	notification := Notification{}
+
+	err = templater(&notification, map[string]interface{}{
+		"value":     "value",
+		"threadKey": "testThreadKey",
+	})
+
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assert.NotNil(t, notification.GoogleChat)
+	assert.Equal(t, notification.GoogleChat.ThreadKey, "testThreadKey")
+
 	message, err := googleChatNotificationToMessage(notification)
 	if err != nil {
 		t.Error(err)
@@ -139,6 +180,12 @@ func TestSendMessage_NoError(t *testing.T) {
 	called := false
 	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		called = true
+
+		if err := req.ParseForm(); err != nil {
+			t.Fatal("error on parse form")
+		}
+		assert.False(t, req.Form.Has("threadKey"), "threadKey query param should not be set")
+
 		res.WriteHeader(http.StatusOK)
 		_, err := res.Write([]byte("{}"))
 		if err != nil {
@@ -150,6 +197,33 @@ func TestSendMessage_NoError(t *testing.T) {
 	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": testServer.URL}}
 	service := NewGoogleChatService(opts).(*googleChatService)
 	notification := Notification{Message: ""}
+	destination := Destination{Recipient: "test"}
+	err := service.Send(notification, destination)
+	assert.Nil(t, err)
+	assert.True(t, called)
+}
+
+func TestSendMessageWithThreadKey_NoError(t *testing.T) {
+	called := false
+	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		called = true
+
+		if err := req.ParseForm(); err != nil {
+			t.Fatal("error on parse form")
+		}
+		assert.Equal(t, "testThreadKey", req.Form.Get("threadKey"), "threadKey query param should be set")
+
+		res.WriteHeader(http.StatusOK)
+		_, err := res.Write([]byte("{}"))
+		if err != nil {
+			t.Fatal("error on write response body")
+		}
+	}))
+	defer func() { testServer.Close() }()
+
+	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": testServer.URL}}
+	service := NewGoogleChatService(opts).(*googleChatService)
+	notification := Notification{Message: "", GoogleChat: &GoogleChatNotification{ThreadKey: "testThreadKey"}}
 	destination := Destination{Recipient: "test"}
 	err := service.Send(notification, destination)
 	assert.Nil(t, err)
