@@ -75,9 +75,9 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		return nil, err
 	}
 
-	var state, label, targetURL *texttemplate.Template
+	var statusState, label, targetURL *texttemplate.Template
 	if g.Status != nil {
-		state, err = texttemplate.New(name).Funcs(f).Parse(g.Status.State)
+		statusState, err = texttemplate.New(name).Funcs(f).Parse(g.Status.State)
 		if err != nil {
 			return nil, err
 		}
@@ -93,9 +93,9 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
-	var environment, environmentURL, logURL *texttemplate.Template
+	var deploymentState, environment, environmentURL, logURL *texttemplate.Template
 	if g.Deployment != nil {
-		state, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
+		deploymentState, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +142,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 
 			var stateData bytes.Buffer
-			if err := state.Execute(&stateData, vars); err != nil {
+			if err := statusState.Execute(&stateData, vars); err != nil {
 				return err
 			}
 			notification.GitHub.Status.State = stateData.String()
@@ -166,7 +166,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 
 			var stateData bytes.Buffer
-			if err := state.Execute(&stateData, vars); err != nil {
+			if err := deploymentState.Execute(&stateData, vars); err != nil {
 				return err
 			}
 			notification.GitHub.Deployment.State = stateData.String()
