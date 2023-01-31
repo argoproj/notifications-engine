@@ -85,3 +85,6 @@ require (
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
 	sigs.k8s.io/yaml v1.2.0 // indirect
 )
+
+// Address CVE-2021-4238
+replace github.com/Masterminds/goutils => github.com/Masterminds/goutils v1.1.1
