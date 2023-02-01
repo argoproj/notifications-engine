@@ -46,10 +46,11 @@ type GitHubStatus struct {
 }
 
 type GitHubDeployment struct {
-	State          string `json:"state,omitempty"`
-	Environment    string `json:"environment,omitempty"`
-	EnvironmentURL string `json:"environmentURL,omitempty"`
-	LogURL         string `json:"logURL,omitempty"`
+	State            string   `json:"state,omitempty"`
+	Environment      string   `json:"environment,omitempty"`
+	EnvironmentURL   string   `json:"environmentURL,omitempty"`
+	LogURL           string   `json:"logURL,omitempty"`
+	RequiredContexts []string `json:"requiredContexts,omitempty"`
 }
 
 const (
@@ -275,7 +276,9 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		if err != nil {
 			return err
 		}
-	} else if notification.GitHub.Deployment != nil {
+	}
+
+	if notification.GitHub.Deployment != nil {
 		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
@@ -284,8 +287,9 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			u[0],
 			u[1],
 			&github.DeploymentRequest{
-				Ref:         &notification.GitHub.revision,
-				Environment: &notification.GitHub.Deployment.Environment,
+				Ref:              &notification.GitHub.revision,
+				Environment:      &notification.GitHub.Deployment.Environment,
+				RequiredContexts: &notification.GitHub.Deployment.RequiredContexts,
 			},
 		)
 		if err != nil {
