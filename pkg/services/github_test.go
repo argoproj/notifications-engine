@@ -112,10 +112,11 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 			RepoURLPath:  "{{.sync.spec.git.repo}}",
 			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
 			Deployment: &GitHubDeployment{
-				State:          "success",
-				Environment:    "production",
-				EnvironmentURL: "https://argoproj.github.io",
-				LogURL:         "https://argoproj.github.io/log",
+				State:            "success",
+				Environment:      "production",
+				EnvironmentURL:   "https://argoproj.github.io",
+				LogURL:           "https://argoproj.github.io/log",
+				RequiredContexts: []string{},
 			},
 		},
 	}
@@ -154,4 +155,5 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Equal(t, "production", notification.GitHub.Deployment.Environment)
 	assert.Equal(t, "https://argoproj.github.io", notification.GitHub.Deployment.EnvironmentURL)
 	assert.Equal(t, "https://argoproj.github.io/log", notification.GitHub.Deployment.LogURL)
+	assert.Len(t, notification.GitHub.Deployment.RequiredContexts, 0)
 }

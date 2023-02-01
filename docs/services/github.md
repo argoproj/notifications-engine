@@ -74,6 +74,7 @@ template.app-deployed: |
       environment: production
       environmentURL: "https://{{.app.metadata.name}}.example.com"
       logURL: "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true"
+      requiredContexts: []
 ```
 
 **Notes**:
