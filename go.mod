@@ -6,7 +6,7 @@ require (
 	github.com/Masterminds/sprig v2.22.0+incompatible
 	github.com/PagerDuty/go-pagerduty v1.6.0
 	github.com/RocketChat/Rocket.Chat.Go.SDK v0.0.0-20210112200207-10ab4d695d60
-	github.com/antonmedv/expr v1.9.0
+	github.com/antonmedv/expr v1.12.0
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
 	github.com/ghodss/yaml v1.0.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
