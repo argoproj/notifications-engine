@@ -3,7 +3,7 @@ package templates
 import (
 	"fmt"
 
-	"github.com/Masterminds/sprig"
+	"github.com/Masterminds/sprig/v3"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
