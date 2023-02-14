@@ -15,7 +15,6 @@ import (
 
 const (
 	notifiedHistoryMaxSize = 100
-	NotifiedAnnotationKey  = "notified." + subscriptions.AnnotationPrefix
 )
 
 func StateItemKey(trigger string, conditionResult triggers.ConditionResult, dest services.Destination) string {
@@ -67,6 +66,7 @@ func (s NotificationsState) SetAlreadyNotified(trigger string, result triggers.C
 func (s NotificationsState) Persist(res metav1.Object) (map[string]string, error) {
 	s.truncate(notifiedHistoryMaxSize)
 
+	notifiedAnnotationKey := subscriptions.NotifiedAnnotationKey()
 	annotations := map[string]string{}
 
 	if res.GetAnnotations() != nil {
@@ -76,13 +76,13 @@ func (s NotificationsState) Persist(res metav1.Object) (map[string]string, error
 	}
 
 	if len(s) == 0 {
-		delete(annotations, NotifiedAnnotationKey)
+		delete(annotations, notifiedAnnotationKey)
 	} else {
 		stateJson, err := json.Marshal(s)
 		if err != nil {
 			return nil, err
 		}
-		annotations[NotifiedAnnotationKey] = string(stateJson)
+		annotations[notifiedAnnotationKey] = string(stateJson)
 	}
 
 	return annotations, nil
@@ -100,8 +100,9 @@ func NewState(val string) NotificationsState {
 }
 
 func NewStateFromRes(res metav1.Object) NotificationsState {
+	notifiedAnnotationKey := subscriptions.NotifiedAnnotationKey()
 	if annotations := res.GetAnnotations(); annotations != nil {
-		return NewState(annotations[NotifiedAnnotationKey])
+		return NewState(annotations[notifiedAnnotationKey])
 	}
 	return NotificationsState{}
 }
