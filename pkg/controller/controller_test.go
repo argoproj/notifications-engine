@@ -29,9 +29,10 @@ import (
 )
 
 var (
-	testGVR       = schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"}
-	testNamespace = "default"
-	logEntry      = logrus.NewEntry(logrus.New())
+	testGVR               = schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"}
+	testNamespace         = "default"
+	logEntry              = logrus.NewEntry(logrus.New())
+	notifiedAnnotationKey = subscriptions.NotifiedAnnotationKey()
 )
 
 func mustToJson(val interface{}) string {
@@ -120,7 +121,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 
 	assert.NoError(t, err)
 
-	state := NewState(annotations[NotifiedAnnotationKey])
+	state := NewState(annotations[notifiedAnnotationKey])
 	assert.NotNil(t, state[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
@@ -132,7 +133,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-		NotifiedAnnotationKey: mustToJson(state),
+		notifiedAnnotationKey: mustToJson(state),
 	}))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	assert.NoError(t, err)
@@ -154,7 +155,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-		NotifiedAnnotationKey: mustToJson(state),
+		notifiedAnnotationKey: mustToJson(state),
 	}))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	assert.NoError(t, err)
@@ -166,7 +167,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
 	assert.NoError(t, err)
-	state = NewState(annotations[NotifiedAnnotationKey])
+	state = NewState(annotations[notifiedAnnotationKey])
 	assert.Empty(t, state)
 }
 
@@ -179,7 +180,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-		NotifiedAnnotationKey: mustToJson(state),
+		notifiedAnnotationKey: mustToJson(state),
 	}))
 
 	patchCh := make(chan []byte)
@@ -202,7 +203,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 		patch := map[string]interface{}{}
 		err = json.Unmarshal(patchData, &patch)
 		assert.NoError(t, err)
-		val, ok, err := unstructured.NestedFieldNoCopy(patch, "metadata", "annotations", NotifiedAnnotationKey)
+		val, ok, err := unstructured.NestedFieldNoCopy(patch, "metadata", "annotations", notifiedAnnotationKey)
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Nil(t, val)
