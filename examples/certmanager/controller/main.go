@@ -34,6 +34,9 @@ func main() {
 	var command = cobra.Command{
 		Use: "controller",
 		Run: func(c *cobra.Command, args []string) {
+			// Optionally set the annotations prefix
+			// subscriptions.SetAnnotationPrefix("example.prefix.io")
+
 			// Get Kubernetes REST Config and current Namespace so we can talk to Kubernetes
 			restConfig, err := clientConfig.ClientConfig()
 			if err != nil {

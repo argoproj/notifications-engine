@@ -6,6 +6,12 @@ The example demonstrates how Notifications Engine can be used to implement noti
 
 The machinery required for controller implementation is provided by [pkg/controller](../../pkg/controller) and [pkg/api](../../pkg/api) packages.
 
+* You may optionally set the annotation prefix using the `subscriptions.SetAnnotationPrefix` function. This defaults to `"notifications.argoproj.io"`.
+
+```golang
+subscriptions.SetAnnotationPrefix("example.prefix.io")
+```
+
 * The first step is to write the boilerplate code required to get Kubernetes REST config so we can talk to API server.
 
 * Next create `ConfigMap` and `Secret` informers and use it to initialize `api.Factory`:

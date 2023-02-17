@@ -257,3 +257,15 @@ func TestUnsubscribe(t *testing.T) {
 	_, ok := a["notifications.argoproj.io/subscribe.my-trigger.slack"]
 	assert.False(t, ok)
 }
+
+func TestSetAnnotationPrefix(t *testing.T) {
+	origPrefix := annotationPrefix
+	defer func() {
+		annotationPrefix = origPrefix
+	}()
+
+	SetAnnotationPrefix("test.prefix")
+
+	assert.Equal(t, "test.prefix", annotationPrefix)
+	assert.Equal(t, "notified.test.prefix", NotifiedAnnotationKey())
+}
