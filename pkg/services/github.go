@@ -50,7 +50,7 @@ type GitHubDeployment struct {
 	Environment      string   `json:"environment,omitempty"`
 	EnvironmentURL   string   `json:"environmentURL,omitempty"`
 	LogURL           string   `json:"logURL,omitempty"`
-	RequiredContexts []string `json:"requiredContexts,omitempty"`
+	RequiredContexts []string `json:"requiredContexts"`
 }
 
 const (
@@ -189,6 +189,8 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 				return err
 			}
 			notification.GitHub.Deployment.LogURL = logURLData.String()
+
+			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 		}
 
 		return nil
