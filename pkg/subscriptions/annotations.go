@@ -10,9 +10,19 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
-const (
-	AnnotationPrefix = "notifications.argoproj.io"
+var (
+	annotationPrefix = "notifications.argoproj.io"
 )
+
+// SetAnnotationPrefix sets the annotationPrefix to the provided string.
+// defaults to "notifications.argoproj.io"
+func SetAnnotationPrefix(prefix string) {
+	annotationPrefix = prefix
+}
+
+func NotifiedAnnotationKey() string {
+	return fmt.Sprintf("notified.%s", annotationPrefix)
+}
 
 func parseRecipients(v string) []string {
 	var recipients []string
@@ -26,7 +36,7 @@ func parseRecipients(v string) []string {
 }
 
 func SubscribeAnnotationKey(trigger string, service string) string {
-	return fmt.Sprintf("%s/subscribe.%s.%s", AnnotationPrefix, trigger, service)
+	return fmt.Sprintf("%s/subscribe.%s.%s", annotationPrefix, trigger, service)
 }
 
 type Annotations map[string]string
@@ -51,8 +61,8 @@ type Destination struct {
 }
 
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
-	prefix := AnnotationPrefix + "/subscribe."
-	altPrefix := AnnotationPrefix + "/subscriptions"
+	prefix := annotationPrefix + "/subscribe."
+	altPrefix := annotationPrefix + "/subscriptions"
 	var recipients []string
 	for k, v := range a {
 		switch {
