@@ -78,7 +78,17 @@ func main() {
 					return certClient.Watch(context.Background(), metav1.ListOptions{})
 				},
 			}, &unstructured.Unstructured{}, time.Minute, cache.Indexers{})
-			ctrl := controller.NewController(certClient, certsInformer, notificationsFactory)
+			ctrl := controller.NewController(
+				certClient,
+				certsInformer,
+				notificationsFactory,
+				// Register a callback to track notification deliveries/errors
+				// May be helpful in use cases such as surfacing metrics/status
+				controller.WithEventCallback(func(eventSequence controller.NotificationEventSequence) {
+					log.Printf("processed notifications for %s. delivered %v notifications with %v errors",
+						eventSequence.Key, len(eventSequence.Delivered), len(eventSequence.Errors))
+				}),
+			)
 
 			// Start informers and controller
 			go informersFactory.Start(context.Background().Done())
