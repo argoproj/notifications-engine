@@ -19,7 +19,7 @@ require (
 	github.com/slack-go/slack v0.12.1
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.1
-	github.com/whilp/git-urls v0.0.0-20191001220047-6db9661140c0
+	github.com/whilp/git-urls v1.0.0
 	golang.org/x/time v0.0.0-20210723032227-1f47c861a9ac
 	gomodules.xyz/notify v0.1.1
 	gopkg.in/yaml.v3 v3.0.1
