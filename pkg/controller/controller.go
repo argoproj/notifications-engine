@@ -23,6 +23,43 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 )
 
+// NotificationDelivery represents a notification that was delivered
+type NotificationDelivery struct {
+	// Trigger is the trigger of the notification delivery
+	Trigger string
+	// Destination is the destination of the notification delivery
+	Destination services.Destination
+	// AlreadyNotified indicates that this notification was already delivered in a previous iteration
+	AlreadyNotified bool
+}
+
+// NotificationEventSequence represents a sequence of events that occurred while
+// processing an object for notifications
+type NotificationEventSequence struct {
+	// Key is the resource key. Format is the namespaced name
+	Key string
+	// Resource is the resource that was being processed when the event occurred
+	Resource v1.Object
+	// Delivered is a list of notifications that were delivered
+	Delivered []NotificationDelivery
+	// Errors is a list of errors that occurred during the processing iteration
+	Errors []error
+	// Warnings is a list of warnings that occurred during the processing iteration
+	Warnings []error
+}
+
+func (s *NotificationEventSequence) addDelivered(event NotificationDelivery) {
+	s.Delivered = append(s.Delivered, event)
+}
+
+func (s *NotificationEventSequence) addError(err error) {
+	s.Errors = append(s.Errors, err)
+}
+
+func (s *NotificationEventSequence) addWarning(warn error) {
+	s.Warnings = append(s.Warnings, warn)
+}
+
 type NotificationController interface {
 	Run(threadiness int, stopCh <-chan struct{})
 }
@@ -50,6 +87,14 @@ func WithAlterDestinations(f func(obj v1.Object, destinations services.Destinati
 func WithSkipProcessing(f func(obj v1.Object) (bool, string)) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.skipProcessing = f
+	}
+}
+
+// WithEventCallback registers a callback to invoke when an object has been
+// processed for notifications.
+func WithEventCallback(f func(eventSequence NotificationEventSequence)) Opts {
+	return func(ctrl *notificationController) {
+		ctrl.eventCallback = f
 	}
 }
 
@@ -106,6 +151,7 @@ type notificationController struct {
 	skipProcessing    func(obj v1.Object) (bool, string)
 	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
 	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
+	eventCallback     func(eventSequence NotificationEventSequence)
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -123,7 +169,7 @@ func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
 	log.Warn("Controller has stopped.")
 }
 
-func (c *notificationController) processResource(resource v1.Object, logEntry *log.Entry) (map[string]string, error) {
+func (c *notificationController) processResource(resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
 	notificationsState := NewStateFromRes(resource)
 	api, err := c.apiFactory.GetAPI()
 	if err != nil {
@@ -144,6 +190,7 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
 			logEntry.Debugf("Failed to execute condition of trigger %s: %v", trigger, err)
+			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %v", trigger, err))
 		}
 		logEntry.Infof("Trigger %s result: %v", trigger, res)
 
@@ -160,6 +207,11 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 			for _, to := range destinations {
 				if changed := notificationsState.SetAlreadyNotified(trigger, cr, to, true); !changed {
 					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v'", trigger, cr.Key, to)
+					eventSequence.addDelivered(NotificationDelivery{
+						Trigger:         trigger,
+						Destination:     to,
+						AlreadyNotified: true,
+					})
 				} else {
 					logEntry.Infof("Sending notification about condition '%s.%s' to '%v'", trigger, cr.Key, to)
 					if err := api.Send(un.Object, cr.Templates, to); err != nil {
@@ -167,9 +219,15 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 							to, resource.GetNamespace(), resource.GetName(), err)
 						notificationsState.SetAlreadyNotified(trigger, cr, to, false)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
+						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v", trigger, to, err))
 					} else {
 						logEntry.Debugf("Notification %s was sent", to.Recipient)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
+						eventSequence.addDelivered(NotificationDelivery{
+							Trigger:         trigger,
+							Destination:     to,
+							AlreadyNotified: false,
+						})
 					}
 				}
 			}
@@ -202,9 +260,17 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		c.queue.Done(key)
 	}()
 
+	eventSequence := NotificationEventSequence{Key: key.(string)}
+	defer func() {
+		if c.eventCallback != nil {
+			c.eventCallback(eventSequence)
+		}
+	}()
+
 	obj, exists, err := c.informer.GetIndexer().GetByKey(key.(string))
 	if err != nil {
 		log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
+		eventSequence.addError(err)
 		return
 	}
 	if !exists {
@@ -214,8 +280,10 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 	resource, ok := obj.(v1.Object)
 	if !ok {
 		log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
+		eventSequence.addError(err)
 		return
 	}
+	eventSequence.Resource = resource
 
 	logEntry := log.WithField("resource", key)
 	logEntry.Info("Start processing")
@@ -226,9 +294,10 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 	}
 
-	annotations, err := c.processResource(resource, logEntry)
+	annotations, err := c.processResource(resource, logEntry, &eventSequence)
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
+		eventSequence.addError(err)
 		return
 	}
 
@@ -248,15 +317,18 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		})
 		if err != nil {
 			logEntry.Errorf("Failed to marshal resource patch: %v", err)
+			eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %v", err))
 			return
 		}
 		resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
 		if err != nil {
 			logEntry.Errorf("Failed to patch resource: %v", err)
+			eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %v", err))
 			return
 		}
 		if err := c.informer.GetStore().Update(resource); err != nil {
 			logEntry.Warnf("Failed to store update resource in informer: %v", err)
+			eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %v", err))
 		}
 	}
 	logEntry.Info("Processing completed")

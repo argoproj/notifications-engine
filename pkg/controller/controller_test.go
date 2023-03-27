@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -64,7 +65,7 @@ func newResource(name string, modifiers ...func(app *unstructured.Unstructured))
 	return &app
 }
 
-func newController(t *testing.T, ctx context.Context, client dynamic.Interface) (*notificationController, *mocks.MockAPI, error) {
+func newController(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, *mocks.MockAPI, error) {
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -89,7 +90,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface) 
 
 	go informer.Run(ctx.Done())
 
-	c := NewController(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI})
+	c := NewController(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, nil, errors.New("failed to sync informers")
 	}
@@ -114,7 +115,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 		return true
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
 
-	annotations, err := ctrl.processResource(app, logEntry)
+	annotations, err := ctrl.processResource(app, logEntry, &NotificationEventSequence{})
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
@@ -140,7 +141,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 
-	_, err = ctrl.processResource(app, logEntry)
+	_, err = ctrl.processResource(app, logEntry, &NotificationEventSequence{})
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
@@ -162,7 +163,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
-	annotations, err := ctrl.processResource(app, logEntry)
+	annotations, err := ctrl.processResource(app, logEntry, &NotificationEventSequence{})
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
@@ -270,4 +271,80 @@ func TestAnnotationIsTheSame(t *testing.T) {
 		}))
 		assert.False(t, mapsEqual(app1.GetAnnotations(), app2.GetAnnotations()))
 	})
+}
+
+func TestWithEventCallback(t *testing.T) {
+	const triggerName = "my-trigger"
+	destination := services.Destination{Service: "mock", Recipient: "recipient"}
+	testCases := []struct {
+		description        string
+		apiErr             error
+		sendErr            error
+		expectedDeliveries []NotificationDelivery
+		expectedErrors     []error
+		expectedWarnings   []error
+	}{
+		{
+			description: "EventCallback should be invoked with nil error on send success",
+			sendErr:     nil,
+			expectedDeliveries: []NotificationDelivery{
+				{
+					Trigger:     triggerName,
+					Destination: destination,
+				},
+			},
+		},
+		{
+			description: "EventCallback should be invoked with non-nil error on send failure",
+			sendErr:     errors.New("this is a send error"),
+			expectedErrors: []error{
+				errors.New("failed to deliver notification my-trigger to {mock recipient}: this is a send error"),
+			},
+		},
+		{
+			description: "EventCallback should be invoked with non-nil error on api failure",
+			apiErr:      errors.New("this is an api error"),
+			expectedErrors: []error{
+				fmt.Errorf("this is an api error"),
+			},
+		},
+	}
+	var actualSequence *NotificationEventSequence
+	mockEventCallback := func(eventSequence NotificationEventSequence) {
+		actualSequence = &eventSequence
+	}
+	for _, tc := range testCases {
+		t.Run(tc.description, func(t *testing.T) {
+			actualSequence = nil
+			ctx, cancel := context.WithCancel(context.TODO())
+			defer cancel()
+			app := newResource("test", withAnnotations(map[string]string{
+				subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+			}))
+
+			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
+			assert.NoError(t, err)
+			ctrl.apiFactory = &mocks.FakeFactory{Api: api, Err: tc.apiErr}
+
+			if tc.apiErr == nil {
+				api.EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+				api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+					return true
+				}), []string{"test"}, destination).Return(tc.sendErr)
+			}
+
+			ctrl.processQueueItem()
+
+			assert.Equal(t, app, actualSequence.Resource)
+
+			assert.Equal(t, len(tc.expectedDeliveries), len(actualSequence.Delivered))
+			for i, event := range actualSequence.Delivered {
+				assert.Equal(t, tc.expectedDeliveries[i].Trigger, event.Trigger)
+				assert.Equal(t, tc.expectedDeliveries[i].Destination, event.Destination)
+			}
+
+			assert.Equal(t, tc.expectedErrors, actualSequence.Errors)
+			assert.Equal(t, tc.expectedWarnings, actualSequence.Warnings)
+		})
+	}
 }
