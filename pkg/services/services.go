@@ -8,7 +8,7 @@ import (
 	texttemplate "text/template"
 	_ "time/tzdata"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 type Notification struct {
