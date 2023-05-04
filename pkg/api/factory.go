@@ -5,6 +5,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -18,11 +19,18 @@ type Settings struct {
 	SecretName string
 	// InitGetVars returns a function that produces notifications context variables
 	InitGetVars func(cfg *Config, configMap *v1.ConfigMap, secret *v1.Secret) (GetVars, error)
+	// Default namespace for ConfigMap and Secret
+	Namespace string
 }
 
 // Factory creates an API instance
 type Factory interface {
 	GetAPI() (API, error)
+}
+
+// Factory creates an API instance
+type MayFactory interface {
+	GetAPIWithNamespace(namespace string) (API, error)
 }
 
 type apiFactory struct {
@@ -32,13 +40,20 @@ type apiFactory struct {
 	secretLister v1listers.SecretNamespaceLister
 	lock         sync.Mutex
 	api          API
+
+	cmInformer      cache.SharedIndexInformer
+	secretsInformer cache.SharedIndexInformer
+	apiMap          map[string]API
 }
 
 func NewFactory(settings Settings, namespace string, secretsInformer cache.SharedIndexInformer, cmInformer cache.SharedIndexInformer) *apiFactory {
 	factory := &apiFactory{
-		Settings:     settings,
-		cmLister:     v1listers.NewConfigMapLister(cmInformer.GetIndexer()).ConfigMaps(namespace),
-		secretLister: v1listers.NewSecretLister(secretsInformer.GetIndexer()).Secrets(namespace),
+		Settings:        settings,
+		cmLister:        v1listers.NewConfigMapLister(cmInformer.GetIndexer()).ConfigMaps(namespace),
+		secretLister:    v1listers.NewSecretLister(secretsInformer.GetIndexer()).Secrets(namespace),
+		cmInformer:      cmInformer,
+		secretsInformer: secretsInformer,
+		apiMap:          make(map[string]API),
 	}
 
 	secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -96,10 +111,39 @@ func (f *apiFactory) getConfigMapAndSecret() (*v1.ConfigMap, *v1.Secret, error) 
 	return cm, secret, err
 }
 
+func (f *apiFactory) getConfigMapAndSecretWithNamespace(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
+
+	cmLister := v1listers.NewConfigMapLister(f.cmInformer.GetIndexer()).ConfigMaps(namespace)
+	secretLister := v1listers.NewSecretLister(f.secretsInformer.GetIndexer()).Secrets(namespace)
+
+	cm, err := cmLister.Get(f.ConfigMapName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			cm = &v1.ConfigMap{}
+		} else {
+			return nil, nil, err
+		}
+	}
+
+	secret, err := secretLister.Get(f.SecretName)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			secret = &v1.Secret{}
+		} else {
+			return nil, nil, err
+		}
+	}
+
+	return cm, secret, err
+}
+
 func (f *apiFactory) invalidateCache() {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	f.api = nil
+	for namespace := range f.apiMap {
+		f.apiMap[namespace] = nil
+	}
 }
 
 func (f *apiFactory) GetAPI() (API, error) {
@@ -125,4 +169,45 @@ func (f *apiFactory) GetAPI() (API, error) {
 		f.api = api
 	}
 	return f.api, nil
+}
+
+func (f *apiFactory) GetAPIWithNamespace(namespace string) (API, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+	namespaceHasConfig := namespace
+
+	if f.apiMap[namespaceHasConfig] != nil {
+		return f.apiMap[namespaceHasConfig], nil
+	}
+
+	cm, secret, err := f.getConfigMapAndSecretWithNamespace(namespaceHasConfig)
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return nil, err
+		}
+		// If could not find it in namespace, try the namespace from settings
+		namespaceHasConfig = f.Settings.Namespace
+		if f.apiMap[namespaceHasConfig] != nil {
+			return f.apiMap[namespaceHasConfig], nil
+		}
+		cm, secret, err = f.getConfigMapAndSecretWithNamespace(namespaceHasConfig)
+		if err != nil {
+			return nil, err
+		}
+	}
+	cfg, err := ParseConfig(cm, secret)
+	if err != nil {
+		return nil, err
+	}
+	getVars, err := f.InitGetVars(cfg, cm, secret)
+	if err != nil {
+		return nil, err
+	}
+	api, err := NewAPI(*cfg, getVars)
+	if err != nil {
+		return nil, err
+	}
+	f.apiMap[namespaceHasConfig] = api
+
+	return f.apiMap[namespaceHasConfig], nil
 }
