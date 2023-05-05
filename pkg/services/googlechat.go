@@ -9,8 +9,8 @@ import (
 	"net/url"
 	texttemplate "text/template"
 
-	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/yaml"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )

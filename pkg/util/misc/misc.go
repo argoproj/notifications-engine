@@ -7,7 +7,7 @@ import (
 	"reflect"
 	"sort"
 
-	"github.com/ghodss/yaml"
+	"sigs.k8s.io/yaml"
 )
 
 func PrintFormatted(input interface{}, output string, out io.Writer) error {
