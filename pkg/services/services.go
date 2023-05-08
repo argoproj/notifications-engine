@@ -24,6 +24,7 @@ type Notification struct {
 	Alertmanager *AlertmanagerNotification `json:"alertmanager,omitempty"`
 	GoogleChat   *GoogleChatNotification   `json:"googlechat,omitempty"`
 	Pagerduty    *PagerDutyNotification    `json:"pagerduty,omitempty"`
+	PagerdutyV2  *PagerDutyV2Notification  `json:"pagerdutyv2,omitempty"`
 	Newrelic     *NewrelicNotification     `json:"newrelic,omitempty"`
 }
 
@@ -95,6 +96,10 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 
 	if n.Pagerduty != nil {
 		sources = append(sources, n.Pagerduty)
+	}
+
+	if n.PagerdutyV2 != nil {
+		sources = append(sources, n.PagerdutyV2)
 	}
 
 	if n.Newrelic != nil {
@@ -197,6 +202,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewPagerdutyService(opts), nil
+	case "pagerdutyv2":
+		var opts PagerdutyV2Options
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewPagerdutyV2Service(opts), nil
 	case "newrelic":
 		var opts NewrelicOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
