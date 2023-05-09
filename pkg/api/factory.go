@@ -33,6 +33,11 @@ type MayFactory interface {
 	GetAPIWithNamespace(namespace string) (API, error)
 }
 
+// Factory creates an API instance
+type MayFactoryWithMultipleAPIs interface {
+	GetAPIsWithNamespace(namespace string) (map[string]API, error)
+}
+
 type apiFactory struct {
 	Settings
 
@@ -210,4 +215,75 @@ func (f *apiFactory) GetAPIWithNamespace(namespace string) (API, error) {
 	f.apiMap[namespaceHasConfig] = api
 
 	return f.apiMap[namespaceHasConfig], nil
+}
+
+// Returns a map of api in the namespace and api in the setting's namespace
+func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, error) {
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	apis := make(map[string]API)
+
+	if f.apiMap[namespace] != nil && f.apiMap[f.Settings.Namespace] != nil {
+		apis[namespace] = f.apiMap[namespace]
+		apis[f.Settings.Namespace] = f.apiMap[f.Settings.Namespace]
+		return apis, nil
+	}
+
+	if f.apiMap[namespace] != nil {
+		apis[namespace] = f.apiMap[namespace]
+		api, err := f.getApiFromNamespace(f.Settings.Namespace)
+		if err == nil {
+			apis[f.Settings.Namespace] = api
+			f.apiMap[f.Settings.Namespace] = api
+		}
+		return apis, nil
+	}
+
+	if f.apiMap[f.Settings.Namespace] != nil {
+		apis[f.Settings.Namespace] = f.apiMap[f.Settings.Namespace]
+		api, err := f.getApiFromNamespace(namespace)
+		if err == nil {
+			apis[namespace] = api
+			f.apiMap[namespace] = api
+		}
+
+		return apis, nil
+	}
+
+	//Where is nothing in cache, then we retrieve them
+	apiFromNamespace, err := f.getApiFromNamespace(namespace)
+	if err == nil {
+		apis[namespace] = apiFromNamespace
+	}
+	apiFromSettings, err := f.getApiFromNamespace(f.Settings.Namespace)
+	if err == nil {
+		apis[f.Settings.Namespace] = apiFromSettings
+	}
+	f.apiMap[namespace] = apiFromNamespace
+	f.apiMap[f.Settings.Namespace] = apiFromSettings
+	return apis, nil
+
+}
+
+func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
+	cm, secret, err := f.getConfigMapAndSecretWithNamespace(namespace)
+	if err != nil {
+		if !k8serrors.IsNotFound(err) {
+			return nil, err
+		}
+	}
+	cfg, err := ParseConfig(cm, secret)
+	if err != nil {
+		return nil, err
+	}
+	getVars, err := f.InitGetVars(cfg, cm, secret)
+	if err != nil {
+		return nil, err
+	}
+	api, err := NewAPI(*cfg, getVars)
+	if err != nil {
+		return nil, err
+	}
+	return api, nil
 }
