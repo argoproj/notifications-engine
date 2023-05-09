@@ -6,9 +6,8 @@ require (
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/PagerDuty/go-pagerduty v1.6.0
 	github.com/RocketChat/Rocket.Chat.Go.SDK v0.0.0-20210112200207-10ab4d695d60
-	github.com/antonmedv/expr v1.9.0
+	github.com/antonmedv/expr v1.12.5
 	github.com/bradleyfalzon/ghinstallation/v2 v2.1.0
-	github.com/ghodss/yaml v1.0.0
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/golang/mock v1.6.0
 	github.com/google/go-github/v41 v41.0.0
@@ -26,6 +25,7 @@ require (
 	k8s.io/api v0.23.3
 	k8s.io/apimachinery v0.23.3
 	k8s.io/client-go v0.23.3
+	sigs.k8s.io/yaml v1.3.0
 )
 
 require (
@@ -85,7 +85,6 @@ require (
 	k8s.io/utils v0.0.0-20211116205334-6203023598ed // indirect
 	sigs.k8s.io/json v0.0.0-20211020170558-c049b76a60c6 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.2.1 // indirect
-	sigs.k8s.io/yaml v1.2.0 // indirect
 )
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.14.0

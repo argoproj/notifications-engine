@@ -9,11 +9,11 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 	"github.com/argoproj/notifications-engine/pkg/triggers"
 
-	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 	yaml3 "gopkg.in/yaml.v3"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"sigs.k8s.io/yaml"
 )
 
 type ServiceFactory func() (services.NotificationService, error)
