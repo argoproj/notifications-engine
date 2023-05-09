@@ -255,13 +255,14 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 	apiFromNamespace, err := f.getApiFromNamespace(namespace)
 	if err == nil {
 		apis[namespace] = apiFromNamespace
+		f.apiMap[namespace] = apiFromNamespace
 	}
 	apiFromSettings, err := f.getApiFromNamespace(f.Settings.Namespace)
 	if err == nil {
 		apis[f.Settings.Namespace] = apiFromSettings
+		f.apiMap[f.Settings.Namespace] = apiFromSettings
 	}
-	f.apiMap[namespace] = apiFromNamespace
-	f.apiMap[f.Settings.Namespace] = apiFromSettings
+
 	return apis, nil
 
 }

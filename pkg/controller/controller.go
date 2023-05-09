@@ -142,16 +142,61 @@ func NewController(
 	return ctrl
 }
 
+func NewControllerWithMultipleNamespace(
+	client dynamic.NamespaceableResourceInterface,
+	informer cache.SharedIndexInformer,
+	apiFactoryWithMultipleNamespace api.MayFactoryWithMultipleAPIs,
+	opts ...Opts,
+) *notificationController {
+	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
+	informer.AddEventHandler(
+		cache.ResourceEventHandlerFuncs{
+			AddFunc: func(obj interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(obj)
+				if err == nil {
+					queue.Add(key)
+				}
+			},
+			UpdateFunc: func(old, new interface{}) {
+				key, err := cache.MetaNamespaceKeyFunc(new)
+				if err == nil {
+					queue.Add(key)
+				}
+			},
+		},
+	)
+
+	ctrl := &notificationController{
+		client:                     client,
+		informer:                   informer,
+		queue:                      queue,
+		metricsRegistry:            NewMetricsRegistry(""),
+		apiFactoryWithMultipleAPIs: apiFactoryWithMultipleNamespace,
+		toUnstructured: func(obj v1.Object) (*unstructured.Unstructured, error) {
+			res, ok := obj.(*unstructured.Unstructured)
+			if !ok {
+				return nil, fmt.Errorf("Object must be *unstructured.Unstructured but was: %v", res)
+			}
+			return res, nil
+		},
+	}
+	for i := range opts {
+		opts[i](ctrl)
+	}
+	return ctrl
+}
+
 type notificationController struct {
-	client            dynamic.NamespaceableResourceInterface
-	informer          cache.SharedIndexInformer
-	queue             workqueue.RateLimitingInterface
-	apiFactory        api.Factory
-	metricsRegistry   *MetricsRegistry
-	skipProcessing    func(obj v1.Object) (bool, string)
-	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
-	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
-	eventCallback     func(eventSequence NotificationEventSequence)
+	client                     dynamic.NamespaceableResourceInterface
+	informer                   cache.SharedIndexInformer
+	queue                      workqueue.RateLimitingInterface
+	apiFactory                 api.Factory
+	metricsRegistry            *MetricsRegistry
+	skipProcessing             func(obj v1.Object) (bool, string)
+	alterDestinations          func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
+	toUnstructured             func(obj v1.Object) (*unstructured.Unstructured, error)
+	eventCallback              func(eventSequence NotificationEventSequence)
+	apiFactoryWithMultipleAPIs api.MayFactoryWithMultipleAPIs
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -237,6 +282,74 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 	return notificationsState.Persist(resource)
 }
 
+func (c *notificationController) processResourceWithAPI(api api.API, apiNamespace string, resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
+	notificationsState := NewStateFromRes(resource)
+	//api, err := c.apiFactory.GetAPI()
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	destinations := c.getDestinations(resource, api.GetConfig())
+	if len(destinations) == 0 {
+		return resource.GetAnnotations(), nil
+	}
+
+	un, err := c.toUnstructured(resource)
+	if err != nil {
+		return nil, err
+	}
+
+	for trigger, destinations := range destinations {
+		res, err := api.RunTrigger(trigger, un.Object)
+		if err != nil {
+			logEntry.Debugf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
+			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace))
+		}
+		logEntry.Infof("Trigger %s result: %v", trigger, res)
+
+		for _, cr := range res {
+			c.metricsRegistry.IncTriggerEvaluationsCounter(trigger, cr.Triggered)
+
+			if !cr.Triggered {
+				for _, to := range destinations {
+					notificationsState.SetAlreadyNotified(trigger, cr, to, false)
+				}
+				continue
+			}
+
+			for _, to := range destinations {
+				if changed := notificationsState.SetAlreadyNotified(trigger, cr, to, true); !changed {
+					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
+					eventSequence.addDelivered(NotificationDelivery{
+						Trigger:         trigger,
+						Destination:     to,
+						AlreadyNotified: true,
+					})
+				} else {
+					logEntry.Infof("Sending notification about condition '%s.%s' to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
+					if err := api.Send(un.Object, cr.Templates, to); err != nil {
+						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
+							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
+						notificationsState.SetAlreadyNotified(trigger, cr, to, false)
+						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
+						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
+					} else {
+						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
+						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
+						eventSequence.addDelivered(NotificationDelivery{
+							Trigger:         trigger,
+							Destination:     to,
+							AlreadyNotified: false,
+						})
+					}
+				}
+			}
+		}
+	}
+
+	return notificationsState.Persist(resource)
+}
+
 func (c *notificationController) getDestinations(resource v1.Object, cfg api.Config) services.Destinations {
 	res := cfg.GetGlobalDestinations(resource.GetLabels())
 	res.Merge(subscriptions.NewAnnotations(resource.GetAnnotations()).GetDestinations(cfg.DefaultTriggers, cfg.ServiceDefaultTriggers))
@@ -294,42 +407,92 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 	}
 
-	annotations, err := c.processResource(resource, logEntry, &eventSequence)
-	if err != nil {
-		logEntry.Errorf("Failed to process: %v", err)
-		eventSequence.addError(err)
-		return
-	}
-
-	if !mapsEqual(resource.GetAnnotations(), annotations) {
-		annotationsPatch := make(map[string]interface{})
-		for k, v := range annotations {
-			annotationsPatch[k] = v
+	if c.apiFactoryWithMultipleAPIs == nil {
+		annotations, err := c.processResource(resource, logEntry, &eventSequence)
+		if err != nil {
+			logEntry.Errorf("Failed to process: %v", err)
+			eventSequence.addError(err)
+			return
 		}
-		for k := range resource.GetAnnotations() {
-			if _, ok = annotations[k]; !ok {
-				annotationsPatch[k] = nil
+
+		if !mapsEqual(resource.GetAnnotations(), annotations) {
+			annotationsPatch := make(map[string]interface{})
+			for k, v := range annotations {
+				annotationsPatch[k] = v
+			}
+			for k := range resource.GetAnnotations() {
+				if _, ok = annotations[k]; !ok {
+					annotationsPatch[k] = nil
+				}
+			}
+
+			patchData, err := json.Marshal(map[string]map[string]interface{}{
+				"metadata": {"annotations": annotationsPatch},
+			})
+			if err != nil {
+				logEntry.Errorf("Failed to marshal resource patch: %v", err)
+				eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %v", err))
+				return
+			}
+			resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
+			if err != nil {
+				logEntry.Errorf("Failed to patch resource: %v", err)
+				eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %v", err))
+				return
+			}
+			if err := c.informer.GetStore().Update(resource); err != nil {
+				logEntry.Warnf("Failed to store update resource in informer: %v", err)
+				eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %v", err))
+			}
+		}
+	} else {
+		apisWithNamespace, err := c.apiFactoryWithMultipleAPIs.GetAPIsWithNamespace(resource.GetNamespace())
+		if err != nil {
+			logEntry.Errorf("Failed to process: %v", err)
+			eventSequence.addError(err)
+			return
+		}
+		for apiNamespace, api := range apisWithNamespace {
+			annotations, err := c.processResourceWithAPI(api, apiNamespace, resource, logEntry, &eventSequence)
+			if err != nil {
+				logEntry.Errorf("Failed to process: %v", err)
+				eventSequence.addError(err)
+				return
+			}
+
+			if !mapsEqual(resource.GetAnnotations(), annotations) {
+				annotationsPatch := make(map[string]interface{})
+				for k, v := range annotations {
+					annotationsPatch[k] = v
+				}
+				for k := range resource.GetAnnotations() {
+					if _, ok = annotations[k]; !ok {
+						annotationsPatch[k] = nil
+					}
+				}
+
+				patchData, err := json.Marshal(map[string]map[string]interface{}{
+					"metadata": {"annotations": annotationsPatch},
+				})
+				if err != nil {
+					logEntry.Errorf("Failed to marshal resource patch: %v", err)
+					eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %v", err))
+					return
+				}
+				resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
+				if err != nil {
+					logEntry.Errorf("Failed to patch resource: %v", err)
+					eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %v", err))
+					return
+				}
+				if err := c.informer.GetStore().Update(resource); err != nil {
+					logEntry.Warnf("Failed to store update resource in informer: %v", err)
+					eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %v", err))
+				}
 			}
 		}
 
-		patchData, err := json.Marshal(map[string]map[string]interface{}{
-			"metadata": {"annotations": annotationsPatch},
-		})
-		if err != nil {
-			logEntry.Errorf("Failed to marshal resource patch: %v", err)
-			eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %v", err))
-			return
-		}
-		resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
-		if err != nil {
-			logEntry.Errorf("Failed to patch resource: %v", err)
-			eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %v", err))
-			return
-		}
-		if err := c.informer.GetStore().Update(resource); err != nil {
-			logEntry.Warnf("Failed to store update resource in informer: %v", err)
-			eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %v", err))
-		}
+		//end
 	}
 	logEntry.Info("Processing completed")
 
