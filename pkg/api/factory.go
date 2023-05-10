@@ -197,36 +197,36 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 	if f.apiMap[f.Settings.Namespace] != nil {
 		apis[f.Settings.Namespace] = f.apiMap[f.Settings.Namespace]
 		api, err := f.getApiFromNamespace(namespace)
-		if err == nil {
-			apis[namespace] = api
-			f.apiMap[namespace] = api
+		if err != nil {
+			return nil, err
 		}
-
+		apis[namespace] = api
+		f.apiMap[namespace] = api
 		return apis, nil
 	}
 
 	//Where is nothing in cache, then we retrieve them
 	apiFromNamespace, err := f.getApiFromNamespace(namespace)
-	if err == nil {
-		apis[namespace] = apiFromNamespace
-		f.apiMap[namespace] = apiFromNamespace
+	if err != nil {
+		return nil, err
 	}
+	apis[namespace] = apiFromNamespace
+	f.apiMap[namespace] = apiFromNamespace
+
 	apiFromSettings, err := f.getApiFromNamespace(f.Settings.Namespace)
-	if err == nil {
-		apis[f.Settings.Namespace] = apiFromSettings
-		f.apiMap[f.Settings.Namespace] = apiFromSettings
+	if err != nil {
+		return nil, err
 	}
+	apis[f.Settings.Namespace] = apiFromSettings
+	f.apiMap[f.Settings.Namespace] = apiFromSettings
 
 	return apis, nil
-
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
 	cm, secret, err := f.getConfigMapAndSecretInNamespace(namespace)
 	if err != nil {
-		if !errors.IsNotFound(err) {
-			return nil, err
-		}
+		return nil, err
 	}
 	cfg, err := ParseConfig(cm, secret)
 	if err != nil {
