@@ -5,7 +5,6 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
 	"k8s.io/client-go/tools/cache"
@@ -28,12 +27,9 @@ type Factory interface {
 	GetAPI() (API, error)
 }
 
-// Factory creates an API instance
-type MayFactory interface {
-	GetAPIWithNamespace(namespace string) (API, error)
-}
-
-// Factory creates an API instance
+// Factory creates a map of APIs that include
+// api in the namespace specified in input parameter
+// and api in the namespace specified in the Settings
 type MayFactoryWithMultipleAPIs interface {
 	GetAPIsWithNamespace(namespace string) (map[string]API, error)
 }
@@ -116,8 +112,7 @@ func (f *apiFactory) getConfigMapAndSecret() (*v1.ConfigMap, *v1.Secret, error) 
 	return cm, secret, err
 }
 
-func (f *apiFactory) getConfigMapAndSecretWithNamespace(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
-
+func (f *apiFactory) getConfigMapAndSecretInNamespace(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
 	cmLister := v1listers.NewConfigMapLister(f.cmInformer.GetIndexer()).ConfigMaps(namespace)
 	secretLister := v1listers.NewSecretLister(f.secretsInformer.GetIndexer()).Secrets(namespace)
 
@@ -176,47 +171,6 @@ func (f *apiFactory) GetAPI() (API, error) {
 	return f.api, nil
 }
 
-func (f *apiFactory) GetAPIWithNamespace(namespace string) (API, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	namespaceHasConfig := namespace
-
-	if f.apiMap[namespaceHasConfig] != nil {
-		return f.apiMap[namespaceHasConfig], nil
-	}
-
-	cm, secret, err := f.getConfigMapAndSecretWithNamespace(namespaceHasConfig)
-	if err != nil {
-		if !k8serrors.IsNotFound(err) {
-			return nil, err
-		}
-		// If could not find it in namespace, try the namespace from settings
-		namespaceHasConfig = f.Settings.Namespace
-		if f.apiMap[namespaceHasConfig] != nil {
-			return f.apiMap[namespaceHasConfig], nil
-		}
-		cm, secret, err = f.getConfigMapAndSecretWithNamespace(namespaceHasConfig)
-		if err != nil {
-			return nil, err
-		}
-	}
-	cfg, err := ParseConfig(cm, secret)
-	if err != nil {
-		return nil, err
-	}
-	getVars, err := f.InitGetVars(cfg, cm, secret)
-	if err != nil {
-		return nil, err
-	}
-	api, err := NewAPI(*cfg, getVars)
-	if err != nil {
-		return nil, err
-	}
-	f.apiMap[namespaceHasConfig] = api
-
-	return f.apiMap[namespaceHasConfig], nil
-}
-
 // Returns a map of api in the namespace and api in the setting's namespace
 func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, error) {
 	f.lock.Lock()
@@ -268,9 +222,9 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
-	cm, secret, err := f.getConfigMapAndSecretWithNamespace(namespace)
+	cm, secret, err := f.getConfigMapAndSecretInNamespace(namespace)
 	if err != nil {
-		if !k8serrors.IsNotFound(err) {
+		if !errors.IsNotFound(err) {
 			return nil, err
 		}
 	}
