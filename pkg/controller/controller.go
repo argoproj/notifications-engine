@@ -142,47 +142,18 @@ func NewController(
 	return ctrl
 }
 
+// For self-service notification
+// This controller is using FactoryWithMultipleAPIs
 func NewControllerWithMultipleNamespace(
 	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
 	apiFactoryWithMultipleNamespace api.FactoryWithMultipleAPIs,
 	opts ...Opts,
 ) *notificationController {
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	informer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(obj)
-				if err == nil {
-					queue.Add(key)
-				}
-			},
-			UpdateFunc: func(old, new interface{}) {
-				key, err := cache.MetaNamespaceKeyFunc(new)
-				if err == nil {
-					queue.Add(key)
-				}
-			},
-		},
-	)
 
-	ctrl := &notificationController{
-		client:                     client,
-		informer:                   informer,
-		queue:                      queue,
-		metricsRegistry:            NewMetricsRegistry(""),
-		apiFactoryWithMultipleAPIs: apiFactoryWithMultipleNamespace,
-		toUnstructured: func(obj v1.Object) (*unstructured.Unstructured, error) {
-			res, ok := obj.(*unstructured.Unstructured)
-			if !ok {
-				return nil, fmt.Errorf("Object must be *unstructured.Unstructured but was: %v", res)
-			}
-			return res, nil
-		},
-	}
-	for i := range opts {
-		opts[i](ctrl)
-	}
+	ctrl := NewController(client, informer, nil, opts...)
+	ctrl.apiFactoryWithMultipleAPIs = apiFactoryWithMultipleNamespace
+
 	return ctrl
 }
 
