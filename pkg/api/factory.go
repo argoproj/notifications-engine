@@ -95,7 +95,7 @@ func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
 	}
 }
 
-func (f *apiFactory) getConfigMapAndSecret(cmLister v1listers.ConfigMapNamespaceLister, secretLister v1listers.SecretNamespaceLister) (*v1.ConfigMap, *v1.Secret, error) {
+func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigMapNamespaceLister, secretLister v1listers.SecretNamespaceLister) (*v1.ConfigMap, *v1.Secret, error) {
 	cm, err := cmLister.Get(f.ConfigMapName)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -117,11 +117,11 @@ func (f *apiFactory) getConfigMapAndSecret(cmLister v1listers.ConfigMapNamespace
 	return cm, secret, err
 }
 
-func (f *apiFactory) getConfigMapAndSecretInNamespace(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
+func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
 	cmLister := v1listers.NewConfigMapLister(f.cmInformer.GetIndexer()).ConfigMaps(namespace)
 	secretLister := v1listers.NewSecretLister(f.secretsInformer.GetIndexer()).Secrets(namespace)
 
-	return f.getConfigMapAndSecret(cmLister, secretLister)
+	return f.getConfigMapAndSecretWithListers(cmLister, secretLister)
 }
 
 func (f *apiFactory) invalidateCache() {
@@ -137,7 +137,7 @@ func (f *apiFactory) GetAPI() (API, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 	if f.api == nil {
-		cm, secret, err := f.getConfigMapAndSecret(f.cmLister, f.secretLister)
+		cm, secret, err := f.getConfigMapAndSecretWithListers(f.cmLister, f.secretLister)
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +206,7 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
-	cm, secret, err := f.getConfigMapAndSecretInNamespace(namespace)
+	cm, secret, err := f.getConfigMapAndSecret(namespace)
 	if err != nil {
 		return nil, err
 	}
