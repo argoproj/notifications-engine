@@ -145,7 +145,7 @@ func NewController(
 func NewControllerWithMultipleNamespace(
 	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
-	apiFactoryWithMultipleNamespace api.MayFactoryWithMultipleAPIs,
+	apiFactoryWithMultipleNamespace api.FactoryWithMultipleAPIs,
 	opts ...Opts,
 ) *notificationController {
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
@@ -196,7 +196,7 @@ type notificationController struct {
 	alterDestinations          func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
 	toUnstructured             func(obj v1.Object) (*unstructured.Unstructured, error)
 	eventCallback              func(eventSequence NotificationEventSequence)
-	apiFactoryWithMultipleAPIs api.MayFactoryWithMultipleAPIs
+	apiFactoryWithMultipleAPIs api.FactoryWithMultipleAPIs
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {

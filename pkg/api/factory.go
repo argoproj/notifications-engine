@@ -18,7 +18,9 @@ type Settings struct {
 	SecretName string
 	// InitGetVars returns a function that produces notifications context variables
 	InitGetVars func(cfg *Config, configMap *v1.ConfigMap, secret *v1.Secret) (GetVars, error)
-	// Default namespace for ConfigMap and Secret
+	// Default namespace for ConfigMap and Secret.
+	// For self-service notification, we get notification configurations from rollout resource namespace
+	// and also the default namespace
 	Namespace string
 }
 
@@ -27,10 +29,10 @@ type Factory interface {
 	GetAPI() (API, error)
 }
 
-// Factory creates a map of APIs that include
+// For self-service notification, factory creates a map of APIs that include
 // api in the namespace specified in input parameter
 // and api in the namespace specified in the Settings
-type MayFactoryWithMultipleAPIs interface {
+type FactoryWithMultipleAPIs interface {
 	GetAPIsWithNamespace(namespace string) (map[string]API, error)
 }
 
@@ -42,6 +44,7 @@ type apiFactory struct {
 	lock         sync.Mutex
 	api          API
 
+	// For self-service notification
 	cmInformer      cache.SharedIndexInformer
 	secretsInformer cache.SharedIndexInformer
 	apiMap          map[string]API
@@ -49,9 +52,11 @@ type apiFactory struct {
 
 func NewFactory(settings Settings, namespace string, secretsInformer cache.SharedIndexInformer, cmInformer cache.SharedIndexInformer) *apiFactory {
 	factory := &apiFactory{
-		Settings:        settings,
-		cmLister:        v1listers.NewConfigMapLister(cmInformer.GetIndexer()).ConfigMaps(namespace),
-		secretLister:    v1listers.NewSecretLister(secretsInformer.GetIndexer()).Secrets(namespace),
+		Settings:     settings,
+		cmLister:     v1listers.NewConfigMapLister(cmInformer.GetIndexer()).ConfigMaps(namespace),
+		secretLister: v1listers.NewSecretLister(secretsInformer.GetIndexer()).Secrets(namespace),
+
+		// For self-service notification
 		cmInformer:      cmInformer,
 		secretsInformer: secretsInformer,
 		apiMap:          make(map[string]API),
@@ -136,15 +141,8 @@ func (f *apiFactory) GetAPI() (API, error) {
 		if err != nil {
 			return nil, err
 		}
-		cfg, err := ParseConfig(cm, secret)
-		if err != nil {
-			return nil, err
-		}
-		getVars, err := f.InitGetVars(cfg, cm, secret)
-		if err != nil {
-			return nil, err
-		}
-		api, err := NewAPI(*cfg, getVars)
+
+		api, err := f.getApiFromConfigmapAndSecret(cm, secret)
 		if err != nil {
 			return nil, err
 		}
@@ -153,7 +151,7 @@ func (f *apiFactory) GetAPI() (API, error) {
 	return f.api, nil
 }
 
-// Returns a map of api in the namespace and api in the setting's namespace
+// For self-service notification, we need a map of apis which include api in the namespace and api in the setting's namespace
 func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
@@ -179,30 +177,32 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 	if f.apiMap[f.Settings.Namespace] != nil {
 		apis[f.Settings.Namespace] = f.apiMap[f.Settings.Namespace]
 		api, err := f.getApiFromNamespace(namespace)
-		if err != nil {
-			return nil, err
+		if err == nil {
+			apis[namespace] = api
+			f.apiMap[namespace] = api
 		}
-		apis[namespace] = api
-		f.apiMap[namespace] = api
 		return apis, nil
 	}
 
-	//Where is nothing in cache, then we retrieve them
-	apiFromNamespace, err := f.getApiFromNamespace(namespace)
-	if err != nil {
-		return nil, err
-	}
-	apis[namespace] = apiFromNamespace
-	f.apiMap[namespace] = apiFromNamespace
+	apiFromNamespace, errApiFromNamespace := f.getApiFromNamespace(namespace)
+	apiFromSettings, errApiFromSettings := f.getApiFromNamespace(f.Settings.Namespace)
 
-	apiFromSettings, err := f.getApiFromNamespace(f.Settings.Namespace)
-	if err != nil {
-		return nil, err
+	if errApiFromNamespace == nil {
+		apis[namespace] = apiFromNamespace
+		f.apiMap[namespace] = apiFromNamespace
 	}
-	apis[f.Settings.Namespace] = apiFromSettings
-	f.apiMap[f.Settings.Namespace] = apiFromSettings
 
-	return apis, nil
+	if errApiFromSettings == nil {
+		apis[f.Settings.Namespace] = apiFromSettings
+		f.apiMap[f.Settings.Namespace] = apiFromSettings
+	}
+
+	// Only return error when we received error from both namespace provided in the input paremeter and settings' namespace
+	if errApiFromNamespace != nil && errApiFromSettings != nil {
+		return apis, errApiFromSettings
+	} else {
+		return apis, nil
+	}
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
@@ -210,6 +210,11 @@ func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
 	if err != nil {
 		return nil, err
 	}
+	return f.getApiFromConfigmapAndSecret(cm, secret)
+
+}
+
+func (f *apiFactory) getApiFromConfigmapAndSecret(cm *v1.ConfigMap, secret *v1.Secret) (API, error) {
 	cfg, err := ParseConfig(cm, secret)
 	if err != nil {
 		return nil, err
