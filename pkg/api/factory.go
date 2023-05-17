@@ -1,6 +1,7 @@
 package api
 
 import (
+	log "github.com/sirupsen/logrus"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -170,6 +171,8 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 		if err == nil {
 			apis[f.Settings.Namespace] = api
 			f.apiMap[f.Settings.Namespace] = api
+		} else {
+			log.Warnf("getApiFromNamespace %s got error %s", f.Settings.Namespace, err)
 		}
 		return apis, nil
 	}
@@ -180,6 +183,8 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 		if err == nil {
 			apis[namespace] = api
 			f.apiMap[namespace] = api
+		} else {
+			log.Warnf("getApiFromNamespace %s got error %s", namespace, err)
 		}
 		return apis, nil
 	}
@@ -190,11 +195,15 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 	if errApiFromNamespace == nil {
 		apis[namespace] = apiFromNamespace
 		f.apiMap[namespace] = apiFromNamespace
+	} else {
+		log.Warnf("getApiFromNamespace %s got error %s", namespace, errApiFromNamespace)
 	}
 
 	if errApiFromSettings == nil {
 		apis[f.Settings.Namespace] = apiFromSettings
 		f.apiMap[f.Settings.Namespace] = apiFromSettings
+	} else {
+		log.Warnf("getApiFromNamespace %s got error %s", f.Settings.Namespace, errApiFromSettings)
 	}
 
 	// Only return error when we received error from both namespace provided in the input paremeter and settings' namespace
