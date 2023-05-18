@@ -316,7 +316,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 		c.processResource(api, resource, logEntry, &eventSequence)
 	} else {
-		apisWithNamespace, err := c.apiFactoryWithMultipleAPIs.GetAPIsWithNamespace(resource.GetNamespace())
+		apisWithNamespace, err := c.apiFactoryWithMultipleAPIs.GetAPIsWithNamespaceV2(resource.GetNamespace())
 		if err != nil {
 			logEntry.Errorf("Failed to process: %v", err)
 			eventSequence.addError(err)
