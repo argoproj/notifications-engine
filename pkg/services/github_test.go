@@ -106,6 +106,58 @@ func TestGetTemplater_GitHub_Custom_Resource(t *testing.T) {
 	assert.Equal(t, "", notification.GitHub.Status.TargetURL)
 }
 
+func TestGetTemplater_GitHub_Deployment(t *testing.T) {
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			Deployment: &GitHubDeployment{
+				State:            "success",
+				Environment:      "production",
+				EnvironmentURL:   "https://argoproj.github.io",
+				LogURL:           "https://argoproj.github.io/log",
+				RequiredContexts: []string{},
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{
+		"sync": map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name": "root-sync-test",
+			},
+			"spec": map[string]interface{}{
+				"git": map[string]interface{}{
+					"repo": "https://github.com/argoproj-labs/argocd-notifications.git",
+				},
+			},
+			"status": map[string]interface{}{
+				"lastSyncedCommit": "0123456789",
+			},
+		},
+	})
+
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, "{{.sync.spec.git.repo}}", notification.GitHub.RepoURLPath)
+	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
+	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
+	assert.Equal(t, "0123456789", notification.GitHub.revision)
+	assert.Equal(t, "success", notification.GitHub.Deployment.State)
+	assert.Equal(t, "production", notification.GitHub.Deployment.Environment)
+	assert.Equal(t, "https://argoproj.github.io", notification.GitHub.Deployment.EnvironmentURL)
+	assert.Equal(t, "https://argoproj.github.io/log", notification.GitHub.Deployment.LogURL)
+	assert.Len(t, notification.GitHub.Deployment.RequiredContexts, 0)
+}
+
 func TestNewGitHubService_GitHubOptions(t *testing.T) {
 	tests := []struct {
 		name                  string
