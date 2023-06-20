@@ -13,6 +13,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v41/github"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cast"
 	giturls "github.com/whilp/git-urls"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
@@ -24,10 +25,10 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID             int64  `json:"appID"`
-	InstallationID    int64  `json:"installationID"`
-	PrivateKey        string `json:"privateKey"`
-	EnterpriseBaseURL string `json:"enterpriseBaseURL"`
+	AppID             interface{} `json:"appID"`
+	InstallationID    interface{} `json:"installationID"`
+	PrivateKey        string      `json:"privateKey"`
+	EnterpriseBaseURL string      `json:"enterpriseBaseURL"`
 }
 
 type GitHubNotification struct {
@@ -139,9 +140,19 @@ func NewGitHubService(opts GitHubOptions) (NotificationService, error) {
 		url = opts.EnterpriseBaseURL
 	}
 
+	appID, err := cast.ToInt64E(opts.AppID)
+	if err != nil {
+		return nil, err
+	}
+
+	installationID, err := cast.ToInt64E(opts.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+
 	tr := httputil.NewLoggingRoundTripper(
 		httputil.NewTransport(url, false), log.WithField("service", "github"))
-	itr, err := ghinstallation.New(tr, opts.AppID, opts.InstallationID, []byte(opts.PrivateKey))
+	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err
 	}
