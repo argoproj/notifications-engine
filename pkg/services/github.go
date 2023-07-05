@@ -13,6 +13,7 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v41/github"
 	log "github.com/sirupsen/logrus"
+	"github.com/spf13/cast"
 	giturls "github.com/whilp/git-urls"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
@@ -24,24 +25,33 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID             int64  `json:"appID"`
-	InstallationID    int64  `json:"installationID"`
-	PrivateKey        string `json:"privateKey"`
-	EnterpriseBaseURL string `json:"enterpriseBaseURL"`
+	AppID             interface{} `json:"appID"`
+	InstallationID    interface{} `json:"installationID"`
+	PrivateKey        string      `json:"privateKey"`
+	EnterpriseBaseURL string      `json:"enterpriseBaseURL"`
 }
 
 type GitHubNotification struct {
 	repoURL      string
 	revision     string
-	Status       *GitHubStatus `json:"status,omitempty"`
-	RepoURLPath  string        `json:"repoURLPath,omitempty"`
-	RevisionPath string        `json:"revisionPath,omitempty"`
+	Status       *GitHubStatus     `json:"status,omitempty"`
+	Deployment   *GitHubDeployment `json:"deployment,omitempty"`
+	RepoURLPath  string            `json:"repoURLPath,omitempty"`
+	RevisionPath string            `json:"revisionPath,omitempty"`
 }
 
 type GitHubStatus struct {
 	State     string `json:"state,omitempty"`
 	Label     string `json:"label,omitempty"`
 	TargetURL string `json:"targetURL,omitempty"`
+}
+
+type GitHubDeployment struct {
+	State            string   `json:"state,omitempty"`
+	Environment      string   `json:"environment,omitempty"`
+	EnvironmentURL   string   `json:"environmentURL,omitempty"`
+	LogURL           string   `json:"logURL,omitempty"`
+	RequiredContexts []string `json:"requiredContexts"`
 }
 
 const (
@@ -67,9 +77,9 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		return nil, err
 	}
 
-	var state, label, targetURL *texttemplate.Template
+	var statusState, label, targetURL *texttemplate.Template
 	if g.Status != nil {
-		state, err = texttemplate.New(name).Funcs(f).Parse(g.Status.State)
+		statusState, err = texttemplate.New(name).Funcs(f).Parse(g.Status.State)
 		if err != nil {
 			return nil, err
 		}
@@ -80,6 +90,29 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 
 		targetURL, err = texttemplate.New(name).Funcs(f).Parse(g.Status.TargetURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var deploymentState, environment, environmentURL, logURL *texttemplate.Template
+	if g.Deployment != nil {
+		deploymentState, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
+		if err != nil {
+			return nil, err
+		}
+
+		environment, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.Environment)
+		if err != nil {
+			return nil, err
+		}
+
+		environmentURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.EnvironmentURL)
+		if err != nil {
+			return nil, err
+		}
+
+		logURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.LogURL)
 		if err != nil {
 			return nil, err
 		}
@@ -111,7 +144,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 
 			var stateData bytes.Buffer
-			if err := state.Execute(&stateData, vars); err != nil {
+			if err := statusState.Execute(&stateData, vars); err != nil {
 				return err
 			}
 			notification.GitHub.Status.State = stateData.String()
@@ -129,6 +162,38 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.Status.TargetURL = targetData.String()
 		}
 
+		if g.Deployment != nil {
+			if notification.GitHub.Deployment == nil {
+				notification.GitHub.Deployment = &GitHubDeployment{}
+			}
+
+			var stateData bytes.Buffer
+			if err := deploymentState.Execute(&stateData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.Deployment.State = stateData.String()
+
+			var environmentData bytes.Buffer
+			if err := environment.Execute(&environmentData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.Deployment.Environment = environmentData.String()
+
+			var environmentURLData bytes.Buffer
+			if err := environmentURL.Execute(&environmentURLData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.Deployment.EnvironmentURL = environmentURLData.String()
+
+			var logURLData bytes.Buffer
+			if err := logURL.Execute(&logURLData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.Deployment.LogURL = logURLData.String()
+
+			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
+		}
+
 		return nil
 	}, nil
 }
@@ -139,9 +204,19 @@ func NewGitHubService(opts GitHubOptions) (NotificationService, error) {
 		url = opts.EnterpriseBaseURL
 	}
 
+	appID, err := cast.ToInt64E(opts.AppID)
+	if err != nil {
+		return nil, err
+	}
+
+	installationID, err := cast.ToInt64E(opts.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+
 	tr := httputil.NewLoggingRoundTripper(
 		httputil.NewTransport(url, false), log.WithField("service", "github"))
-	itr, err := ghinstallation.New(tr, opts.AppID, opts.InstallationID, []byte(opts.PrivateKey))
+	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +284,41 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				Description: &description,
 				Context:     &notification.GitHub.Status.Label,
 				TargetURL:   &notification.GitHub.Status.TargetURL,
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if notification.GitHub.Deployment != nil {
+		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
+		// maximum is 140 characters
+		description := trunc(notification.Message, 140)
+		deployment, _, err := g.client.Repositories.CreateDeployment(
+			context.Background(),
+			u[0],
+			u[1],
+			&github.DeploymentRequest{
+				Ref:              &notification.GitHub.revision,
+				Environment:      &notification.GitHub.Deployment.Environment,
+				RequiredContexts: &notification.GitHub.Deployment.RequiredContexts,
+			},
+		)
+		if err != nil {
+			return err
+		}
+		_, _, err = g.client.Repositories.CreateDeploymentStatus(
+			context.Background(),
+			u[0],
+			u[1],
+			*deployment.ID,
+			&github.DeploymentStatusRequest{
+				State:          &notification.GitHub.Deployment.State,
+				LogURL:         &notification.GitHub.Deployment.LogURL,
+				Description:    &description,
+				Environment:    &notification.GitHub.Deployment.Environment,
+				EnvironmentURL: &notification.GitHub.Deployment.EnvironmentURL,
 			},
 		)
 		if err != nil {
