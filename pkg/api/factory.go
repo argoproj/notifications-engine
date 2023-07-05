@@ -117,12 +117,6 @@ func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1
 	return f.getConfigMapAndSecretWithListers(cmLister, secretLister)
 }
 
-func (f *apiFactory) invalidateCache(namespace string) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	f.apiMap[namespace] = nil
-}
-
 func (f *apiFactory) GetAPI() (API, error) {
 	apis, err := f.GetAPIsWithNamespace(f.Settings.Namespace)
 	if err != nil {
