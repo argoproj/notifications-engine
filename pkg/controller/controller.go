@@ -142,32 +142,28 @@ func NewController(
 	return ctrl
 }
 
-// For self-service notification
-// This controller is using FactoryWithMultipleAPIs
-func NewControllerWithMultipleNamespace(
+// NewControllerWithNamespaceSupport For self-service notification
+func NewControllerWithNamespaceSupport(
 	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
-	apiFactoryWithMultipleNamespace api.FactoryWithMultipleAPIs,
 	opts ...Opts,
 ) *notificationController {
-
 	ctrl := NewController(client, informer, nil, opts...)
-	ctrl.apiFactoryWithMultipleAPIs = apiFactoryWithMultipleNamespace
-
+	ctrl.namespaceSupport = true
 	return ctrl
 }
 
 type notificationController struct {
-	client                     dynamic.NamespaceableResourceInterface
-	informer                   cache.SharedIndexInformer
-	queue                      workqueue.RateLimitingInterface
-	apiFactory                 api.Factory
-	metricsRegistry            *MetricsRegistry
-	skipProcessing             func(obj v1.Object) (bool, string)
-	alterDestinations          func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
-	toUnstructured             func(obj v1.Object) (*unstructured.Unstructured, error)
-	eventCallback              func(eventSequence NotificationEventSequence)
-	apiFactoryWithMultipleAPIs api.FactoryWithMultipleAPIs
+	client            dynamic.NamespaceableResourceInterface
+	informer          cache.SharedIndexInformer
+	queue             workqueue.RateLimitingInterface
+	apiFactory        api.Factory
+	metricsRegistry   *MetricsRegistry
+	skipProcessing    func(obj v1.Object) (bool, string)
+	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
+	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
+	eventCallback     func(eventSequence NotificationEventSequence)
+	namespaceSupport  bool
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -307,7 +303,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 	}
 
-	if c.apiFactoryWithMultipleAPIs == nil {
+	if !c.namespaceSupport {
 		api, err := c.apiFactory.GetAPI()
 		if err != nil {
 			logEntry.Errorf("Failed to process: %v", err)
@@ -316,7 +312,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 		c.processResource(api, resource, logEntry, &eventSequence)
 	} else {
-		apisWithNamespace, err := c.apiFactoryWithMultipleAPIs.GetAPIsWithNamespaceV2(resource.GetNamespace())
+		apisWithNamespace, err := c.apiFactory.GetAPIsWithNamespace(resource.GetNamespace())
 		if err != nil {
 			logEntry.Errorf("Failed to process: %v", err)
 			eventSequence.addError(err)

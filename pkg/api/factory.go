@@ -1,7 +1,7 @@
 package api
 
 import (
-	log "github.com/sirupsen/logrus"
+	"k8s.io/utils/strings/slices"
 	"sync"
 
 	v1 "k8s.io/api/core/v1"
@@ -28,47 +28,29 @@ type Settings struct {
 // Factory creates an API instance
 type Factory interface {
 	GetAPI() (API, error)
-}
-
-// For self-service notification, factory creates a map of APIs that include
-// api in the namespace specified in input parameter
-// and api in the namespace specified in the Settings
-type FactoryWithMultipleAPIs interface {
-	GetAPIsWithNamespaceV2(namespace string) (map[string]API, error)
+	GetAPIsWithNamespace(namespace string) (map[string]API, error)
 }
 
 type apiFactory struct {
 	Settings
 
-	cmLister     v1listers.ConfigMapNamespaceLister
-	secretLister v1listers.SecretNamespaceLister
+	cmLister     v1listers.ConfigMapLister
+	secretLister v1listers.SecretLister
 	lock         sync.Mutex
-	api          API
-
-	// For self-service notification
-	cmInformer      cache.SharedIndexInformer
-	secretsInformer cache.SharedIndexInformer
-	apiMap          map[string]API
-	cacheList       []apisCache
+	apiMap       map[string]API
 }
 
-type apisCache struct {
-	api       API
-	namespace string
-	refresh   bool
-}
-
+// NewFactory creates a new API factory if namespace is not empty, it will override the default namespace set in settings
 func NewFactory(settings Settings, namespace string, secretsInformer cache.SharedIndexInformer, cmInformer cache.SharedIndexInformer) *apiFactory {
+	if namespace != "" {
+		settings.Namespace = namespace
+	}
+
 	factory := &apiFactory{
 		Settings:     settings,
-		cmLister:     v1listers.NewConfigMapLister(cmInformer.GetIndexer()).ConfigMaps(namespace),
-		secretLister: v1listers.NewSecretLister(secretsInformer.GetIndexer()).Secrets(namespace),
-
-		// For self-service notification
-		cmInformer:      cmInformer,
-		secretsInformer: secretsInformer,
-		apiMap:          make(map[string]API),
-		cacheList:       []apisCache{},
+		cmLister:     v1listers.NewConfigMapLister(cmInformer.GetIndexer()),
+		secretLister: v1listers.NewSecretLister(secretsInformer.GetIndexer()),
+		apiMap:       make(map[string]API),
 	}
 
 	secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
@@ -100,7 +82,9 @@ func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
 		return
 	}
 	if metaObj.GetName() == name {
-		f.invalidateCache(metaObj.GetNamespace())
+		f.lock.Lock()
+		defer f.lock.Unlock()
+		f.apiMap[metaObj.GetNamespace()] = nil
 	}
 }
 
@@ -127,8 +111,8 @@ func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigM
 }
 
 func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
-	cmLister := v1listers.NewConfigMapLister(f.cmInformer.GetIndexer()).ConfigMaps(namespace)
-	secretLister := v1listers.NewSecretLister(f.secretsInformer.GetIndexer()).Secrets(namespace)
+	cmLister := f.cmLister.ConfigMaps(namespace)
+	secretLister := f.secretLister.Secrets(namespace)
 
 	return f.getConfigMapAndSecretWithListers(cmLister, secretLister)
 }
@@ -136,34 +120,15 @@ func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1
 func (f *apiFactory) invalidateCache(namespace string) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
-	f.api = nil
-
 	f.apiMap[namespace] = nil
-
-	for _, mycache := range f.cacheList {
-		if mycache.namespace == namespace {
-			mycache.refresh = true
-			mycache.api = nil
-		}
-	}
 }
 
 func (f *apiFactory) GetAPI() (API, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-	if f.api == nil {
-		cm, secret, err := f.getConfigMapAndSecretWithListers(f.cmLister, f.secretLister)
-		if err != nil {
-			return nil, err
-		}
-
-		api, err := f.getApiFromConfigmapAndSecret(cm, secret)
-		if err != nil {
-			return nil, err
-		}
-		f.api = api
+	apis, err := f.GetAPIsWithNamespace(f.Settings.Namespace)
+	if err != nil {
+		return nil, err
 	}
-	return f.api, nil
+	return apis[f.Settings.Namespace], nil
 }
 
 // For self-service notification, we need a map of apis which include api in the namespace and api in the setting's namespace
@@ -173,112 +138,22 @@ func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, err
 
 	apis := make(map[string]API)
 
-	if f.apiMap[namespace] != nil && f.apiMap[f.Settings.Namespace] != nil {
-		apis[namespace] = f.apiMap[namespace]
-		apis[f.Settings.Namespace] = f.apiMap[f.Settings.Namespace]
-		return apis, nil
-	}
-
-	if f.apiMap[namespace] != nil {
-		apis[namespace] = f.apiMap[namespace]
-		api, err := f.getApiFromNamespace(f.Settings.Namespace)
-		if err == nil {
-			apis[f.Settings.Namespace] = api
-			f.apiMap[f.Settings.Namespace] = api
-		} else {
-			log.Warnf("getApiFromNamespace %s got error %s", f.Settings.Namespace, err)
-		}
-		return apis, nil
-	}
-
-	if f.apiMap[f.Settings.Namespace] != nil {
-		apis[f.Settings.Namespace] = f.apiMap[f.Settings.Namespace]
-		api, err := f.getApiFromNamespace(namespace)
-		if err == nil {
-			apis[namespace] = api
-			f.apiMap[namespace] = api
-		} else {
-			log.Warnf("getApiFromNamespace %s got error %s", namespace, err)
-		}
-		return apis, nil
-	}
-
-	apiFromNamespace, errApiFromNamespace := f.getApiFromNamespace(namespace)
-	apiFromSettings, errApiFromSettings := f.getApiFromNamespace(f.Settings.Namespace)
-
-	if errApiFromNamespace == nil {
-		apis[namespace] = apiFromNamespace
-		f.apiMap[namespace] = apiFromNamespace
-	} else {
-		log.Warnf("getApiFromNamespace %s got error %s", namespace, errApiFromNamespace)
-	}
-
-	if errApiFromSettings == nil {
-		apis[f.Settings.Namespace] = apiFromSettings
-		f.apiMap[f.Settings.Namespace] = apiFromSettings
-	} else {
-		log.Warnf("getApiFromNamespace %s got error %s", f.Settings.Namespace, errApiFromSettings)
-	}
-
-	// Only return error when we received error from both namespace provided in the input paremeter and settings' namespace
-	if errApiFromNamespace != nil && errApiFromSettings != nil {
-		return apis, errApiFromSettings
-	} else {
-		return apis, nil
-	}
-}
-
-// For self-service notification, we need a map of apis which include api in the namespace and api in the setting's namespace
-func (f *apiFactory) GetAPIsWithNamespaceV2(namespace string) (map[string]API, error) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	apis := make(map[string]API)
-
 	// namespaces to look for notification configurations
 	namespaces := []string{namespace}
-	if f.Settings.Namespace != "" && f.Settings.Namespace != namespace {
+	if !slices.Contains(namespaces, f.Settings.Namespace) {
 		namespaces = append(namespaces, f.Settings.Namespace)
 	}
 
 	for _, namespace := range namespaces {
-		//Look up the cacheList
-		//Exist in cacheList and does not need refresh, then use it
-		//Exist in cacheList and needs refresh, then retrieve it
-		//Doesn't exist in cacheList, get it and put in cacheList
-		foundInCache := false
-		for _, cache := range f.cacheList {
-			if cache.namespace == namespace {
-				foundInCache = true
-				if !cache.refresh {
-					//Found in cache, and no need to refresh
-					if cache.api != nil {
-						apis[namespace] = cache.api
-					}
-				} else {
-					//Found in cache, and need refresh
-					api, err := f.getApiFromNamespace(namespace)
-					if err == nil {
-						apis[namespace] = api
-						cache.api = api
-						cache.refresh = false
-					} else {
-						log.Warnf("getApiFromNamespace %s got error %s", namespace, err)
-					}
-				}
-				break
-			}
-		}
-
-		if !foundInCache {
+		if f.apiMap[namespace] == nil {
 			api, err := f.getApiFromNamespace(namespace)
-			if err == nil {
-				apis[namespace] = api
-				myCache := apisCache{refresh: false, api: api, namespace: namespace}
-				f.cacheList = append(f.cacheList, myCache)
-			} else {
-				log.Warnf("getApiFromNamespace %s got error %s", namespace, err)
+			if err != nil {
+				return nil, err
 			}
+			f.apiMap[namespace] = api
+			apis[namespace] = f.apiMap[namespace]
+		} else {
+			apis[namespace] = f.apiMap[namespace]
 		}
 	}
 
