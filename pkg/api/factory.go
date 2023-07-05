@@ -1,8 +1,9 @@
 package api
 
 import (
-	"k8s.io/utils/strings/slices"
 	"sync"
+
+	"k8s.io/utils/strings/slices"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
