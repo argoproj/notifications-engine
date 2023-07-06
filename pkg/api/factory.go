@@ -88,7 +88,7 @@ func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
 		f.lock.Lock()
 		defer f.lock.Unlock()
 		f.apiMap[metaObj.GetNamespace()] = nil
-		log.Info("invalidated cache for namespace: ", metaObj.GetNamespace(), " name: ", metaObj.GetName())
+		log.Info("invalidated cache for resource in namespace: ", metaObj.GetNamespace(), "with the name: ", metaObj.GetName())
 	}
 }
 
