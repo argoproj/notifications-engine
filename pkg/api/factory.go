@@ -3,6 +3,8 @@ package api
 import (
 	"sync"
 
+	log "github.com/sirupsen/logrus"
+
 	"k8s.io/utils/strings/slices"
 
 	v1 "k8s.io/api/core/v1"
@@ -20,10 +22,10 @@ type Settings struct {
 	SecretName string
 	// InitGetVars returns a function that produces notifications context variables
 	InitGetVars func(cfg *Config, configMap *v1.ConfigMap, secret *v1.Secret) (GetVars, error)
-	// Default namespace for ConfigMap and Secret.
+	// DefaultNamespace default namespace for ConfigMap and Secret.
 	// For self-service notification, we get notification configurations from rollout resource namespace
 	// and also the default namespace
-	Namespace string
+	DefaultNamespace string
 }
 
 // Factory creates an API instance
@@ -44,7 +46,7 @@ type apiFactory struct {
 // NewFactory creates a new API factory if namespace is not empty, it will override the default namespace set in settings
 func NewFactory(settings Settings, namespace string, secretsInformer cache.SharedIndexInformer, cmInformer cache.SharedIndexInformer) *apiFactory {
 	if namespace != "" {
-		settings.Namespace = namespace
+		settings.DefaultNamespace = namespace
 	}
 
 	factory := &apiFactory{
@@ -86,6 +88,7 @@ func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
 		f.lock.Lock()
 		defer f.lock.Unlock()
 		f.apiMap[metaObj.GetNamespace()] = nil
+		log.Info("invalidated cache for namespace: ", metaObj.GetNamespace(), " name: ", metaObj.GetName())
 	}
 }
 
@@ -122,11 +125,11 @@ func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1
 }
 
 func (f *apiFactory) GetAPI() (API, error) {
-	apis, err := f.GetAPIsFromNamespace(f.Settings.Namespace)
+	apis, err := f.GetAPIsFromNamespace(f.Settings.DefaultNamespace)
 	if err != nil {
 		return nil, err
 	}
-	return apis[f.Settings.Namespace], nil
+	return apis[f.Settings.DefaultNamespace], nil
 }
 
 // For self-service notification, we need a map of apis which include api in the namespace and api in the setting's namespace
@@ -138,8 +141,8 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 
 	// namespaces to look for notification configurations
 	namespaces := []string{namespace}
-	if !slices.Contains(namespaces, f.Settings.Namespace) {
-		namespaces = append(namespaces, f.Settings.Namespace)
+	if !slices.Contains(namespaces, f.Settings.DefaultNamespace) {
+		namespaces = append(namespaces, f.Settings.DefaultNamespace)
 	}
 
 	for _, namespace := range namespaces {
