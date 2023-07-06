@@ -44,9 +44,9 @@ type apiFactory struct {
 }
 
 // NewFactory creates a new API factory if namespace is not empty, it will override the default namespace set in settings
-func NewFactory(settings Settings, namespace string, secretsInformer cache.SharedIndexInformer, cmInformer cache.SharedIndexInformer) *apiFactory {
-	if namespace != "" {
-		settings.DefaultNamespace = namespace
+func NewFactory(settings Settings, defaultNamespace string, secretsInformer cache.SharedIndexInformer, cmInformer cache.SharedIndexInformer) *apiFactory {
+	if defaultNamespace != "" {
+		settings.DefaultNamespace = defaultNamespace
 	}
 
 	factory := &apiFactory{
