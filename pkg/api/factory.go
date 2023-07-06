@@ -108,6 +108,9 @@ func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigM
 		}
 	}
 
+	if errors.IsNotFound(err) {
+		return cm, secret, nil
+	}
 	return cm, secret, err
 }
 

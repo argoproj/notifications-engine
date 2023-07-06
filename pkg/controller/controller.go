@@ -146,9 +146,10 @@ func NewController(
 func NewControllerWithNamespaceSupport(
 	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
+	apiFactory api.Factory,
 	opts ...Opts,
 ) *notificationController {
-	ctrl := NewController(client, informer, nil, opts...)
+	ctrl := NewController(client, informer, apiFactory, opts...)
 	ctrl.namespaceSupport = true
 	return ctrl
 }
