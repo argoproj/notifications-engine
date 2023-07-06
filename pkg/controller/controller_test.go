@@ -90,7 +90,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 
 	go informer.Run(ctx.Done())
 
-	c := NewController(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
+	c := NewControllerWithNamespaceSupport(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, nil, errors.New("failed to sync informers")
 	}
