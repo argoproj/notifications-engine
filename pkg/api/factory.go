@@ -29,7 +29,7 @@ type Settings struct {
 // Factory creates an API instance
 type Factory interface {
 	GetAPI() (API, error)
-	GetAPIsWithNamespace(namespace string) (map[string]API, error)
+	GetAPIsFromNamespace(namespace string) (map[string]API, error)
 }
 
 type apiFactory struct {
@@ -122,7 +122,7 @@ func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1
 }
 
 func (f *apiFactory) GetAPI() (API, error) {
-	apis, err := f.GetAPIsWithNamespace(f.Settings.Namespace)
+	apis, err := f.GetAPIsFromNamespace(f.Settings.Namespace)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +130,7 @@ func (f *apiFactory) GetAPI() (API, error) {
 }
 
 // For self-service notification, we need a map of apis which include api in the namespace and api in the setting's namespace
-func (f *apiFactory) GetAPIsWithNamespace(namespace string) (map[string]API, error) {
+func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
 
