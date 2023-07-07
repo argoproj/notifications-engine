@@ -117,6 +117,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 				EnvironmentURL:   "https://argoproj.github.io",
 				LogURL:           "https://argoproj.github.io/log",
 				RequiredContexts: []string{},
+				AutoMerge:        false,
 			},
 		},
 	}
