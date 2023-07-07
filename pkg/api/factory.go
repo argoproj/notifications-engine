@@ -162,7 +162,10 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 		}
 	}
 
-	return apis, fmt.Errorf("errors getting apis: %v", errors)
+	if len(errors) > 0 {
+		return apis, fmt.Errorf("errors getting apis: %s", errors)
+	}
+	return apis, nil
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
