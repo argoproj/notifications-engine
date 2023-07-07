@@ -133,7 +133,9 @@ func (f *apiFactory) GetAPI() (API, error) {
 	return apis[f.Settings.DefaultNamespace], nil
 }
 
-// For self-service notification, we need a map of apis which include api in the namespace and api in the setting's namespace
+// GetAPIsFromNamespace returns a map of API instances for a given namespace, if there is an error in populating the API for a namespace, it will be skipped
+// and the error will be logged and returned. The caller is responsible for handling the error. The API map will also be returned with any successfully constructed
+// API instances.
 func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, error) {
 	f.lock.Lock()
 	defer f.lock.Unlock()
