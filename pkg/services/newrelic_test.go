@@ -65,7 +65,7 @@ func TestSend_Newrelic(t *testing.T) {
 
 			assert.Equal(t, r.URL.Path, "/v2/applications/123456789/deployments.json")
 			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["Api-Key"], []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, r.Header["X-Api-Key"], []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
 
 			assert.JSONEq(t, `{
 				"deployment": {
@@ -106,7 +106,7 @@ func TestSend_Newrelic(t *testing.T) {
 
 			assert.Equal(t, r.URL.Path, "/v2/applications/123456789/deployments.json")
 			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["Api-Key"], []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, r.Header["X-Api-Key"], []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
 
 			assert.JSONEq(t, `{
 				"deployment": {
