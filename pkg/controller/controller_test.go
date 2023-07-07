@@ -323,6 +323,7 @@ func TestWithEventCallback(t *testing.T) {
 			}))
 
 			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
+			ctrl.namespaceSupport = false
 			assert.NoError(t, err)
 			ctrl.apiFactory = &mocks.FakeFactory{Api: api, Err: tc.apiErr}
 
