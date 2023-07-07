@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"sync"
 
 	log "github.com/sirupsen/logrus"
@@ -145,11 +146,14 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 		namespaces = append(namespaces, f.Settings.DefaultNamespace)
 	}
 
+	errors := []error{}
 	for _, namespace := range namespaces {
 		if f.apiMap[namespace] == nil {
 			api, err := f.getApiFromNamespace(namespace)
 			if err != nil {
-				return nil, err
+				log.Error("error getting api from namespace: ", namespace, " error: ", err)
+				errors = append(errors, err)
+				continue
 			}
 			f.apiMap[namespace] = api
 			apis[namespace] = f.apiMap[namespace]
@@ -158,7 +162,7 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 		}
 	}
 
-	return apis, nil
+	return apis, fmt.Errorf("errors getting apis: %v", errors)
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
