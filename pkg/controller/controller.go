@@ -317,7 +317,6 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		if err != nil {
 			logEntry.Errorf("Failed to process: %v", err)
 			eventSequence.addError(err)
-			return
 		}
 		for _, api := range apisWithNamespace {
 			c.processResource(api, resource, logEntry, &eventSequence)
