@@ -307,7 +307,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 	if !c.namespaceSupport {
 		api, err := c.apiFactory.GetAPI()
 		if err != nil {
-			logEntry.Errorf("Failed to process: %v", err)
+			logEntry.Errorf("Failed to get api: %v", err)
 			eventSequence.addError(err)
 			return
 		}
@@ -315,7 +315,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 	} else {
 		apisWithNamespace, err := c.apiFactory.GetAPIsFromNamespace(resource.GetNamespace())
 		if err != nil {
-			logEntry.Errorf("Failed to process: %v", err)
+			logEntry.Errorf("Failed to get api with namespace: %v", err)
 			eventSequence.addError(err)
 		}
 		for _, api := range apisWithNamespace {
