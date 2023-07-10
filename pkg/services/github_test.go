@@ -157,6 +157,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Equal(t, "https://argoproj.github.io", notification.GitHub.Deployment.EnvironmentURL)
 	assert.Equal(t, "https://argoproj.github.io/log", notification.GitHub.Deployment.LogURL)
 	assert.Len(t, notification.GitHub.Deployment.RequiredContexts, 0)
+	assert.Equal(t, false, notification.GitHub.Deployment.AutoMerge)
 }
 
 func TestNewGitHubService_GitHubOptions(t *testing.T) {

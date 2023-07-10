@@ -81,3 +81,5 @@ template.app-deployed: |
 **Notes**:
 - If the message is set to 140 characters or more, it will be truncated.
 - If `github.repoURLPath` and `github.revisionPath` are same as above, they can be omitted.
+- By default, github deployments utilize automerge to ensure the requested ref is up to date with the default branch.
+  Setting this option to `false` is required if you would like to deploy older refs in your default branch.

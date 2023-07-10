@@ -192,8 +192,8 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 			notification.GitHub.Deployment.LogURL = logURLData.String()
 
-			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 			notification.GitHub.Deployment.AutoMerge = g.Deployment.AutoMerge
+			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 		}
 
 		return nil
