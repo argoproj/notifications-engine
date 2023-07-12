@@ -142,6 +142,18 @@ func NewController(
 	return ctrl
 }
 
+// NewControllerWithNamespaceSupport For self-service notification
+func NewControllerWithNamespaceSupport(
+	client dynamic.NamespaceableResourceInterface,
+	informer cache.SharedIndexInformer,
+	apiFactory api.Factory,
+	opts ...Opts,
+) *notificationController {
+	ctrl := NewController(client, informer, apiFactory, opts...)
+	ctrl.namespaceSupport = true
+	return ctrl
+}
+
 type notificationController struct {
 	client            dynamic.NamespaceableResourceInterface
 	informer          cache.SharedIndexInformer
@@ -152,6 +164,7 @@ type notificationController struct {
 	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
 	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
 	eventCallback     func(eventSequence NotificationEventSequence)
+	namespaceSupport  bool
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -169,12 +182,9 @@ func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
 	log.Warn("Controller has stopped.")
 }
 
-func (c *notificationController) processResource(resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
+func (c *notificationController) processResourceWithAPI(api api.API, resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
+	apiNamespace := api.GetConfig().Namespace
 	notificationsState := NewStateFromRes(resource)
-	api, err := c.apiFactory.GetAPI()
-	if err != nil {
-		return nil, err
-	}
 
 	destinations := c.getDestinations(resource, api.GetConfig())
 	if len(destinations) == 0 {
@@ -189,8 +199,8 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 	for trigger, destinations := range destinations {
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
-			logEntry.Debugf("Failed to execute condition of trigger %s: %v", trigger, err)
-			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %v", trigger, err))
+			logEntry.Debugf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
+			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace))
 		}
 		logEntry.Infof("Trigger %s result: %v", trigger, res)
 
@@ -206,22 +216,22 @@ func (c *notificationController) processResource(resource v1.Object, logEntry *l
 
 			for _, to := range destinations {
 				if changed := notificationsState.SetAlreadyNotified(trigger, cr, to, true); !changed {
-					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v'", trigger, cr.Key, to)
+					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
 					eventSequence.addDelivered(NotificationDelivery{
 						Trigger:         trigger,
 						Destination:     to,
 						AlreadyNotified: true,
 					})
 				} else {
-					logEntry.Infof("Sending notification about condition '%s.%s' to '%v'", trigger, cr.Key, to)
+					logEntry.Infof("Sending notification about condition '%s.%s' to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
 					if err := api.Send(un.Object, cr.Templates, to); err != nil {
-						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v",
-							to, resource.GetNamespace(), resource.GetName(), err)
+						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
+							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
 						notificationsState.SetAlreadyNotified(trigger, cr, to, false)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
-						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v", trigger, to, err))
+						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
 					} else {
-						logEntry.Debugf("Notification %s was sent", to.Recipient)
+						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
 						eventSequence.addDelivered(NotificationDelivery{
 							Trigger:         trigger,
@@ -294,7 +304,31 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 	}
 
-	annotations, err := c.processResource(resource, logEntry, &eventSequence)
+	if !c.namespaceSupport {
+		api, err := c.apiFactory.GetAPI()
+		if err != nil {
+			logEntry.Errorf("Failed to get api: %v", err)
+			eventSequence.addError(err)
+			return
+		}
+		c.processResource(api, resource, logEntry, &eventSequence)
+	} else {
+		apisWithNamespace, err := c.apiFactory.GetAPIsFromNamespace(resource.GetNamespace())
+		if err != nil {
+			logEntry.Errorf("Failed to get api with namespace: %v", err)
+			eventSequence.addError(err)
+		}
+		for _, api := range apisWithNamespace {
+			c.processResource(api, resource, logEntry, &eventSequence)
+		}
+	}
+	logEntry.Info("Processing completed")
+
+	return
+}
+
+func (c *notificationController) processResource(api api.API, resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) {
+	annotations, err := c.processResourceWithAPI(api, resource, logEntry, eventSequence)
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 		eventSequence.addError(err)
@@ -307,7 +341,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 			annotationsPatch[k] = v
 		}
 		for k := range resource.GetAnnotations() {
-			if _, ok = annotations[k]; !ok {
+			if _, ok := annotations[k]; !ok {
 				annotationsPatch[k] = nil
 			}
 		}
@@ -329,11 +363,9 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		if err := c.informer.GetStore().Update(resource); err != nil {
 			logEntry.Warnf("Failed to store update resource in informer: %v", err)
 			eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %v", err))
+			return
 		}
 	}
-	logEntry.Info("Processing completed")
-
-	return
 }
 
 func mapsEqual(first, second map[string]string) bool {
