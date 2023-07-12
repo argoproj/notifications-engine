@@ -150,7 +150,7 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Api-Key", s.opts.ApiKey)
+	req.Header.Set("X-Api-Key", s.opts.ApiKey)
 
 	_, err = client.Do(req)
 	return err
