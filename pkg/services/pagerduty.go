@@ -93,7 +93,7 @@ func (p pagerdutyService) Send(notification Notification, dest Destination) erro
 		Priority: &pagerduty.APIReference{ID: priorityID, Type: "priority"},
 		Title:    title,
 		Urgency:  urgency,
-		Body: &pagerduty.APIDetails{Type: "incident_details	", Details: body},
+		Body:     &pagerduty.APIDetails{Type: "incident_details	", Details: body},
 	}
 	incident, err := pagerDutyClient.CreateIncidentWithContext(context.TODO(), p.opts.From, input)
 	if err != nil {

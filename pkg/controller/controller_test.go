@@ -90,7 +90,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 
 	go informer.Run(ctx.Done())
 
-	c := NewController(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
+	c := NewControllerWithNamespaceSupport(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, nil, errors.New("failed to sync informers")
 	}
@@ -115,7 +115,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 		return true
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
 
-	annotations, err := ctrl.processResource(app, logEntry, &NotificationEventSequence{})
+	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 
-	_, err = ctrl.processResource(app, logEntry, &NotificationEventSequence{})
+	_, err = ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
-	annotations, err := ctrl.processResource(app, logEntry, &NotificationEventSequence{})
+	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
@@ -298,7 +298,7 @@ func TestWithEventCallback(t *testing.T) {
 			description: "EventCallback should be invoked with non-nil error on send failure",
 			sendErr:     errors.New("this is a send error"),
 			expectedErrors: []error{
-				errors.New("failed to deliver notification my-trigger to {mock recipient}: this is a send error"),
+				errors.New("failed to deliver notification my-trigger to {mock recipient}: this is a send error using the configuration in namespace "),
 			},
 		},
 		{
@@ -323,6 +323,7 @@ func TestWithEventCallback(t *testing.T) {
 			}))
 
 			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
+			ctrl.namespaceSupport = false
 			assert.NoError(t, err)
 			ctrl.apiFactory = &mocks.FakeFactory{Api: api, Err: tc.apiErr}
 
