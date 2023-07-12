@@ -10,3 +10,9 @@ type FakeFactory struct {
 func (f *FakeFactory) GetAPI() (api.API, error) {
 	return f.Api, f.Err
 }
+
+func (f *FakeFactory) GetAPIsWithNamespaceV2(namespace string) (map[string]api.API, error) {
+	apiMap := make(map[string]api.API)
+	apiMap[namespace] = f.Api
+	return apiMap, f.Err
+}

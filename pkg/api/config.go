@@ -29,6 +29,7 @@ type Config struct {
 	DefaultTriggers []string
 	// ServiceDefaultTriggers holds list of default triggers per service
 	ServiceDefaultTriggers map[string][]string
+	Namespace              string
 }
 
 // Returns list of destinations for the specified trigger
@@ -76,6 +77,7 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 		Triggers:               map[string][]triggers.Condition{},
 		ServiceDefaultTriggers: map[string][]string{},
 		Templates:              map[string]services.Notification{},
+		Namespace:              configMap.Namespace,
 	}
 	if subscriptionYaml, ok := configMap.Data["subscriptions"]; ok {
 		if err := yaml.Unmarshal([]byte(subscriptionYaml), &cfg.Subscriptions); err != nil {
