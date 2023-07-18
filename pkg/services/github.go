@@ -52,7 +52,7 @@ type GitHubDeployment struct {
 	EnvironmentURL   string   `json:"environmentURL,omitempty"`
 	LogURL           string   `json:"logURL,omitempty"`
 	RequiredContexts []string `json:"requiredContexts"`
-	AutoMerge        bool     `json:"autoMerge,omitempty"`
+	AutoMerge        *bool    `json:"autoMerge,omitempty"`
 }
 
 const (
@@ -192,7 +192,12 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 			notification.GitHub.Deployment.LogURL = logURLData.String()
 
-			notification.GitHub.Deployment.AutoMerge = g.Deployment.AutoMerge
+			if g.Deployment.AutoMerge == nil {
+				deploymentAutoMergeDefault := true
+				notification.GitHub.Deployment.AutoMerge = &deploymentAutoMergeDefault
+			} else {
+				notification.GitHub.Deployment.AutoMerge = g.Deployment.AutoMerge
+			}
 			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 		}
 
@@ -305,7 +310,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				Ref:              &notification.GitHub.revision,
 				Environment:      &notification.GitHub.Deployment.Environment,
 				RequiredContexts: &notification.GitHub.Deployment.RequiredContexts,
-				AutoMerge:        &notification.GitHub.Deployment.AutoMerge,
+				AutoMerge:        notification.GitHub.Deployment.AutoMerge,
 			},
 		)
 		if err != nil {
