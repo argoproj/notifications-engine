@@ -313,7 +313,19 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 		c.processResource(api, resource, logEntry, &eventSequence)
 	} else {
-		apisWithNamespace, err := c.apiFactory.GetAPIsFromNamespace(resource.GetNamespace())
+		// this is for cluster support
+		annotations := resource.GetAnnotations()
+		notificationNS := annotations["notification-namespace"]
+		notificationCluster := annotations["notification-cluster"]
+		log.Infof("%s", notificationNS)
+		log.Infof("%s", notificationCluster)
+
+		resourceNameSpace := resource.GetNamespace()
+		if notificationNS != "" && notificationCluster != "" {
+			resourceNameSpace = notificationCluster + "#" + notificationNS
+		}
+
+		apisWithNamespace, err := c.apiFactory.GetAPIsFromNamespace(resourceNameSpace)
 		if err != nil {
 			logEntry.Errorf("Failed to get api with namespace: %v", err)
 			eventSequence.addError(err)
