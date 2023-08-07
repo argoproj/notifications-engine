@@ -320,7 +320,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 	if c.factorySupport {
 		apisWithNamespace, err := c.apiFactory.GetAPIsFromFactory(resource)
 		if err != nil {
-			logEntry.Errorf("Failed to get api with namespace: %v", err)
+			logEntry.Errorf("Failed to get api with key: %v", err)
 			eventSequence.addError(err)
 		}
 		for _, api := range apisWithNamespace {
