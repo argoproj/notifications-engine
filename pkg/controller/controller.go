@@ -154,7 +154,7 @@ func NewControllerWithNamespaceSupport(
 	return ctrl
 }
 
-// NewControllerWithNamespaceSupport For self-service notification
+// NewControllerWithNamespaceSupport For self-service notification getting configuration from apiFactory
 func NewControllerWithFactorySupport(
 	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
