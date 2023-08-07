@@ -204,7 +204,7 @@ func controllerRunAndVerifyResult(t *testing.T, factorySupport bool) {
 		patchCh <- action.(kubetesting.PatchAction).GetPatch()
 		return true, nil, nil
 	})
-	ctrl, api, err := newController(t, ctx, client, false)
+	ctrl, api, err := newController(t, ctx, client, factorySupport)
 	assert.NoError(t, err)
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
