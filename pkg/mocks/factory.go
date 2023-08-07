@@ -18,5 +18,7 @@ func (f *FakeFactory) GetAPIsFromNamespace(namespace string) (map[string]api.API
 }
 
 func (f *FakeFactory) GetAPIsFromFactory(resource interface{}) (map[string]api.API, error) {
-	return nil, f.Err
+	apiMap := make(map[string]api.API)
+	apiMap["key1"] = f.Api
+	return apiMap, f.Err
 }
