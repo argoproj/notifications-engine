@@ -1,9 +1,6 @@
 package mocks
 
-import (
-	"fmt"
-	"github.com/argoproj/notifications-engine/pkg/api"
-)
+import "github.com/argoproj/notifications-engine/pkg/api"
 
 type FakeFactory struct {
 	Api api.API
@@ -21,5 +18,5 @@ func (f *FakeFactory) GetAPIsFromNamespace(namespace string) (map[string]api.API
 }
 
 func (f *FakeFactory) GetAPIsFromFactory(resource interface{}) (map[string]api.API, error) {
-	return nil, fmt.Errorf("not implemented")
+	return nil, f.Err
 }
