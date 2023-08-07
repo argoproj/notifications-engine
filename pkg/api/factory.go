@@ -33,6 +33,7 @@ type Settings struct {
 type Factory interface {
 	GetAPI() (API, error)
 	GetAPIsFromNamespace(namespace string) (map[string]API, error)
+	GetAPIsFromFactory(resource interface{}) (map[string]API, error)
 }
 
 type apiFactory struct {
@@ -168,6 +169,10 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 		return apis, fmt.Errorf("errors getting apis: %s", errors)
 	}
 	return apis, nil
+}
+
+func (f *apiFactory) GetAPIsFromFactory(resource interface{}) (map[string]API, error) {
+	return nil, fmt.Errorf("not implemented")
 }
 
 func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {

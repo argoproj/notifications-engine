@@ -154,6 +154,18 @@ func NewControllerWithNamespaceSupport(
 	return ctrl
 }
 
+// NewControllerWithNamespaceSupport For self-service notification
+func NewControllerWithFactorySupport(
+	client dynamic.NamespaceableResourceInterface,
+	informer cache.SharedIndexInformer,
+	apiFactory api.Factory,
+	opts ...Opts,
+) *notificationController {
+	ctrl := NewController(client, informer, apiFactory, opts...)
+	ctrl.factorySupport = true
+	return ctrl
+}
+
 type notificationController struct {
 	client            dynamic.NamespaceableResourceInterface
 	informer          cache.SharedIndexInformer
@@ -165,6 +177,7 @@ type notificationController struct {
 	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
 	eventCallback     func(eventSequence NotificationEventSequence)
 	namespaceSupport  bool
+	factorySupport    bool
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -304,28 +317,8 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 	}
 
-	if !c.namespaceSupport {
-		api, err := c.apiFactory.GetAPI()
-		if err != nil {
-			logEntry.Errorf("Failed to get api: %v", err)
-			eventSequence.addError(err)
-			return
-		}
-		c.processResource(api, resource, logEntry, &eventSequence)
-	} else {
-		// this is for cluster support
-		annotations := resource.GetAnnotations()
-		notificationNS := annotations["notification-namespace"]
-		notificationCluster := annotations["notification-cluster"]
-		log.Infof("%s", notificationNS)
-		log.Infof("%s", notificationCluster)
-
-		resourceNameSpace := resource.GetNamespace()
-		if notificationNS != "" && notificationCluster != "" {
-			resourceNameSpace = notificationCluster + "#" + notificationNS
-		}
-
-		apisWithNamespace, err := c.apiFactory.GetAPIsFromNamespace(resourceNameSpace)
+	if c.factorySupport {
+		apisWithNamespace, err := c.apiFactory.GetAPIsFromFactory(resource)
 		if err != nil {
 			logEntry.Errorf("Failed to get api with namespace: %v", err)
 			eventSequence.addError(err)
@@ -333,7 +326,26 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		for _, api := range apisWithNamespace {
 			c.processResource(api, resource, logEntry, &eventSequence)
 		}
+
+	} else if c.namespaceSupport {
+		apisWithNamespace, err := c.apiFactory.GetAPIsFromNamespace(resource.GetNamespace())
+		if err != nil {
+			logEntry.Errorf("Failed to get api with namespace: %v", err)
+			eventSequence.addError(err)
+		}
+		for _, api := range apisWithNamespace {
+			c.processResource(api, resource, logEntry, &eventSequence)
+		}
+	} else {
+		api, err := c.apiFactory.GetAPI()
+		if err != nil {
+			logEntry.Errorf("Failed to get api: %v", err)
+			eventSequence.addError(err)
+			return
+		}
+		c.processResource(api, resource, logEntry, &eventSequence)
 	}
+
 	logEntry.Info("Processing completed")
 
 	return
