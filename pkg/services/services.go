@@ -13,6 +13,7 @@ import (
 
 type Notification struct {
 	Message      string                    `json:"message,omitempty"`
+	AwsSqs       *AwsSqsNotification       `json:"awssqs,omitempty"`
 	Email        *EmailNotification        `json:"email,omitempty"`
 	Slack        *SlackNotification        `json:"slack,omitempty"`
 	Mattermost   *MattermostNotification   `json:"mattermost,omitempty"`
@@ -60,6 +61,9 @@ type Destination struct {
 
 func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	var sources []TemplaterSource
+	if n.AwsSqs != nil {
+		sources = append(sources, n.AwsSqs)
+	}
 	if n.Slack != nil {
 		sources = append(sources, n.Slack)
 	}
@@ -75,37 +79,30 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	if n.Webhook != nil {
 		sources = append(sources, n.Webhook)
 	}
-
 	if n.Opsgenie != nil {
 		sources = append(sources, n.Opsgenie)
 	}
 	if n.GitHub != nil {
 		sources = append(sources, n.GitHub)
 	}
-
 	if n.Teams != nil {
 		sources = append(sources, n.Teams)
 	}
 	if n.Alertmanager != nil {
 		sources = append(sources, n.Alertmanager)
 	}
-
 	if n.GoogleChat != nil {
 		sources = append(sources, n.GoogleChat)
 	}
-
 	if n.Pagerduty != nil {
 		sources = append(sources, n.Pagerduty)
 	}
-
 	if n.PagerdutyV2 != nil {
 		sources = append(sources, n.PagerdutyV2)
 	}
-
 	if n.Newrelic != nil {
 		sources = append(sources, n.Newrelic)
 	}
-
 	return n.getTemplater(name, f, sources)
 }
 
@@ -118,6 +115,12 @@ type NotificationService interface {
 
 func NewService(serviceType string, optsData []byte) (NotificationService, error) {
 	switch serviceType {
+	case "awssqs":
+		var opts AwsSqsOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewAwsSqsService(opts), nil
 	case "email":
 		var opts EmailOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
