@@ -3,9 +3,9 @@ package api
 import (
 	"fmt"
 
-	"github.com/argoproj/notifications-engine/pkg/services"
-	"github.com/argoproj/notifications-engine/pkg/templates"
-	"github.com/argoproj/notifications-engine/pkg/triggers"
+	"github.com/lol3909/notifications-engine/pkg/services"
+	"github.com/lol3909/notifications-engine/pkg/templates"
+	"github.com/lol3909/notifications-engine/pkg/triggers"
 )
 
 const (

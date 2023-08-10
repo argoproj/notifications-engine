@@ -6,7 +6,7 @@ import (
 
 	"gomodules.xyz/notify/smtp"
 
-	"github.com/argoproj/notifications-engine/pkg/util/text"
+	"github.com/lol3909/notifications-engine/pkg/util/text"
 )
 
 type EmailNotification struct {

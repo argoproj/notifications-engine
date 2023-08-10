@@ -3,8 +3,8 @@ package api
 import (
 	"testing"
 
-	"github.com/argoproj/notifications-engine/pkg/services"
-	"github.com/argoproj/notifications-engine/pkg/subscriptions"
+	"github.com/lol3909/notifications-engine/pkg/services"
+	"github.com/lol3909/notifications-engine/pkg/subscriptions"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"

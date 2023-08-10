@@ -5,9 +5,9 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/argoproj/notifications-engine/pkg/services"
-	"github.com/argoproj/notifications-engine/pkg/subscriptions"
-	"github.com/argoproj/notifications-engine/pkg/triggers"
+	"github.com/lol3909/notifications-engine/pkg/services"
+	"github.com/lol3909/notifications-engine/pkg/subscriptions"
+	"github.com/lol3909/notifications-engine/pkg/triggers"
 
 	log "github.com/sirupsen/logrus"
 	yaml3 "gopkg.in/yaml.v3"

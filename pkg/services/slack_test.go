@@ -4,7 +4,7 @@ import (
 	"testing"
 	"text/template"
 
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
+	slackutil "github.com/lol3909/notifications-engine/pkg/util/slack"
 
 	"github.com/stretchr/testify/assert"
 )

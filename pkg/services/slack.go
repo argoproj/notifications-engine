@@ -10,8 +10,8 @@ import (
 	"regexp"
 	texttemplate "text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
+	httputil "github.com/lol3909/notifications-engine/pkg/util/http"
+	slackutil "github.com/lol3909/notifications-engine/pkg/util/slack"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"

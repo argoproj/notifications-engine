@@ -7,9 +7,9 @@ package mocks
 import (
 	reflect "reflect"
 
-	api "github.com/argoproj/notifications-engine/pkg/api"
-	services "github.com/argoproj/notifications-engine/pkg/services"
-	triggers "github.com/argoproj/notifications-engine/pkg/triggers"
+	api "github.com/lol3909/notifications-engine/pkg/api"
+	services "github.com/lol3909/notifications-engine/pkg/services"
+	triggers "github.com/lol3909/notifications-engine/pkg/triggers"
 	gomock "github.com/golang/mock/gomock"
 )
 

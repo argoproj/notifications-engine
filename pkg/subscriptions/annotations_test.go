@@ -3,7 +3,7 @@ package subscriptions
 import (
 	"testing"
 
-	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/lol3909/notifications-engine/pkg/services"
 
 	"github.com/stretchr/testify/assert"
 )

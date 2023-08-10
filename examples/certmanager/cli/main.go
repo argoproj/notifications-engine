@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/argoproj/notifications-engine/pkg/api"
-	"github.com/argoproj/notifications-engine/pkg/cmd"
-	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/lol3909/notifications-engine/pkg/api"
+	"github.com/lol3909/notifications-engine/pkg/cmd"
+	"github.com/lol3909/notifications-engine/pkg/services"
 
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"

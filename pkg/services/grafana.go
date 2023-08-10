@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	httputil "github.com/lol3909/notifications-engine/pkg/util/http"
 
 	log "github.com/sirupsen/logrus"
 )

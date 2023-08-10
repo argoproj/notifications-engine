@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/lol3909/notifications-engine/pkg/services"
 )
 
 func TestFormat_Message(t *testing.T) {

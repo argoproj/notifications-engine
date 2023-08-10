@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/argoproj/notifications-engine/pkg/util/slack/mocks"
+	"github.com/lol3909/notifications-engine/pkg/util/slack/mocks"
 
 	"github.com/golang/mock/gomock"
 	"github.com/slack-go/slack"
