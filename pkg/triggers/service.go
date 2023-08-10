@@ -81,7 +81,7 @@ func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]Cond
 			Templates: condition.Send,
 			Key:       fmt.Sprintf("[%d].%s", i, hash(condition.When)),
 		}
-		whenResult := true
+		var whenResult bool
 		if prog, ok := svc.compiledConditions[condition.When]; !ok {
 			return nil, fmt.Errorf("trigger configuration has changed after initialization")
 		} else if val, err := expr.Run(prog, vars); err == nil {
@@ -92,6 +92,7 @@ func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]Cond
 			log.Errorf("failed to execute when condition: %+v", err)
 			whenResult = false
 		}
+
 		if whenResult {
 			if prog, ok := svc.compiledOncePer[condition.OncePer]; ok {
 				if val, err := expr.Run(prog, vars); err == nil {
