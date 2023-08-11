@@ -82,6 +82,7 @@ func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]Cond
 			Key:       fmt.Sprintf("[%d].%s", i, hash(condition.When)),
 		}
 		var whenResult bool
+		log.Debugf("This is the version with the whenResult variable")
 		if prog, ok := svc.compiledConditions[condition.When]; !ok {
 			return nil, fmt.Errorf("trigger configuration has changed after initialization")
 		} else if val, err := expr.Run(prog, vars); err == nil {
