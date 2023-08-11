@@ -13,7 +13,7 @@ import (
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/lol3909/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
 var (

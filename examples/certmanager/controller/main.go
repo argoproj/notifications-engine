@@ -7,9 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/lol3909/notifications-engine/pkg/api"
-	"github.com/lol3909/notifications-engine/pkg/controller"
-	"github.com/lol3909/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/api"
+	"github.com/argoproj/notifications-engine/pkg/controller"
+	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"

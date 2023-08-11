@@ -8,8 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/lol3909/notifications-engine/pkg/services"
-	"github.com/lol3909/notifications-engine/pkg/util/misc"
+	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/util/misc"
 )
 
 func newTemplateCommand(cmdContext *commandContext) *cobra.Command {

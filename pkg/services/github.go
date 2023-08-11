@@ -16,8 +16,8 @@ import (
 	"github.com/spf13/cast"
 	giturls "github.com/whilp/git-urls"
 
-	httputil "github.com/lol3909/notifications-engine/pkg/util/http"
-	"github.com/lol3909/notifications-engine/pkg/util/text"
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
 var (

@@ -7,7 +7,7 @@ package mocks
 import (
 	reflect "reflect"
 
-	services "github.com/lol3909/notifications-engine/pkg/services"
+	services "github.com/argoproj/notifications-engine/pkg/services"
 	gomock "github.com/golang/mock/gomock"
 )
 

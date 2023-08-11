@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/lol3909/notifications-engine/pkg/api"
-	"github.com/lol3909/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/api"
+	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/api/core/v1"

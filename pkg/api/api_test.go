@@ -6,8 +6,8 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/lol3909/notifications-engine/pkg/services"
-	"github.com/lol3909/notifications-engine/pkg/services/mocks"
+	"github.com/argoproj/notifications-engine/pkg/services"
+	"github.com/argoproj/notifications-engine/pkg/services/mocks"
 )
 
 func getVars(in map[string]interface{}, _ services.Destination) map[string]interface{} {

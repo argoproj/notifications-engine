@@ -16,7 +16,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	httputil "github.com/lol3909/notifications-engine/pkg/util/http"
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 const (

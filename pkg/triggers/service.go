@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/lol3909/notifications-engine/pkg/util/text"
+	"github.com/argoproj/notifications-engine/pkg/util/text"
 
 	"github.com/antonmedv/expr"
 	"github.com/antonmedv/expr/vm"
