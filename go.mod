@@ -1,4 +1,4 @@
-module github.com/lol3909/notifications-engine
+module github.com/argoproj/notifications-engine
 
 go 1.17
 
