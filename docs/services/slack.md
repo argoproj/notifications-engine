@@ -6,11 +6,11 @@ If you want to send message using incoming webhook, you can use [webhook](./webh
 
 The Slack notification service configuration includes following settings:
 
-* `token` – (`string`) the app token
 * `apiURL` – (optional, `string`) the server url, e.g. https://example.com/api
-* `username` – (optional, `string`) the app username
 * `icon` – (optional, `string`) the app icon, e.g. :robot_face: or https://example.com/image.png
 * `insecureSkipVerify` – (optional, `bool`)
+* `token` – (`string`) the app token
+* `username` – (optional, `string`) the app username
 
 ## Configuration
 
