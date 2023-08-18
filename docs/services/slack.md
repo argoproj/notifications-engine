@@ -6,15 +6,15 @@ If you want to send message using incoming webhook, you can use [webhook](./webh
 
 The Slack notification service configuration includes following settings:
 
-| **Option**           | **Required** | **Type**       | **Description** |
-| -------------------- | ------------ | -------------- | --------------- |
-| `apiURL`             | False        | `string`       | The server URL, e.g. `https://example.com/api` |
-| `channels`           | False        | `list[string]` | |
-| `icon`               | False        | `string`       | The app icon, e.g. `:robot_face:` or `https://example.com/image.png` |
-| `insecureSkipVerify` | False        | `bool`         | |
-| `sigingSecret`       | False        | `string`       | |
-| `token`              | **True**     | `string`       | The app's OAuth access token |
-| `username`           | False        | `string`       | The app username |
+| **Option**           | **Required** | **Type**       | **Description** | **Example** |
+| -------------------- | ------------ | -------------- | --------------- | ----------- |
+| `apiURL`             | False        | `string`       | The server URL. | `https://example.com/api` |
+| `channels`           | False        | `list[string]` |                 | |
+| `icon`               | False        | `string`       | The app icon.   | `:robot_face:` or `https://example.com/image.png` |
+| `insecureSkipVerify` | False        | `bool`         |                 | |
+| `sigingSecret`       | False        | `string`       |                 | |
+| `token`              | **True**     | `string`       | The app's OAuth access token. | `xoxb-1234567890-1234567890123-5n38u5ed63fgzqlvuyxvxcx6` |
+| `username`           | False        | `string`       | The app username. | |
 
 ## Configuration
 
