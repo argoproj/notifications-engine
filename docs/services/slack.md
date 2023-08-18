@@ -13,7 +13,7 @@ The Slack notification service configuration includes following settings:
 | `icon`               | False        | `string`       | The app icon, e.g. `:robot_face:` or `https://example.com/image.png` |
 | `insecureSkipVerify` | False        | `bool`         | |
 | `sigingSecret`       | False        | `string`       | |
-| `token`              | **True**     | `string`       | The app token |
+| `token`              | **True**     | `string`       | The app's OAuth access token |
 | `username`           | False        | `string`       | The app username |
 
 ## Configuration
