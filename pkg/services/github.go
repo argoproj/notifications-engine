@@ -32,12 +32,13 @@ type GitHubOptions struct {
 }
 
 type GitHubNotification struct {
-	repoURL      string
-	revision     string
-	Status       *GitHubStatus     `json:"status,omitempty"`
-	Deployment   *GitHubDeployment `json:"deployment,omitempty"`
-	RepoURLPath  string            `json:"repoURLPath,omitempty"`
-	RevisionPath string            `json:"revisionPath,omitempty"`
+	repoURL            string
+	revision           string
+	Status             *GitHubStatus             `json:"status,omitempty"`
+	Deployment         *GitHubDeployment         `json:"deployment,omitempty"`
+	PullRequestComment *GitHubPullRequestComment `json:"pullRequestComment,omitempty"`
+	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
+	RevisionPath       string                    `json:"revisionPath,omitempty"`
 }
 
 type GitHubStatus struct {
@@ -52,6 +53,10 @@ type GitHubDeployment struct {
 	EnvironmentURL   string   `json:"environmentURL,omitempty"`
 	LogURL           string   `json:"logURL,omitempty"`
 	RequiredContexts []string `json:"requiredContexts"`
+}
+
+type GitHubPullRequestComment struct {
+	Content string `json:"content,omitempty"`
 }
 
 const (
@@ -113,6 +118,14 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 
 		logURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.LogURL)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var pullRequestCommentContent *texttemplate.Template
+	if g.PullRequestComment != nil {
+		pullRequestCommentContent, err = texttemplate.New(name).Funcs(f).Parse(g.PullRequestComment.Content)
 		if err != nil {
 			return nil, err
 		}
@@ -192,6 +205,18 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.Deployment.LogURL = logURLData.String()
 
 			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
+		}
+
+		if g.PullRequestComment != nil {
+			if notification.GitHub.PullRequestComment == nil {
+				notification.GitHub.PullRequestComment = &GitHubPullRequestComment{}
+			}
+
+			var contentData bytes.Buffer
+			if err := pullRequestCommentContent.Execute(&contentData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.PullRequestComment.Content = contentData.String()
 		}
 
 		return nil
@@ -323,6 +348,39 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		)
 		if err != nil {
 			return err
+		}
+	}
+
+	if notification.GitHub.PullRequestComment != nil {
+		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
+		// maximum is 65536 characters
+		body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
+		comment := &github.IssueComment{
+			Body: &body,
+		}
+
+		prs, _, err := g.client.PullRequests.ListPullRequestsWithCommit(
+			context.Background(),
+			u[0],
+			u[1],
+			notification.GitHub.revision,
+			nil,
+		)
+		if err != nil {
+			return err
+		}
+
+		for _, pr := range prs {
+			_, _, err = g.client.Issues.CreateComment(
+				context.Background(),
+				u[0],
+				u[1],
+				pr.GetNumber(),
+				comment,
+			)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
