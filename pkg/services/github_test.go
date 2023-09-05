@@ -107,6 +107,7 @@ func TestGetTemplater_GitHub_Custom_Resource(t *testing.T) {
 }
 
 func TestGetTemplater_GitHub_Deployment(t *testing.T) {
+	f := false
 	n := Notification{
 		GitHub: &GitHubNotification{
 			RepoURLPath:  "{{.sync.spec.git.repo}}",
@@ -117,6 +118,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 				EnvironmentURL:   "https://argoproj.github.io",
 				LogURL:           "https://argoproj.github.io/log",
 				RequiredContexts: []string{},
+				AutoMerge:        &f,
 			},
 		},
 	}
@@ -156,6 +158,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Equal(t, "https://argoproj.github.io", notification.GitHub.Deployment.EnvironmentURL)
 	assert.Equal(t, "https://argoproj.github.io/log", notification.GitHub.Deployment.LogURL)
 	assert.Len(t, notification.GitHub.Deployment.RequiredContexts, 0)
+	assert.Equal(t, &f, notification.GitHub.Deployment.AutoMerge)
 }
 
 func TestNewGitHubService_GitHubOptions(t *testing.T) {
