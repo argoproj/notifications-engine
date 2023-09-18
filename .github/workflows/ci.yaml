@@ -51,6 +51,6 @@ jobs:
           go mod download && go mod tidy && make generate
           git diff --exit-code -- .
       - run: make test
-      - uses: codecov/codecov-action@v4
+      - uses: codecov/codecov-action@v3
         with:
           file: ./coverage.out
