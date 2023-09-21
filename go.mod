@@ -1,6 +1,6 @@
 module github.com/argoproj/notifications-engine
 
-go 1.17
+go 1.21
 
 require (
 	github.com/Masterminds/sprig/v3 v3.2.3
