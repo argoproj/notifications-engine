@@ -93,7 +93,7 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 			}
 			err := yaml.Unmarshal(source, &subscriptions)
 			if err != nil {
-				log.Errorf("Notification subscription unrmashal error: %v", err)
+				log.Errorf("Notification subscription unmarshal error: %v", err)
 				callback("", "", recipients, k)
 			}
 			for _, v := range subscriptions {
