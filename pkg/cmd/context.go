@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"time"
 
@@ -66,9 +65,9 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 	var err error
 	var data []byte
 	if filePath == "-" {
-		data, err = ioutil.ReadAll(c.stdin)
+		data, err = io.ReadAll(c.stdin)
 	} else {
-		data, err = ioutil.ReadFile(filePath)
+		data, err = os.ReadFile(filePath)
 	}
 	if err != nil {
 		return err
@@ -88,7 +87,7 @@ func (c *commandContext) unmarshalFromFile(filePath string, name string, gk sche
 
 func (c *commandContext) loadResource(name string) (*unstructured.Unstructured, error) {
 	if fileinfo, err := os.Stat(name); err == nil && !fileinfo.IsDir() {
-		data, err := ioutil.ReadFile(name)
+		data, err := os.ReadFile(name)
 		if err != nil {
 			return nil, err
 		}

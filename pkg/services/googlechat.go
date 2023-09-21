@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	texttemplate "text/template"
@@ -142,7 +142,7 @@ func (c *googlechatClient) sendMessage(message *googleChatMessage, threadKey str
 		_ = response.Body.Close()
 	}()
 
-	bodyBytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}

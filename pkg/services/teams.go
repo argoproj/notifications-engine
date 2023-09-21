@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	texttemplate "text/template"
 
@@ -175,7 +175,7 @@ func (s teamsService) Send(notification Notification, dest Destination) error {
 		_ = response.Body.Close()
 	}()
 
-	bodyBytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return err
 	}

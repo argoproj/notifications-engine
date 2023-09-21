@@ -3,7 +3,6 @@ package cmd
 import (
 	"bytes"
 	"io"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -42,7 +41,7 @@ func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, 
 	if err != nil {
 		return nil, nil, err
 	}
-	tmpFile, err := ioutil.TempFile("", "*-cm.yaml")
+	tmpFile, err := os.CreateTemp("", "*-cm.yaml")
 	if err != nil {
 		return nil, nil, err
 	}
