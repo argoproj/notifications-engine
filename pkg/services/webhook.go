@@ -3,7 +3,7 @@ package services
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"strings"
 	texttemplate "text/template"
@@ -109,7 +109,7 @@ func (s webhookService) Send(notification Notification, dest Destination) error 
 	}
 
 	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
-		data, err := ioutil.ReadAll(resp.Body)
+		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			data = []byte(fmt.Sprintf("unable to read response data: %v", err))
 		}

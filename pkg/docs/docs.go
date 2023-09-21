@@ -1,7 +1,6 @@
 package docs
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
@@ -29,7 +28,7 @@ func CopyServicesDocs(dest string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = ioutil.WriteFile(destName, data, 0755)
+		err = os.WriteFile(destName, data, 0755)
 		if err != nil {
 			return nil, err
 		}
