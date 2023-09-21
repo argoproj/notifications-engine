@@ -1,7 +1,7 @@
 # Webhook
 
 The webhook notification service allows sending a generic HTTP request using the templatized request body and URL.
-Using Webhook you might trigger a Jenkins job, update Github commit status.
+Using Webhook you might trigger a Jenkins job, update GitHub commit status.
 
 ## Parameters
 
@@ -67,7 +67,7 @@ metadata:
 
 ## Examples
 
-### Set Github commit status
+### Set GitHub commit status
 
 ```yaml
 apiVersion: v1
