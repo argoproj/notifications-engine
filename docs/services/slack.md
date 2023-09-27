@@ -12,7 +12,7 @@ The Slack notification service configuration includes following settings:
 | `channels`           | False        | `list[string]` |                 | `["my-channel-1", "my-channel-2"]` |
 | `icon`               | False        | `string`       | The app icon.   | `:robot_face:` or `https://example.com/image.png` |
 | `insecureSkipVerify` | False        | `bool`         |                 | `true` |
-| `sigingSecret`       | False        | `string`       |                 | `8f742231b10e8888abcd99yyyzzz85a5` |
+| `signingSecret`       | False        | `string`       |                 | `8f742231b10e8888abcd99yyyzzz85a5` |
 | `token`              | **True**     | `string`       | The app's OAuth access token. | `xoxb-1234567890-1234567890123-5n38u5ed63fgzqlvuyxvxcx6` |
 | `username`           | False        | `string`       | The app username. | `argocd` |
 
