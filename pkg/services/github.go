@@ -392,14 +392,14 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			u[1],
 			id,
 			github.UpdateCheckRunOptions{
-				Name:        notification.GitHub.CheckRun.Name,       
-				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL, 
-				ExternalID:  &notification.GitHub.CheckRun.ExternalID, 
-				Status:      &notification.GitHub.CheckRun.Status,     
-				Conclusion:  &notification.GitHub.CheckRun.Conclusion, 
+				Name:        notification.GitHub.CheckRun.Name,
+				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL
+				ExternalID:  &notification.GitHub.CheckRun.ExternalID
+				Status:      &notification.GitHub.CheckRun.Status,
+				Conclusion:  &notification.GitHub.CheckRun.Conclusion
 				CompletedAt: timestamp,
-				Output:      notification.GitHub.CheckRun.Output,     
-				Actions:     notification.GitHub.CheckRun.Actions,    
+				Output:      notification.GitHub.CheckRun.Output,
+				Actions:     notification.GitHub.CheckRun.Actions,
 			},
 		)
 		if err != nil {

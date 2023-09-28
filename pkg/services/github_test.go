@@ -251,7 +251,7 @@ func TestGetTemplater_Github_CheckRun(t *testing.T) {
 			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
 			CheckRun: &GitHubCheckRun{
 				Output: &github.CheckRunOutput{
-            		Title: &title,
+					Title: &title,
 				},
 			},
 		},
