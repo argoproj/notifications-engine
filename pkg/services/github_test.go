@@ -246,11 +246,11 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 func TestGetTemplater_Github_CheckRun(t *testing.T) {
 	title := "{{.sync.status.lastSyncedCommit}}"
 	n := Notification{
-		GitHub: &GitHubNotification {
+		GitHub: &GitHubNotification{
 			RepoURLPath:  "{{.sync.spec.git.repo}}",
 			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
-			CheckRun: &GitHubCheckRun {
-				Output: &github.CheckRunOutput {
+			CheckRun: &GitHubCheckRun{
+				Output: &github.CheckRunOutput{
             		Title: &title,
 				},
 			},

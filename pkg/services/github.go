@@ -52,13 +52,13 @@ type GitHubStatus struct {
 
 //copy of github:UpdateCheckRunOptions + id + timestamp as string
 type GitHubCheckRun struct {
-	Id          string            `json:"id"`                     // check_id, actually an int64, but string since we want it to be template'able. (Optional - create new check-run for revision if missing.)
-	Name        string            `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
-	DetailsURL  string            `json:"details_url,omitempty"`  // The URL of the integrator's site that has the full details of the check. (Optional.)
-	ExternalID  string            `json:"external_id,omitempty"`  // A reference for the run on the integrator's system. (Optional.)
-	Status      string            `json:"status,omitempty"`       // The current status. Can be one of "queued", "in_progress", or "completed". Default: "queued". (Optional.)
-	Conclusion  string            `json:"conclusion,omitempty"`   // Can be one of "success", "failure", "neutral", "cancelled", "skipped", "timed_out", or "action_required". (Optional. Required if you provide a status of "completed".)
-	CompletedAt string            `json:"completed_at,omitempty"` // The time the check completed. (Optional. Required if you provide conclusion.)
+	Id          string                   `json:"id"`                     // check_id, actually an int64, but string since we want it to be template'able. (Optional - create new check-run for revision if missing.)
+	Name        string                   `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
+	DetailsURL  string                   `json:"details_url,omitempty"`  // The URL of the integrator's site that has the full details of the check. (Optional.)
+	ExternalID  string                   `json:"external_id,omitempty"`  // A reference for the run on the integrator's system. (Optional.)
+	Status      string                   `json:"status,omitempty"`       // The current status. Can be one of "queued", "in_progress", or "completed". Default: "queued". (Optional.)
+	Conclusion  string                   `json:"conclusion,omitempty"`   // Can be one of "success", "failure", "neutral", "cancelled", "skipped", "timed_out", or "action_required". (Optional. Required if you provide a status of "completed".)
+	CompletedAt string                   `json:"completed_at,omitempty"` // The time the check completed. (Optional. Required if you provide conclusion.)
 	Output      *github.CheckRunOutput   `json:"output,omitempty"`       // Provide descriptive details about the run. (Optional)
 	Actions     []*github.CheckRunAction `json:"actions,omitempty"`      // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
 }
@@ -184,7 +184,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.CheckRun.Actions = g.CheckRun.Actions
 			if g.CheckRun.Output != nil {
 				notification.GitHub.CheckRun.Output.Annotations = g.CheckRun.Output.Annotations
-				notification.GitHub.CheckRun.Output.Images      = g.CheckRun.Output.Images
+				notification.GitHub.CheckRun.Output.Images = g.CheckRun.Output.Images
 			}
 		}
 		return nil
@@ -392,14 +392,14 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			u[1],
 			id,
 			github.UpdateCheckRunOptions{
-				Name       : notification.GitHub.CheckRun.Name,       
-				DetailsURL : &notification.GitHub.CheckRun.DetailsURL, 
-				ExternalID : &notification.GitHub.CheckRun.ExternalID, 
-				Status     : &notification.GitHub.CheckRun.Status,     
-				Conclusion : &notification.GitHub.CheckRun.Conclusion, 
+				Name:        notification.GitHub.CheckRun.Name,       
+				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL, 
+				ExternalID:  &notification.GitHub.CheckRun.ExternalID, 
+				Status:      &notification.GitHub.CheckRun.Status,     
+				Conclusion:  &notification.GitHub.CheckRun.Conclusion, 
 				CompletedAt: timestamp,
-				Output     : notification.GitHub.CheckRun.Output,     
-				Actions    : notification.GitHub.CheckRun.Actions,    
+				Output:      notification.GitHub.CheckRun.Output,     
+				Actions:     notification.GitHub.CheckRun.Actions,    
 			},
 		)
 		if err != nil {
@@ -409,4 +409,3 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 
 	return nil
 }
-
