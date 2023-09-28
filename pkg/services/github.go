@@ -116,7 +116,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &x.PullRequestComment.Content } else { return nil } }, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
 
 		//CheckRunUpdate support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &createField           } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun = nil { x.CheckRun == &GitHubCheckRun{} } }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &createField           } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun == nil { x.CheckRun == &GitHubCheckRun{} } }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Id         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Id          = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Name       } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Name        = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.DetailsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.DetailsURL  = val }},
@@ -410,3 +410,4 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 
 	return nil
 }
+
