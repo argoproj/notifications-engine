@@ -37,6 +37,7 @@ type GitHubNotification struct {
 	Status             *GitHubStatus             `json:"status,omitempty"`
 	Deployment         *GitHubDeployment         `json:"deployment,omitempty"`
 	PullRequestComment *GitHubPullRequestComment `json:"pullRequestComment,omitempty"`
+	CheckRun           *GitHubCheckRun           `json:"checkRun,omitempty"`
 	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
 	RevisionPath       string                    `json:"revisionPath,omitempty"`
 }
@@ -45,6 +46,19 @@ type GitHubStatus struct {
 	State     string `json:"state,omitempty"`
 	Label     string `json:"label,omitempty"`
 	TargetURL string `json:"targetURL,omitempty"`
+}
+
+//copy of github:UpdateCheckRunOptions + id
+type GitHubCheckRun struct {
+	Id          string            `json:"id"`                     // check_id, actually an int64, but string since we want it to be template'able. (Optional - create new check-run for revision if missing.)
+	Name        string            `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
+	DetailsURL  string            `json:"details_url,omitempty"`  // The URL of the integrator's site that has the full details of the check. (Optional.)
+	ExternalID  string            `json:"external_id,omitempty"`  // A reference for the run on the integrator's system. (Optional.)
+	Status      string            `json:"status,omitempty"`       // The current status. Can be one of "queued", "in_progress", or "completed". Default: "queued". (Optional.)
+	Conclusion  string            `json:"conclusion,omitempty"`   // Can be one of "success", "failure", "neutral", "cancelled", "skipped", "timed_out", or "action_required". (Optional. Required if you provide a status of "completed".)
+	CompletedAt string            `json:"completed_at,omitempty"` // The time the check completed. (Optional. Required if you provide conclusion.)
+	Output      *CheckRunOutput   `json:"output,omitempty"`       // Provide descriptive details about the run. (Optional)
+	Actions     []*CheckRunAction `json:"actions,omitempty"`      // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
 }
 
 type GitHubDeployment struct {
@@ -73,63 +87,69 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		g.RevisionPath = revisionTemplate
 	}
 
-	repoURL, err := texttemplate.New(name).Funcs(f).Parse(g.RepoURLPath)
-	if err != nil {
-		return nil, err
+	type GetterSetter struct {
+		G func(*GitHubNotification) *string
+		S func(*GitHubNotification, string)
+	}
+	createField := "create"
+
+	//list of template'able fields
+	fields := []GetterSetter{
+		{G: func(x *GitHubNotification) *string { return &x.RepoURLPath  }, S: func(x *GitHubNotification, val string) { x.repoURL  = val }},
+		{G: func(x *GitHubNotification) *string { return &x.RevisionPath }, S: func(x *GitHubNotification, val string) { x.revision = val }},
+
+		//Status support
+		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &createField        } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Status = nil { x.Status = &GitHubStatus{} } }},
+		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.State     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.State     = val }},
+		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.Label     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.Label     = val }},
+		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.TargetURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.TargetURL = val }},
+
+		//Deployment support
+		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &createField                } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Deployment = nil { x.Deployment = &GitHubDeployment{} } }},
+		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.State         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.State           = val }},
+		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.Environment   } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.Environment     = val }},
+		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.EnvironmentURL} else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.EnvironmentURL  = val }},
+		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.LogURL        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.LogURL          = val }},
+
+		//PullRequestComment support
+		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &createField                  } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.PullRequestComment = nil { x.PullRequestComment = &GitHubPullRequestComment{} } }},
+		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &x.PullRequestComment.Content } else { return nil } }, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
+
+		//CheckRunUpdate support
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &createField           } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun = nil { x.CheckRun = &GitHubCheckRun{} } }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Id         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Id          = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Name       } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Name        = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.DetailsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.DetailsURL  = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.ExternalID } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.ExternalID  = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Status     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Status      = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Conclusion } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Conclusion  = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.CompletedAt} else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
+
+		//CheckRunUpdate.Output support
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &createField                      } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output = &CheckRunOutput{} }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Title          } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title          = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Summary        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary        = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Text           } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text           = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.AnnotationsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.AnnotationsURL = val }},
+	};
+
+	type TmplSetter struct {
+		S func(*GitHubNotification, string)
+		T *texttemplate.Template
 	}
 
-	revision, err := texttemplate.New(name).Funcs(f).Parse(g.RevisionPath)
-	if err != nil {
-		return nil, err
-	}
+	templates := []TmplSetter{}
 
-	var statusState, label, targetURL *texttemplate.Template
-	if g.Status != nil {
-		statusState, err = texttemplate.New(name).Funcs(f).Parse(g.Status.State)
+	for _, field := range fields {
+		templateStr := field.G(g)
+		if templateStr == nil {
+			continue
+		}
+		tmpl, err := texttemplate.New(name).Funcs(f).Parse(*templateStr)
 		if err != nil {
 			return nil, err
 		}
-
-		label, err = texttemplate.New(name).Funcs(f).Parse(g.Status.Label)
-		if err != nil {
-			return nil, err
-		}
-
-		targetURL, err = texttemplate.New(name).Funcs(f).Parse(g.Status.TargetURL)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var deploymentState, environment, environmentURL, logURL *texttemplate.Template
-	if g.Deployment != nil {
-		deploymentState, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
-		if err != nil {
-			return nil, err
-		}
-
-		environment, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.Environment)
-		if err != nil {
-			return nil, err
-		}
-
-		environmentURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.EnvironmentURL)
-		if err != nil {
-			return nil, err
-		}
-
-		logURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.LogURL)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	var pullRequestCommentContent *texttemplate.Template
-	if g.PullRequestComment != nil {
-		pullRequestCommentContent, err = texttemplate.New(name).Funcs(f).Parse(g.PullRequestComment.Content)
-		if err != nil {
-			return nil, err
-		}
+		templates = append(templates, {S: field.S, T: tmpl})
 	}
 
 	return func(notification *Notification, vars map[string]interface{}) error {
@@ -140,71 +160,16 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 		}
 
-		var repoData bytes.Buffer
-		if err := repoURL.Execute(&repoData, vars); err != nil {
-			return err
-		}
-		notification.GitHub.repoURL = repoData.String()
-
-		var revisionData bytes.Buffer
-		if err := revision.Execute(&revisionData, vars); err != nil {
-			return err
-		}
-		notification.GitHub.revision = revisionData.String()
-
-		if g.Status != nil {
-			if notification.GitHub.Status == nil {
-				notification.GitHub.Status = &GitHubStatus{}
-			}
-
-			var stateData bytes.Buffer
-			if err := statusState.Execute(&stateData, vars); err != nil {
+		for _, tmplFunc := range templates {
+			var data bytes.Buffer
+			if err := tmplFunc.T.Execute(&data, vars); err != nil {
 				return err
 			}
-			notification.GitHub.Status.State = stateData.String()
-
-			var labelData bytes.Buffer
-			if err := label.Execute(&labelData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Status.Label = labelData.String()
-
-			var targetData bytes.Buffer
-			if err := targetURL.Execute(&targetData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Status.TargetURL = targetData.String()
+			tmplFunc.S(notification.GitHub, data.String())
 		}
 
+		//non-template'able props
 		if g.Deployment != nil {
-			if notification.GitHub.Deployment == nil {
-				notification.GitHub.Deployment = &GitHubDeployment{}
-			}
-
-			var stateData bytes.Buffer
-			if err := deploymentState.Execute(&stateData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Deployment.State = stateData.String()
-
-			var environmentData bytes.Buffer
-			if err := environment.Execute(&environmentData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Deployment.Environment = environmentData.String()
-
-			var environmentURLData bytes.Buffer
-			if err := environmentURL.Execute(&environmentURLData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Deployment.EnvironmentURL = environmentURLData.String()
-
-			var logURLData bytes.Buffer
-			if err := logURL.Execute(&logURLData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.Deployment.LogURL = logURLData.String()
-
 			if g.Deployment.AutoMerge == nil {
 				deploymentAutoMergeDefault := true
 				notification.GitHub.Deployment.AutoMerge = &deploymentAutoMergeDefault
@@ -213,19 +178,13 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 		}
-
-		if g.PullRequestComment != nil {
-			if notification.GitHub.PullRequestComment == nil {
-				notification.GitHub.PullRequestComment = &GitHubPullRequestComment{}
+		if g.CheckRun != nil {
+			notification.GitHub.CheckRun.Actions = g.CheckRun.Actions
+			if g.CheckRun.Output != nil {
+				notification.GitHub.CheckRun.Output.Annotations = g.CheckRun.Output.Annotations
+				notification.GitHub.CheckRun.Output.Images      = g.CheckRun.Output.Images
 			}
-
-			var contentData bytes.Buffer
-			if err := pullRequestCommentContent.Execute(&contentData, vars); err != nil {
-				return err
-			}
-			notification.GitHub.PullRequestComment.Content = contentData.String()
 		}
-
 		return nil
 	}, nil
 }
@@ -389,6 +348,55 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			if err != nil {
 				return err
 			}
+		}
+	}
+
+	if notification.GitHub.CheckRun != nil {
+		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
+		var id int64
+		if notification.GitHub.CheckRun.Id != "" {
+			parsedId, err := strconv.ParseInt(notification.GitHub.CheckRun.Id, 10, 64)
+			if err != nil {
+				// Handle error. Log it, return it, etc.
+				return fmt.Errorf("Failed to parse ID: %v", err)
+			}
+			id = parsedId
+		} else {
+			id := 0
+		}
+		if id == 0 {
+			checkrun, _, err := g.client.Checks.CreateCheckRun(
+				context.Background(),
+				u[0],
+				u[1],
+				&github.CreateCheckRunOptions{
+					HeadSHA: &notification.GitHub.revision,
+					Name:    &notification.GitHub.Deployment.Environment,
+				},
+			)
+			if err != nil {
+				return err
+			}
+			id := checkrun.ID
+		}
+		_, _, err = g.client.Checks.UpdateCheckRun(
+			context.Background(),
+			u[0],
+			u[1],
+			id,
+			&github.UpdateCheckRunOptions{
+				Name       : &notifications.GitHub.CheckRun.Name,       
+				DetailsURL : &notifications.GitHub.CheckRun.DetailsURL, 
+				ExternalID : &notifications.GitHub.CheckRun.ExternalID, 
+				Status     : &notifications.GitHub.CheckRun.Status,     
+				Conclusion : &notifications.GitHub.CheckRun.Conclusion, 
+				CompletedAt: &notifications.GitHub.CheckRun.CompletedAt,
+				Output     : &notifications.GitHub.CheckRun.Output,     
+				Actions    : &notifications.GitHub.CheckRun.Actions,    
+			},
+		)
+		if err != nil {
+			return err
 		}
 	}
 
