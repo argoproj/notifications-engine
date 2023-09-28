@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/google/go-github/v41/github"
 )
 
 func TestGetTemplater_GitHub(t *testing.T) {
