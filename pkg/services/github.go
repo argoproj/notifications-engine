@@ -90,12 +90,12 @@ type tmplSetter struct {
 	T *texttemplate.Template
 }
 
-func api(template *[]templates, g *GitHubNotification, creatorCheck func(*GitHubNotification) bool, apiCreator func(*GitHubNotification, string), fields []apiField) error {
+func api(templates *[]tmplSetter, g *GitHubNotification, name string, f texttemplate.FuncMap, creatorCheck func(*GitHubNotification) bool, apiCreator func(*GitHubNotification, string), fields []apiField) error {
 	if !creatorCheck(g) {
 		return nil
 	}
 	//create the object that holds this api, the text template is just a dummy so we can generalize the code
-	templates = append(templates, tmplSetter{S: apiCreator, T: texttemplate.New(name).Funcs(f).Parse("")})
+	*templates = append(*templates, tmplSetter{S: apiCreator, T: texttemplate.New(name).Funcs(f).Parse("")})
 	//create the template for each field
 	for _, field := range fields {
 		templateStr := field.G(g)
@@ -123,7 +123,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	templates := []tmplSetter{}
 
 	//common api
-	if err := api(&templates, g, func(x *GitHubNotification) bool { return true }, func(x *GitHubNotification, v string) {}, []apiField{
+	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return true }, func(x *GitHubNotification, v string) {}, []apiField{
 		{G: func(x *GitHubNotification) *string { return &x.RepoURLPath }, S: func(x *GitHubNotification, val string) { x.repoURL = val }},
 		{G: func(x *GitHubNotification) *string { return &x.RevisionPath }, S: func(x *GitHubNotification, val string) { x.revision = val }},
 	}); err != nil {
@@ -131,7 +131,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}
 
 	//Status api
-	if err := api(&templates, g, func(x *GitHubNotification) bool { return x.Status != nil }, func(x *GitHubNotification, v string) { x.Status = &GitHubStatus{} }, []apiField{
+	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return x.Status != nil }, func(x *GitHubNotification, v string) { x.Status = &GitHubStatus{} }, []apiField{
 		{G: func(x *GitHubNotification) *string { return &x.Status.State }, S: func(x *GitHubNotification, val string) { x.Status.State = val }},
 		{G: func(x *GitHubNotification) *string { return &x.Status.Label }, S: func(x *GitHubNotification, val string) { x.Status.Label = val }},
 		{G: func(x *GitHubNotification) *string { return &x.Status.TargetURL }, S: func(x *GitHubNotification, val string) { x.Status.TargetURL = val }},
@@ -140,7 +140,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}
 
 	//Deployment api
-	if err := api(&templates, g, func(x *GitHubNotification) bool { return x.Deployment != nil }, func(x *GitHubNotification, v string) { x.Deployment = &GitHubDeployment{} }, []apiField{
+	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return x.Deployment != nil }, func(x *GitHubNotification, v string) { x.Deployment = &GitHubDeployment{} }, []apiField{
 		{G: func(x *GitHubNotification) *string { return &x.Deployment.State }, S: func(x *GitHubNotification, val string) { x.Deployment.State = val }},
 		{G: func(x *GitHubNotification) *string { return &x.Deployment.Environment }, S: func(x *GitHubNotification, val string) { x.Deployment.Environment = val }},
 		{G: func(x *GitHubNotification) *string { return &x.Deployment.EnvironmentURL }, S: func(x *GitHubNotification, val string) { x.Deployment.EnvironmentURL = val }},
@@ -150,14 +150,14 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}
 
 	//PullRequestComment api
-	if err := api(&templates, g, func(x *GitHubNotification) bool { return x.PullRequestComment != nil }, func(x *GitHubNotification, v string) { x.PullRequestComment = &GitHubPullRequestComment{} }, []apiField{
+	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return x.PullRequestComment != nil }, func(x *GitHubNotification, v string) { x.PullRequestComment = &GitHubPullRequestComment{} }, []apiField{
 		{G: func(x *GitHubNotification) *string { return &x.PullRequestComment.Content }, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
 	}); err != nil {
 		return err
 	}
 
 	//CheckRunUpdate api
-	if err := api(&templates, g, func(x *GitHubNotification) bool { return x.CheckRun != nil }, func(x *GitHubNotification, v string) { x.CheckRun = &GitHubCheckRun{} }, []apiField{
+	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return x.CheckRun != nil }, func(x *GitHubNotification, v string) { x.CheckRun = &GitHubCheckRun{} }, []apiField{
 		{G: func(x *GitHubNotification) *string { return &x.CheckRun.ID }, S: func(x *GitHubNotification, val string) { x.CheckRun.ID = val }},
 		{G: func(x *GitHubNotification) *string { return &x.CheckRun.Name }, S: func(x *GitHubNotification, val string) { x.CheckRun.Name = val }},
 		{G: func(x *GitHubNotification) *string { return &x.CheckRun.DetailsURL }, S: func(x *GitHubNotification, val string) { x.CheckRun.DetailsURL = val }},
@@ -170,7 +170,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}
 
 	//CheckRunUpdate.Outout api
-	if err := api(&templates, g, func(x *GitHubNotification) bool { return x.CheckRun != nil && x.CheckRun.Output != nil }, func(x *GitHubNotification, v string) { x.CheckRun.Output = &github.CheckRunOutput{} }, []apiField{
+	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return x.CheckRun != nil && x.CheckRun.Output != nil }, func(x *GitHubNotification, v string) { x.CheckRun.Output = &github.CheckRunOutput{} }, []apiField{
 		{G: func(x *GitHubNotification) *string { return x.CheckRun.Output.Title }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title = &val }},
 		{G: func(x *GitHubNotification) *string { return x.CheckRun.Output.Summary }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary = &val }},
 		{G: func(x *GitHubNotification) *string { return x.CheckRun.Output.Text }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text = &val }},
