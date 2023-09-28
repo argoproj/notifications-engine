@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"strconv"
+	"time"
 	"strings"
 	texttemplate "text/template"
 	"unicode/utf8"
@@ -57,8 +59,8 @@ type GitHubCheckRun struct {
 	Status      string            `json:"status,omitempty"`       // The current status. Can be one of "queued", "in_progress", or "completed". Default: "queued". (Optional.)
 	Conclusion  string            `json:"conclusion,omitempty"`   // Can be one of "success", "failure", "neutral", "cancelled", "skipped", "timed_out", or "action_required". (Optional. Required if you provide a status of "completed".)
 	CompletedAt string            `json:"completed_at,omitempty"` // The time the check completed. (Optional. Required if you provide conclusion.)
-	Output      *CheckRunOutput   `json:"output,omitempty"`       // Provide descriptive details about the run. (Optional)
-	Actions     []*CheckRunAction `json:"actions,omitempty"`      // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
+	Output      *github.CheckRunOutput   `json:"output,omitempty"`       // Provide descriptive details about the run. (Optional)
+	Actions     []*github.CheckRunAction `json:"actions,omitempty"`      // Possible further actions the integrator can perform, which a user may trigger. (Optional.)
 }
 
 type GitHubDeployment struct {
@@ -126,7 +128,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.CompletedAt} else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
 
 		//CheckRunUpdate.Output support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &createField                      } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output == &CheckRunOutput{} }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &createField                      } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun.Output == nil { x.CheckRun.Output = &github.CheckRunOutput{} } }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Title          } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title          = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Summary        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary        = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Text           } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text           = val }},
@@ -369,7 +371,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				context.Background(),
 				u[0],
 				u[1],
-				&github.CreateCheckRunOptions{
+				github.CreateCheckRunOptions{
 					Name:    notification.GitHub.CheckRun.Name,
 					HeadSHA: notification.GitHub.revision,
 				},
@@ -380,8 +382,8 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			id := checkrun.ID
 		}
 		var timestamp *github.Timestamp
-		if notifications.GitHub.CheckRun.CompletedAt != nil {
-			parsedTime, err = time.Parse("2006-01-02T15:04:05Z07:00", notifications.GitHub.CheckRun.CompletedAt)
+		if notification.GitHub.CheckRun.CompletedAt != nil {
+			parsedTime, err = time.Parse("2006-01-02T15:04:05Z07:00", notification.GitHub.CheckRun.CompletedAt)
 			if err != nil {
 				return err
 			}
@@ -392,15 +394,15 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			u[0],
 			u[1],
 			id,
-			&github.UpdateCheckRunOptions{
-				Name       : notifications.GitHub.CheckRun.Name,       
-				DetailsURL : &notifications.GitHub.CheckRun.DetailsURL, 
-				ExternalID : &notifications.GitHub.CheckRun.ExternalID, 
-				Status     : &notifications.GitHub.CheckRun.Status,     
-				Conclusion : &notifications.GitHub.CheckRun.Conclusion, 
+			github.UpdateCheckRunOptions{
+				Name       : notification.GitHub.CheckRun.Name,       
+				DetailsURL : &notification.GitHub.CheckRun.DetailsURL, 
+				ExternalID : &notification.GitHub.CheckRun.ExternalID, 
+				Status     : &notification.GitHub.CheckRun.Status,     
+				Conclusion : &notification.GitHub.CheckRun.Conclusion, 
 				CompletedAt: timestamp,
-				Output     : &notifications.GitHub.CheckRun.Output,     
-				Actions    : &notifications.GitHub.CheckRun.Actions,    
+				Output     : &notification.GitHub.CheckRun.Output,     
+				Actions    : &notification.GitHub.CheckRun.Actions,    
 			},
 		)
 		if err != nil {
