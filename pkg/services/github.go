@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"regexp"
 	"strconv"
-	"time"
 	"strings"
 	texttemplate "text/template"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
