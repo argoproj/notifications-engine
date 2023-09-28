@@ -245,8 +245,8 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 func TestGetTemplater_Github_CheckRun(t *testing.T) {
 	n := Notification{
 		CheckRun: &GitHubCheckRun{
-			Output:  &CheckRunOutput {
-               Title: "{{.sync.status.lastSyncedCommit}}"
+			Output: &github.CheckRunOutput {
+               Title: "{{.sync.status.lastSyncedCommit}}",
 			},
 		},
 	}
