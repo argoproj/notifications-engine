@@ -359,12 +359,9 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		if notification.GitHub.CheckRun.Id != "" {
 			parsedId, err := strconv.ParseInt(notification.GitHub.CheckRun.Id, 10, 64)
 			if err != nil {
-				// Handle error. Log it, return it, etc.
-				return fmt.Errorf("Failed to parse ID: %v", err)
+				return err
 			}
-			id = parsedId
-		} else {
-			id := 0
+			id := parsedId
 		}
 		if id == 0 {
 			checkrun, _, err := g.client.Checks.CreateCheckRun(
