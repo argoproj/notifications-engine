@@ -247,6 +247,8 @@ func TestGetTemplater_Github_CheckRun(t *testing.T) {
 	title := "{{.sync.status.lastSyncedCommit}}"
 	n := Notification{
 		GitHub: &GitHubNotification {
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
 			CheckRun: &GitHubCheckRun {
 				Output: &github.CheckRunOutput {
             		Title: &title,
@@ -285,5 +287,5 @@ func TestGetTemplater_Github_CheckRun(t *testing.T) {
 	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
 	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
 	assert.Equal(t, "0123456789", notification.GitHub.revision)
-	assert.Equal(t, "0123456789", notification.GitHub.CheckRun.Output.Title)
+	assert.Equal(t, "0123456789", *notification.GitHub.CheckRun.Output.Title)
 }
