@@ -99,24 +99,24 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { return &x.RevisionPath }, S: func(x *GitHubNotification, val string) { x.revision = val }},
 
 		//Status support
-		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &createField        } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Status = nil { x.Status = &GitHubStatus{} } }},
+		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &createField        } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Status == nil { x.Status = &GitHubStatus{} } }},
 		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.State     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.State     = val }},
 		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.Label     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.Label     = val }},
 		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.TargetURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.TargetURL = val }},
 
 		//Deployment support
-		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &createField                } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Deployment = nil { x.Deployment = &GitHubDeployment{} } }},
+		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &createField                } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Deployment == nil { x.Deployment = &GitHubDeployment{} } }},
 		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.State         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.State           = val }},
 		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.Environment   } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.Environment     = val }},
 		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.EnvironmentURL} else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.EnvironmentURL  = val }},
 		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.LogURL        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.LogURL          = val }},
 
 		//PullRequestComment support
-		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &createField                  } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.PullRequestComment = nil { x.PullRequestComment = &GitHubPullRequestComment{} } }},
+		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &createField                  } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.PullRequestComment == nil { x.PullRequestComment = &GitHubPullRequestComment{} } }},
 		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &x.PullRequestComment.Content } else { return nil } }, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
 
 		//CheckRunUpdate support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &createField           } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun = nil { x.CheckRun = &GitHubCheckRun{} } }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &createField           } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun = nil { x.CheckRun == &GitHubCheckRun{} } }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Id         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Id          = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Name       } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Name        = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.DetailsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.DetailsURL  = val }},
@@ -126,7 +126,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.CompletedAt} else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
 
 		//CheckRunUpdate.Output support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &createField                      } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output = &CheckRunOutput{} }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &createField                      } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output == &CheckRunOutput{} }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Title          } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title          = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Summary        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary        = val }},
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output { return &x.CheckRun.Output.Text           } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text           = val }},
@@ -149,7 +149,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		if err != nil {
 			return nil, err
 		}
-		templates = append(templates, {S: field.S, T: tmpl})
+		templates = append(templates, TmplSetter{S: field.S, T: tmpl})
 	}
 
 	return func(notification *Notification, vars map[string]interface{}) error {
