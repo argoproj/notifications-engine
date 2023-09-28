@@ -81,6 +81,17 @@ const (
 	revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
 )
 
+func ifnil(condition bool, f func() *string) *string {
+	if condition {
+		return f()
+	}
+	return nil
+}
+func ifnilset(condition bool, f func()) {
+	if condition {
+		f()
+	}
+}
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	if g.RepoURLPath == "" {
 		g.RepoURLPath = repoURLtemplate
@@ -93,47 +104,84 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		G func(*GitHubNotification) *string
 		S func(*GitHubNotification, string)
 	}
-	createField := "create"
-
+	createMe := "create"
 	//list of template'able fields
 	fields := []GetterSetter{
-		{G: func(x *GitHubNotification) *string { return &x.RepoURLPath  }, S: func(x *GitHubNotification, val string) { x.repoURL  = val }},
+		{G: func(x *GitHubNotification) *string { return &x.RepoURLPath }, S: func(x *GitHubNotification, val string) { x.repoURL = val }},
 		{G: func(x *GitHubNotification) *string { return &x.RevisionPath }, S: func(x *GitHubNotification, val string) { x.revision = val }},
 
 		//Status support
-		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &createField        } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Status == nil { x.Status = &GitHubStatus{} } }},
-		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.State     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.State     = val }},
-		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.Label     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.Label     = val }},
-		{G: func(x *GitHubNotification) *string { if x.Status != nil { return &x.Status.TargetURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Status.TargetURL = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.Status != nil, func() { return &createMe }) }, S: func(x *GitHubNotification, val string) {
+			ifnilset(x.Status == nil, func() { x.Status = &GitHubStatus{} })
+		}},
+		{G: func(x *GitHubNotification) *string { ifnil(x.Status != nil, func() { return &x.Status.State }) }, S: func(x *GitHubNotification, val string) { x.Status.State = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.Status != nil, func() { return &x.Status.Label }) }, S: func(x *GitHubNotification, val string) { x.Status.Label = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.Status != nil, func() { return &x.Status.TargetURL }) }, S: func(x *GitHubNotification, val string) { x.Status.TargetURL = val }},
 
 		//Deployment support
-		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &createField                } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.Deployment == nil { x.Deployment = &GitHubDeployment{} } }},
-		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.State         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.State           = val }},
-		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.Environment   } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.Environment     = val }},
-		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.EnvironmentURL} else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.EnvironmentURL  = val }},
-		{G: func(x *GitHubNotification) *string { if x.Deployment != nil { return &x.Deployment.LogURL        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.Deployment.LogURL          = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.Deployment != nil, func() { return &createMe }) }, S: func(x *GitHubNotification, val string) {
+			ifnilset(x.Deployment == nil, func() { x.Deployment = &GitHubDeployment{} })
+		}},
+		{G: func(x *GitHubNotification) *string { ifnil(x.Deployment != nil, func() { return &x.Deployment.State }) }, S: func(x *GitHubNotification, val string) { x.Deployment.State = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.Deployment != nil, func() { return &x.Deployment.Environment })
+		}, S: func(x *GitHubNotification, val string) { x.Deployment.Environment = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.Deployment != nil, func() { return &x.Deployment.EnvironmentURL })
+		}, S: func(x *GitHubNotification, val string) { x.Deployment.EnvironmentURL = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.Deployment != nil, func() { return &x.Deployment.LogURL })
+		}, S: func(x *GitHubNotification, val string) { x.Deployment.LogURL = val }},
 
 		//PullRequestComment support
-		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &createField                  } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.PullRequestComment == nil { x.PullRequestComment = &GitHubPullRequestComment{} } }},
-		{G: func(x *GitHubNotification) *string { if x.PullRequestComment != nil { return &x.PullRequestComment.Content } else { return nil } }, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.PullRequestComment != nil, func() { return &createMe })
+		}, S: func(x *GitHubNotification, val string) {
+			ifnilset(x.PullRequestComment == nil, func() { x.PullRequestComment = &GitHubPullRequestComment{} })
+		}},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.PullRequestComment != nil, func() { return &x.PullRequestComment.Content })
+		}, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
 
 		//CheckRunUpdate support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &createField           } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun == nil { x.CheckRun = &GitHubCheckRun{} } }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Id         } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Id          = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Name       } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Name        = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.DetailsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.DetailsURL  = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.ExternalID } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.ExternalID  = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Status     } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Status      = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.Conclusion } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Conclusion  = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.CompletedAt} else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.CheckRun != nil, func() { return &createMe }) }, S: func(x *GitHubNotification, val string) {
+			ifnilset(x.CheckRun == nil, func() { x.CheckRun = &GitHubCheckRun{} })
+		}},
+		{G: func(x *GitHubNotification) *string { ifnil(x.CheckRun != nil, func() { return &x.CheckRun.Id }) }, S: func(x *GitHubNotification, val string) { x.CheckRun.Id = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.CheckRun != nil, func() { return &x.CheckRun.Name }) }, S: func(x *GitHubNotification, val string) { x.CheckRun.Name = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil, func() { return &x.CheckRun.DetailsURL })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.DetailsURL = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil, func() { return &x.CheckRun.ExternalID })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.ExternalID = val }},
+		{G: func(x *GitHubNotification) *string { ifnil(x.CheckRun != nil, func() { return &x.CheckRun.Status }) }, S: func(x *GitHubNotification, val string) { x.CheckRun.Status = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil, func() { return &x.CheckRun.Conclusion })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Conclusion = val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil, func() { return &x.CheckRun.CompletedAt })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
 
 		//CheckRunUpdate.Output support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &createField                     } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun.Output == nil { x.CheckRun.Output = &github.CheckRunOutput{} } }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.Title          } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title          = &val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.Summary        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary        = &val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.Text           } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text           = &val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.AnnotationsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.AnnotationsURL = &val }},
-	};
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil && x.CheckRun.Output != nil, func() { return &createMe })
+		}, S: func(x *GitHubNotification, val string) {
+			ifnilset(x.CheckRun.Output == nil, func() { x.CheckRun.Output = &github.CheckRunOutput{} })
+		}},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil && x.CheckRun.Output != nil, func() { return x.CheckRun.Output.Title })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title = &val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil && x.CheckRun.Output != nil, func() { return x.CheckRun.Output.Summary })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary = &val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil && x.CheckRun.Output != nil, func() { return x.CheckRun.Output.Text })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text = &val }},
+		{G: func(x *GitHubNotification) *string {
+			ifnil(x.CheckRun != nil && x.CheckRun.Output != nil, func() { return x.CheckRun.Output.AnnotationsURL })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.AnnotationsURL = &val }},
+	}
 
 	type TmplSetter struct {
 		S func(*GitHubNotification, string)
