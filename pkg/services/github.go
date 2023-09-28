@@ -383,13 +383,13 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		}
 		var timestamp *github.Timestamp
 		if notification.GitHub.CheckRun.CompletedAt != "" {
-			parsedTime, err = time.Parse("2006-01-02T15:04:05Z07:00", notification.GitHub.CheckRun.CompletedAt)
+			parsedTime, err := time.Parse("2006-01-02T15:04:05Z07:00", notification.GitHub.CheckRun.CompletedAt)
 			if err != nil {
 				return err
 			}
-			timestamp = &Timestamp{parsedTime}
+			timestamp = &github.Timestamp{parsedTime}
 		}
-		_, _, err = g.client.Checks.UpdateCheckRun(
+		_, _, err := g.client.Checks.UpdateCheckRun(
 			context.Background(),
 			u[0],
 			u[1],
@@ -401,8 +401,8 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				Status     : &notification.GitHub.CheckRun.Status,     
 				Conclusion : &notification.GitHub.CheckRun.Conclusion, 
 				CompletedAt: timestamp,
-				Output     : &notification.GitHub.CheckRun.Output,     
-				Actions    : &notification.GitHub.CheckRun.Actions,    
+				Output     : notification.GitHub.CheckRun.Output,     
+				Actions    : notification.GitHub.CheckRun.Actions,    
 			},
 		)
 		if err != nil {
