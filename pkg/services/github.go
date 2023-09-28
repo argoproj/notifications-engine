@@ -95,7 +95,11 @@ func api(templates *[]tmplSetter, g *GitHubNotification, name string, f texttemp
 		return nil
 	}
 	//create the object that holds this api, the text template is just a dummy so we can generalize the code
-	*templates = append(*templates, tmplSetter{S: apiCreator, T: texttemplate.New(name).Funcs(f).Parse("")})
+	tmpl, err := texttemplate.New(name).Funcs(f).Parse("")
+	if err != nil {
+		return err
+	}
+	*templates = append(*templates, tmplSetter{S: apiCreator, T: tmpl})
 	//create the template for each field
 	for _, field := range fields {
 		templateStr := field.G(g)
@@ -127,7 +131,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { return &x.RepoURLPath }, S: func(x *GitHubNotification, val string) { x.repoURL = val }},
 		{G: func(x *GitHubNotification) *string { return &x.RevisionPath }, S: func(x *GitHubNotification, val string) { x.revision = val }},
 	}); err != nil {
-		return err
+		return nil,err
 	}
 
 	//Status api
@@ -136,7 +140,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { return &x.Status.Label }, S: func(x *GitHubNotification, val string) { x.Status.Label = val }},
 		{G: func(x *GitHubNotification) *string { return &x.Status.TargetURL }, S: func(x *GitHubNotification, val string) { x.Status.TargetURL = val }},
 	}); err != nil {
-		return err
+		return nil,err
 	}
 
 	//Deployment api
@@ -146,14 +150,14 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { return &x.Deployment.EnvironmentURL }, S: func(x *GitHubNotification, val string) { x.Deployment.EnvironmentURL = val }},
 		{G: func(x *GitHubNotification) *string { return &x.Deployment.LogURL }, S: func(x *GitHubNotification, val string) { x.Deployment.LogURL = val }},
 	}); err != nil {
-		return err
+		return nil,err
 	}
 
 	//PullRequestComment api
 	if err := api(&templates, g, name, f, func(x *GitHubNotification) bool { return x.PullRequestComment != nil }, func(x *GitHubNotification, v string) { x.PullRequestComment = &GitHubPullRequestComment{} }, []apiField{
 		{G: func(x *GitHubNotification) *string { return &x.PullRequestComment.Content }, S: func(x *GitHubNotification, val string) { x.PullRequestComment.Content = val }},
 	}); err != nil {
-		return err
+		return nil,err
 	}
 
 	//CheckRunUpdate api
@@ -166,7 +170,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { return &x.CheckRun.Conclusion }, S: func(x *GitHubNotification, val string) { x.CheckRun.Conclusion = val }},
 		{G: func(x *GitHubNotification) *string { return &x.CheckRun.CompletedAt }, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
 	}); err != nil {
-		return err
+		return nil,err
 	}
 
 	//CheckRunUpdate.Outout api
@@ -177,7 +181,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { return x.CheckRun.Output.Text }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text = &val }},
 		{G: func(x *GitHubNotification) *string { return x.CheckRun.Output.AnnotationsURL }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.AnnotationsURL = &val }},
 	}); err != nil {
-		return err
+		return nil,err
 	}
 
 	return func(notification *Notification, vars map[string]interface{}) error {
