@@ -128,11 +128,11 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil { return &x.CheckRun.CompletedAt} else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.CompletedAt = val }},
 
 		//CheckRunUpdate.Output support
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &createField                      } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun.Output == nil { x.CheckRun.Output = &github.CheckRunOutput{} } }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &x.CheckRun.Output.Title          } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title          = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &x.CheckRun.Output.Summary        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary        = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &x.CheckRun.Output.Text           } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text           = val }},
-		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &x.CheckRun.Output.AnnotationsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.AnnotationsURL = val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return &createField                     } else { return nil } }, S: func(x *GitHubNotification, val string) { if x.CheckRun.Output == nil { x.CheckRun.Output = &github.CheckRunOutput{} } }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.Title          } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Title          = &val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.Summary        } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Summary        = &val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.Text           } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.Text           = &val }},
+		{G: func(x *GitHubNotification) *string { if x.CheckRun != nil && x.CheckRun.Output != nil { return x.CheckRun.Output.AnnotationsURL } else { return nil } }, S: func(x *GitHubNotification, val string) { x.CheckRun.Output.AnnotationsURL = &val }},
 	};
 
 	type TmplSetter struct {
@@ -382,7 +382,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			id := checkrun.ID
 		}
 		var timestamp *github.Timestamp
-		if notification.GitHub.CheckRun.CompletedAt != nil {
+		if notification.GitHub.CheckRun.CompletedAt != "" {
 			parsedTime, err = time.Parse("2006-01-02T15:04:05Z07:00", notification.GitHub.CheckRun.CompletedAt)
 			if err != nil {
 				return err
