@@ -48,7 +48,7 @@ type GitHubStatus struct {
 	TargetURL string `json:"targetURL,omitempty"`
 }
 
-//copy of github:UpdateCheckRunOptions + id
+//copy of github:UpdateCheckRunOptions + id + timestamp as string
 type GitHubCheckRun struct {
 	Id          string            `json:"id"`                     // check_id, actually an int64, but string since we want it to be template'able. (Optional - create new check-run for revision if missing.)
 	Name        string            `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
@@ -370,8 +370,8 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				u[0],
 				u[1],
 				&github.CreateCheckRunOptions{
-					HeadSHA: &notification.GitHub.revision,
-					Name:    &notification.GitHub.Deployment.Environment,
+					Name:    notification.GitHub.CheckRun.Name,
+					HeadSHA: notification.GitHub.revision,
 				},
 			)
 			if err != nil {
@@ -379,18 +379,26 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			}
 			id := checkrun.ID
 		}
+		var timestamp *github.Timestamp
+		if notifications.GitHub.CheckRun.CompletedAt != nil {
+			parsedTime, err = time.Parse("2006-01-02T15:04:05Z07:00", notifications.GitHub.CheckRun.CompletedAt)
+			if err != nil {
+				return err
+			}
+			timestamp = &Timestamp{parsedTime}
+		}
 		_, _, err = g.client.Checks.UpdateCheckRun(
 			context.Background(),
 			u[0],
 			u[1],
 			id,
 			&github.UpdateCheckRunOptions{
-				Name       : &notifications.GitHub.CheckRun.Name,       
+				Name       : notifications.GitHub.CheckRun.Name,       
 				DetailsURL : &notifications.GitHub.CheckRun.DetailsURL, 
 				ExternalID : &notifications.GitHub.CheckRun.ExternalID, 
 				Status     : &notifications.GitHub.CheckRun.Status,     
 				Conclusion : &notifications.GitHub.CheckRun.Conclusion, 
-				CompletedAt: &notifications.GitHub.CheckRun.CompletedAt,
+				CompletedAt: timestamp,
 				Output     : &notifications.GitHub.CheckRun.Output,     
 				Actions    : &notifications.GitHub.CheckRun.Actions,    
 			},
