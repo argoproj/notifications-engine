@@ -162,8 +162,8 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			ifnilset(x.CheckRun == nil, func() { x.CheckRun = &GitHubCheckRun{} })
 		}},
 		{G: func(x *GitHubNotification) *string {
-			return ifnil(x.CheckRun != nil, func() *string { return &x.CheckRun.Id })
-		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Id = val }},
+			return ifnil(x.CheckRun != nil, func() *string { return &x.CheckRun.ID })
+		}, S: func(x *GitHubNotification, val string) { x.CheckRun.ID = val }},
 		{G: func(x *GitHubNotification) *string {
 			return ifnil(x.CheckRun != nil, func() *string { return &x.CheckRun.Name })
 		}, S: func(x *GitHubNotification, val string) { x.CheckRun.Name = val }},
@@ -424,7 +424,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub.CheckRun != nil {
 		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
 		var id int64
-		if notification.GitHub.CheckRun.Id != "" {
+		if notification.GitHub.CheckRun.ID != "" {
 			parsedID, err := strconv.ParseInt(notification.GitHub.CheckRun.ID, 10, 64)
 			if err != nil {
 				return err
