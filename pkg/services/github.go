@@ -376,7 +376,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			if err != nil {
 				return err
 			}
-			id = checkrun.ID
+			id = *checkrun.ID
 		}
 		var timestamp *github.Timestamp
 		if notification.GitHub.CheckRun.CompletedAt != "" {
