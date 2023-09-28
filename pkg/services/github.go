@@ -51,7 +51,7 @@ type GitHubStatus struct {
 }
 
 type GitHubCheckRun struct {
-//copy of github:UpdateCheckRunOptions + id + timestamp as string
+	//copy of github:UpdateCheckRunOptions + id + timestamp as string
 	ID          string                   `json:"id"`                     // check_id, actually an int64, but string since we want it to be template'able. (Optional - create new check-run for revision if missing.)
 	Name        string                   `json:"name"`                   // The name of the check (e.g., "code-coverage"). (Required.)
 	DetailsURL  string                   `json:"details_url,omitempty"`  // The URL of the integrator's site that has the full details of the check. (Optional.)
