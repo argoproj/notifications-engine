@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"strings"
 	texttemplate "text/template"
 
 	"gomodules.xyz/notify/smtp"
@@ -74,6 +75,7 @@ func (s *emailService) Send(notification Notification, dest Destination) error {
 		subject = notification.Email.Subject
 		body = text.Coalesce(notification.Email.Body, body)
 	}
+	to := strings.Split(dest.Recipient, ",")
 	email := smtp.New(smtp.Options{
 		From:               s.opts.From,
 		Host:               s.opts.Host,
@@ -81,7 +83,7 @@ func (s *emailService) Send(notification Notification, dest Destination) error {
 		InsecureSkipVerify: s.opts.InsecureSkipVerify,
 		Password:           s.opts.Password,
 		Username:           s.opts.Username,
-	}).WithSubject(subject).WithBody(body).To(dest.Recipient)
+	}).WithSubject(subject).WithBody(body).To(to[0], to[1:]...)
 
 	if s.opts.Html {
 		return email.SendHtml()
