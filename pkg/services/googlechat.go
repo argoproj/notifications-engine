@@ -4,53 +4,40 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	texttemplate "text/template"
 
+	"github.com/google/uuid"
+
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
+
+	"google.golang.org/api/chat/v1"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 type GoogleChatNotification struct {
 	Cards     string `json:"cards"`
+	CardsV2   string `json:"cardsV2"`
 	ThreadKey string `json:"threadKey,omitempty"`
 }
 
 type googleChatMessage struct {
-	Text  string        `json:"text"`
-	Cards []cardMessage `json:"cards"`
-}
-
-type cardMessage struct {
-	Header   cardHeader    `json:"header,omitempty"`
-	Sections []cardSection `json:"sections"`
-}
-
-type cardHeader struct {
-	Title      string `json:"title,omitempty"`
-	Subtitle   string `json:"subtitle,omitempty"`
-	ImageUrl   string `json:"imageUrl,omitempty"`
-	ImageStyle string `json:"imageStyle,omitempty"`
-}
-
-type cardSection struct {
-	Header  string       `json:"header"`
-	Widgets []cardWidget `json:"widgets"`
-}
-
-type cardWidget struct {
-	TextParagraph map[string]interface{}   `json:"textParagraph,omitempty"`
-	Keyvalue      map[string]interface{}   `json:"keyValue,omitempty"`
-	Image         map[string]interface{}   `json:"image,omitempty"`
-	Buttons       []map[string]interface{} `json:"buttons,omitempty"`
+	Text    string            `json:"text"`
+	Cards   []chat.Card       `json:"cards,omitempty"`
+	CardsV2 []chat.CardWithId `json:"cardsV2,omitempty"`
 }
 
 func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	cards, err := texttemplate.New(name).Funcs(f).Parse(n.Cards)
+	if err != nil {
+		return nil, fmt.Errorf("error in '%s' googlechat.cards : %w", name, err)
+	}
+
+	cardsV2, err := texttemplate.New(name).Funcs(f).Parse(n.CardsV2)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' googlechat.cards : %w", name, err)
 	}
@@ -70,6 +57,14 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 		}
 		if val := cardsBuff.String(); val != "" {
 			notification.GoogleChat.Cards = val
+		}
+
+		var cardsV2Buff bytes.Buffer
+		if err := cardsV2.Execute(&cardsV2Buff, vars); err != nil {
+			return err
+		}
+		if val := cardsV2Buff.String(); val != "" {
+			notification.GoogleChat.CardsV2 = val
 		}
 
 		var threadKeyBuff bytes.Buffer
@@ -147,7 +142,7 @@ func (c *googlechatClient) sendMessage(message *googleChatMessage, threadKey str
 		_ = response.Body.Close()
 	}()
 
-	bodyBytes, err := ioutil.ReadAll(response.Body)
+	bodyBytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		return nil, err
 	}
@@ -187,10 +182,32 @@ func (s googleChatService) Send(notification Notification, dest Destination) err
 
 func googleChatNotificationToMessage(n Notification) (*googleChatMessage, error) {
 	message := &googleChatMessage{}
-	if n.GoogleChat != nil && n.GoogleChat.Cards != "" {
-		err := yaml.Unmarshal([]byte(n.GoogleChat.Cards), &message.Cards)
-		if err != nil {
-			return nil, err
+	if n.GoogleChat != nil && (n.GoogleChat.CardsV2 != "" || n.GoogleChat.Cards != "") {
+		if n.GoogleChat.CardsV2 != "" {
+			// Unmarshal Modern Type
+
+			var cardData []chat.GoogleAppsCardV1Card
+			err := yaml.Unmarshal([]byte(n.GoogleChat.CardsV2), &cardData)
+			if err != nil {
+				return nil, err
+			}
+
+			message.CardsV2 = make([]chat.CardWithId, len(cardData))
+
+			for i, datum := range cardData {
+				message.CardsV2[i] = chat.CardWithId{
+					CardId: uuid.New().String(),
+					Card:   &datum,
+				}
+			}
+		}
+
+		if n.GoogleChat.Cards != "" {
+			// Unmarshal Legacy Type
+			err := yaml.Unmarshal([]byte(n.GoogleChat.Cards), &message.Cards)
+			if err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		message.Text = n.Message

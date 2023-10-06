@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"path"
@@ -79,7 +79,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 		_ = response.Body.Close()
 	}()
 
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("unable to read response data: %v", err)
 	}

@@ -5,7 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -232,7 +232,7 @@ func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, r
 		_ = response.Body.Close()
 	}()
 
-	data, err := ioutil.ReadAll(response.Body)
+	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		return fmt.Errorf("unable to read response data: %v", err)
 	}
