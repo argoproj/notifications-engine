@@ -30,6 +30,7 @@ type Config struct {
 	// ServiceDefaultTriggers holds list of default triggers per service
 	ServiceDefaultTriggers map[string][]string
 	Namespace              string
+	IsSelfServiceConfig    bool
 }
 
 // Returns list of destinations for the specified trigger

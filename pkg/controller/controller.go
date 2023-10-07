@@ -182,6 +182,11 @@ func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
 	log.Warn("Controller has stopped.")
 }
 
+// check if an api is a self-service API
+func (c *notificationController) isSelfServiceConfigureApi(api api.API) bool {
+	return c.namespaceSupport && api.GetConfig().IsSelfServiceConfig
+}
+
 func (c *notificationController) processResourceWithAPI(api api.API, resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
 	apiNamespace := api.GetConfig().Namespace
 	notificationsState := NewStateFromRes(resource)
@@ -209,13 +214,13 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 
 			if !cr.Triggered {
 				for _, to := range destinations {
-					notificationsState.SetAlreadyNotified(trigger, cr, to, false)
+					notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
 				}
 				continue
 			}
 
 			for _, to := range destinations {
-				if changed := notificationsState.SetAlreadyNotified(trigger, cr, to, true); !changed {
+				if changed := notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, true); !changed {
 					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
 					eventSequence.addDelivered(NotificationDelivery{
 						Trigger:         trigger,
@@ -227,7 +232,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 					if err := api.Send(un.Object, cr.Templates, to); err != nil {
 						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
 							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
-						notificationsState.SetAlreadyNotified(trigger, cr, to, false)
+						notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
 						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
 					} else {
@@ -320,6 +325,24 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		}
 		for _, api := range apisWithNamespace {
 			c.processResource(api, resource, logEntry, &eventSequence)
+
+			//refresh
+			obj, exists, err := c.informer.GetIndexer().GetByKey(key.(string))
+			if err != nil {
+				log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
+				eventSequence.addError(err)
+				return
+			}
+			if !exists {
+				// This happens after resource was deleted, but the work queue still had an entry for it.
+				return
+			}
+			resource, ok = obj.(v1.Object)
+			if !ok {
+				log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
+				eventSequence.addError(err)
+				return
+			}
 		}
 	}
 	logEntry.Info("Processing completed")
