@@ -5,6 +5,7 @@ import (
 	"strings"
 	texttemplate "text/template"
 
+	"gomodules.xyz/notify"
 	"gomodules.xyz/notify/smtp"
 
 	"github.com/argoproj/notifications-engine/pkg/util/text"
@@ -61,31 +62,37 @@ type EmailOptions struct {
 }
 
 type emailService struct {
-	opts EmailOptions
+	client notify.ByEmail
+	html   bool
 }
 
-func NewEmailService(opts EmailOptions) NotificationService {
-	return &emailService{opts: opts}
+func NewEmailService(opts EmailOptions) *emailService {
+	return &emailService{
+		client: smtp.New(smtp.Options{
+			From:               opts.From,
+			Host:               opts.Host,
+			Port:               opts.Port,
+			InsecureSkipVerify: opts.InsecureSkipVerify,
+			Password:           opts.Password,
+			Username:           opts.Username,
+		}),
+		html: opts.Html,
+	}
 }
 
 func (s *emailService) Send(notification Notification, dest Destination) error {
 	subject := ""
 	body := notification.Message
+	to := strings.Split(dest.Recipient, ",")
+
 	if notification.Email != nil {
 		subject = notification.Email.Subject
 		body = text.Coalesce(notification.Email.Body, body)
 	}
-	to := strings.Split(dest.Recipient, ",")
-	email := smtp.New(smtp.Options{
-		From:               s.opts.From,
-		Host:               s.opts.Host,
-		Port:               s.opts.Port,
-		InsecureSkipVerify: s.opts.InsecureSkipVerify,
-		Password:           s.opts.Password,
-		Username:           s.opts.Username,
-	}).WithSubject(subject).WithBody(body).To(to[0], to[1:]...)
 
-	if s.opts.Html {
+	email := s.client.WithSubject(subject).WithBody(body).To(to[0], to[1:]...)
+
+	if s.html {
 		return email.SendHtml()
 	} else {
 		return email.Send()
