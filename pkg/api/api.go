@@ -24,6 +24,7 @@ type API interface {
 	AddNotificationService(name string, service services.NotificationService)
 	GetNotificationServices() map[string]services.NotificationService
 	GetConfig() Config
+	SetConfig(config Config)
 }
 
 type api struct {
@@ -36,6 +37,10 @@ type api struct {
 
 func (n *api) GetConfig() Config {
 	return n.config
+}
+
+func (n *api) SetConfig(config Config) {
+	n.config = config
 }
 
 // AddService adds new service with the specified name
