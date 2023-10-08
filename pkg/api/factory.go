@@ -160,6 +160,7 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 			if namespace != f.Settings.DefaultNamespace {
 				apiConfig := api.GetConfig()
 				apiConfig.IsSelfServiceConfig = true
+				api.SetConfig(apiConfig)
 			}
 			f.apiMap[namespace] = api
 			apis[namespace] = f.apiMap[namespace]
