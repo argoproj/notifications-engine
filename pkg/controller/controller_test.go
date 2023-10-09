@@ -123,7 +123,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	assert.NoError(t, err)
 
 	state := NewState(annotations[notifiedAnnotationKey])
-	assert.NotNil(t, state[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
+	assert.NotNil(t, state[StateItemKey(false, "", "mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
 
@@ -131,7 +131,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 	state := NotificationsState{}
-	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 		notifiedAnnotationKey: mustToJson(state),
@@ -153,7 +153,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	defer cancel()
 
 	state := NotificationsState{}
-	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 		notifiedAnnotationKey: mustToJson(state),
@@ -177,7 +177,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	defer cancel()
 
 	state := NotificationsState{}
-	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
