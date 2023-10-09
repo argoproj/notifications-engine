@@ -24,7 +24,6 @@ type API interface {
 	AddNotificationService(name string, service services.NotificationService)
 	GetNotificationServices() map[string]services.NotificationService
 	GetConfig() Config
-	SetConfig(config Config)
 }
 
 type api struct {
