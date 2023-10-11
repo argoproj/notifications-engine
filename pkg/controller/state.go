@@ -17,8 +17,13 @@ const (
 	notifiedHistoryMaxSize = 100
 )
 
-func StateItemKey(trigger string, conditionResult triggers.ConditionResult, dest services.Destination) string {
-	key := fmt.Sprintf("%s:%s:%s:%s", trigger, conditionResult.Key, dest.Service, dest.Recipient)
+func StateItemKey(isSelfConfig bool, apiNamespace, trigger string, conditionResult triggers.ConditionResult, dest services.Destination) string {
+	var key string
+	if isSelfConfig {
+		key = fmt.Sprintf("%s:%s:%s:%s:%s", apiNamespace, trigger, conditionResult.Key, dest.Service, dest.Recipient)
+	} else {
+		key = fmt.Sprintf("%s:%s:%s:%s", trigger, conditionResult.Key, dest.Service, dest.Recipient)
+	}
 	if conditionResult.OncePer != "" {
 		key = conditionResult.OncePer + ":" + key
 	}
@@ -47,8 +52,8 @@ func (s NotificationsState) truncate(maxSize int) {
 }
 
 // SetAlreadyNotified set the state of given trigger/destination and return if state has been changed
-func (s NotificationsState) SetAlreadyNotified(trigger string, result triggers.ConditionResult, dest services.Destination, isNotified bool) bool {
-	key := StateItemKey(trigger, result, dest)
+func (s NotificationsState) SetAlreadyNotified(isSelfConfig bool, apiNamespace, trigger string, result triggers.ConditionResult, dest services.Destination, isNotified bool) bool {
+	key := StateItemKey(isSelfConfig, apiNamespace, trigger, result, dest)
 	if _, alreadyNotified := s[key]; alreadyNotified == isNotified {
 		return false
 	}
