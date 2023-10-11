@@ -38,10 +38,6 @@ func (n *api) GetConfig() Config {
 	return n.config
 }
 
-func (n *api) SetConfig(config Config) {
-	n.config = config
-}
-
 // AddService adds new service with the specified name
 func (n *api) AddNotificationService(name string, service services.NotificationService) {
 	n.notificationServices[name] = service
