@@ -2,7 +2,7 @@ package services
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -56,7 +56,7 @@ func TestGetTemplater_Teams(t *testing.T) {
 func TestTeams_DefaultMessage(t *testing.T) {
 	var receivedBody teamsMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		data, err := ioutil.ReadAll(request.Body)
+		data, err := io.ReadAll(request.Body)
 		assert.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
@@ -92,7 +92,7 @@ func TestTeams_DefaultMessage(t *testing.T) {
 func TestTeams_TemplateMessage(t *testing.T) {
 	var receivedBody string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		data, err := ioutil.ReadAll(request.Body)
+		data, err := io.ReadAll(request.Body)
 		assert.NoError(t, err)
 
 		receivedBody = string(data)
@@ -129,7 +129,7 @@ func TestTeams_TemplateMessage(t *testing.T) {
 func TestTeams_MessageFields(t *testing.T) {
 	var receivedBody teamsMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		data, err := ioutil.ReadAll(request.Body)
+		data, err := io.ReadAll(request.Body)
 		assert.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)

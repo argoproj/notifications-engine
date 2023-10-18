@@ -22,7 +22,7 @@ import (
 	kubetesting "k8s.io/client-go/testing"
 	"k8s.io/client-go/tools/cache"
 
-	"github.com/argoproj/notifications-engine/pkg/api"
+	notificationApi "github.com/argoproj/notifications-engine/pkg/api"
 	"github.com/argoproj/notifications-engine/pkg/mocks"
 	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
@@ -72,7 +72,6 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 		mockCtrl.Finish()
 	}()
 	mockAPI := mocks.NewMockAPI(mockCtrl)
-	mockAPI.EXPECT().GetConfig().Return(api.Config{}).AnyTimes()
 	resourceClient := client.Resource(testGVR)
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
@@ -98,6 +97,45 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 	return c, mockAPI, nil
 }
 
+func newControllerWithNamespaceSupport(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, map[string]notificationApi.API, error) {
+	mockCtrl := gomock.NewController(t)
+	go func() {
+		<-ctx.Done()
+		mockCtrl.Finish()
+	}()
+
+	resourceClient := client.Resource(testGVR)
+	informer := cache.NewSharedIndexInformer(
+		&cache.ListWatch{
+			ListFunc: func(options v1.ListOptions) (object runtime.Object, err error) {
+				return resourceClient.List(context.Background(), options)
+			},
+			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+				return resourceClient.Watch(context.Background(), options)
+			},
+		},
+		&unstructured.Unstructured{},
+		time.Minute,
+		cache.Indexers{},
+	)
+
+	go informer.Run(ctx.Done())
+
+	apiMap := make(map[string]notificationApi.API)
+	mockAPIDefault := mocks.NewMockAPI(mockCtrl)
+	apiMap["default"] = mockAPIDefault
+
+	mockAPISelfService := mocks.NewMockAPI(mockCtrl)
+	apiMap["selfservice_namespace"] = mockAPISelfService
+
+	c := NewControllerWithNamespaceSupport(resourceClient, informer, &mocks.FakeFactory{ApiMap: apiMap}, opts...)
+	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
+		return nil, nil, errors.New("failed to sync informers")
+	}
+
+	return c, apiMap, nil
+}
+
 func TestSendsNotificationIfTriggered(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
@@ -109,6 +147,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	assert.NoError(t, err)
 
 	receivedObj := map[string]interface{}{}
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
 		receivedObj = obj
@@ -123,7 +162,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	assert.NoError(t, err)
 
 	state := NewState(annotations[notifiedAnnotationKey])
-	assert.NotNil(t, state[StateItemKey("mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
+	assert.NotNil(t, state[StateItemKey(false, "", "mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
 
@@ -131,7 +170,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 	state := NotificationsState{}
-	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 		notifiedAnnotationKey: mustToJson(state),
@@ -139,6 +178,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	assert.NoError(t, err)
 
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 
 	_, err = ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
@@ -153,7 +193,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	defer cancel()
 
 	state := NotificationsState{}
-	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 		notifiedAnnotationKey: mustToJson(state),
@@ -161,6 +201,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	assert.NoError(t, err)
 
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
 	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
@@ -177,7 +218,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	defer cancel()
 
 	state := NotificationsState{}
-	_ = state.SetAlreadyNotified("my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
 
 	app := newResource("test", withAnnotations(map[string]string{
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
@@ -193,6 +234,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	})
 	ctrl, api, err := newController(t, ctx, client)
 	assert.NoError(t, err)
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
 	go ctrl.Run(1, ctx.Done())
@@ -324,6 +366,7 @@ func TestWithEventCallback(t *testing.T) {
 
 			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
 			ctrl.namespaceSupport = false
+			api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 			assert.NoError(t, err)
 			ctrl.apiFactory = &mocks.FakeFactory{Api: api, Err: tc.apiErr}
 
@@ -348,4 +391,97 @@ func TestWithEventCallback(t *testing.T) {
 			assert.Equal(t, tc.expectedWarnings, actualSequence.Warnings)
 		})
 	}
+}
+
+// verify annotations after calling processResourceWithAPI when using self-service
+func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+	}))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+	ctrl.namespaceSupport = true
+
+	trigger := "my-trigger"
+	namespace := "my-namespace"
+
+	receivedObj := map[string]interface{}{}
+
+	//SelfService API: config has IsSelfServiceConfig set to true
+	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: namespace}).AnyTimes()
+	api.EXPECT().RunTrigger(trigger, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+		receivedObj = obj
+		return true
+	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
+
+	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+	if err != nil {
+		logEntry.Errorf("Failed to process: %v", err)
+	}
+
+	assert.NoError(t, err)
+
+	state := NewState(annotations[notifiedAnnotationKey])
+	assert.NotZero(t, state[StateItemKey(true, namespace, trigger, triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
+	assert.Equal(t, app.Object, receivedObj)
+}
+
+// verify notification sent to both default and self-service configuration after calling processResourceWithAPI when using self-service
+func TestProcessItemsWithSelfService(t *testing.T) {
+	const triggerName = "my-trigger"
+	destination := services.Destination{Service: "mock", Recipient: "recipient"}
+
+	var actualSequence *NotificationEventSequence
+	mockEventCallback := func(eventSequence NotificationEventSequence) {
+		actualSequence = &eventSequence
+	}
+
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+	}))
+
+	ctrl, apiMap, err := newControllerWithNamespaceSupport(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
+	assert.NoError(t, err)
+
+	ctrl.namespaceSupport = true
+	//SelfService API: config has IsSelfServiceConfig set to true
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).Times(3)
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+		return true
+	}), []string{"test"}, destination).Return(nil).AnyTimes()
+
+	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default"}).Times(3)
+	apiMap["default"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+	apiMap["default"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+		return true
+	}), []string{"test"}, destination).Return(nil).AnyTimes()
+
+	ctrl.apiFactory = &mocks.FakeFactory{ApiMap: apiMap}
+
+	ctrl.processQueueItem()
+
+	assert.Equal(t, app, actualSequence.Resource)
+
+	expectedDeliveries := []NotificationDelivery{
+		{
+			Trigger:     triggerName,
+			Destination: destination,
+		},
+		{
+			Trigger:     triggerName,
+			Destination: destination,
+		},
+	}
+	for i, event := range actualSequence.Delivered {
+		assert.Equal(t, expectedDeliveries[i].Trigger, event.Trigger)
+		assert.Equal(t, expectedDeliveries[i].Destination, event.Destination)
+	}
+
 }

@@ -1,7 +1,7 @@
 package services
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,7 +19,7 @@ func TestValidEmail(t *testing.T) {
 func TestSend_Webex(t *testing.T) {
 	t.Run("successful attempt - email", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}
@@ -53,7 +53,7 @@ func TestSend_Webex(t *testing.T) {
 
 	t.Run("successful attempt - room", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}
@@ -88,7 +88,7 @@ func TestSend_Webex(t *testing.T) {
 	t.Run("auth error", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(401)
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}

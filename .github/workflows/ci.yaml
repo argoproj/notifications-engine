@@ -11,7 +11,7 @@ on:
 
 env:
   # Golang version to use across CI steps
-  GOLANG_VERSION: '1.17'
+  GOLANG_VERSION: '1.21'
 
 jobs:
   lint-go:
@@ -27,7 +27,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.49.0
+          version: v1.53.3
           args: --timeout 5m
   test:
     runs-on: ubuntu-latest
