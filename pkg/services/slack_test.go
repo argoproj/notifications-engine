@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestValidIconEmoij(t *testing.T) {
+func TestValidIconEmoji(t *testing.T) {
 	assert.Equal(t, true, validIconEmoji.MatchString(":slack:"))
 	assert.Equal(t, true, validIconEmoji.MatchString(":chart_with_upwards_trend:"))
 	assert.Equal(t, false, validIconEmoji.MatchString("http://lorempixel.com/48/48"))

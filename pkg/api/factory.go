@@ -184,6 +184,10 @@ func (f *apiFactory) getApiFromConfigmapAndSecret(cm *v1.ConfigMap, secret *v1.S
 	if err != nil {
 		return nil, err
 	}
+
+	if cm.Namespace != f.Settings.DefaultNamespace {
+		cfg.IsSelfServiceConfig = true
+	}
 	getVars, err := f.InitGetVars(cfg, cm, secret)
 	if err != nil {
 		return nil, err
