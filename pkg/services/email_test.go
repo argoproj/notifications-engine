@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"gomodules.xyz/notify"
+	"k8s.io/utils/strings/slices"
 )
 
 func TestGetTemplater_Email(t *testing.T) {
@@ -85,5 +86,23 @@ func TestNewEmailService(t *testing.T) {
 	es := NewEmailService(EmailOptions{Html: true})
 	if es.html != true {
 		t.Error("Html set incorrectly")
+	}
+}
+
+func TestParseTo(t *testing.T) {
+	es := emailService{}
+	testCases := []struct {
+		recepient string
+		want      []string
+	}{
+		{"email1@email.com", []string{"email1@email.com"}},
+		{" email1@email.com ", []string{"email1@email.com"}},
+		{" email1@email.com  , email2@email.com,email3@email.com", []string{"email1@email.com", "email2@email.com", "email3@email.com"}},
+	}
+	for _, testCase := range testCases {
+		got := es.parseTo(testCase.recepient)
+		if !slices.Equal(testCase.want, got) {
+			t.Errorf("Failed to parse \"%v\", got: %v", testCase.recepient, got)
+		}
 	}
 }

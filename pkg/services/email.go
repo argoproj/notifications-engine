@@ -83,8 +83,7 @@ func NewEmailService(opts EmailOptions) *emailService {
 func (s *emailService) Send(notification Notification, dest Destination) error {
 	subject := ""
 	body := notification.Message
-	to := strings.Split(dest.Recipient, ",")
-
+	to := s.parseTo(dest.Recipient)
 	if notification.Email != nil {
 		subject = notification.Email.Subject
 		body = text.Coalesce(notification.Email.Body, body)
@@ -97,4 +96,12 @@ func (s *emailService) Send(notification Notification, dest Destination) error {
 	} else {
 		return email.Send()
 	}
+}
+
+func (s *emailService) parseTo(recipient string) []string {
+	to := strings.Split(recipient, ",")
+	for i, email := range to {
+		to[i] = strings.Trim(email, " ")
+	}
+	return to
 }
