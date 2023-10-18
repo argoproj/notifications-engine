@@ -100,6 +100,6 @@ func (p pagerdutyService) Send(notification Notification, dest Destination) erro
 		log.Errorf("Error: %v", err)
 		return err
 	}
-	log.Debugf("Incident created Succesfully. Incident Number: %v, IncidentKey:%v, incident.ID: %v, incident.Title: %v", incident.IncidentNumber, incident.IncidentKey, incident.ID, incident.Title)
+	log.Debugf("Incident created Successfully. Incident Number: %v, IncidentKey:%v, incident.ID: %v, incident.Title: %v", incident.IncidentNumber, incident.IncidentKey, incident.ID, incident.Title)
 	return nil
 }

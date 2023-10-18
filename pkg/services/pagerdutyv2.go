@@ -129,7 +129,7 @@ func (p pagerdutyV2Service) Send(notification Notification, dest Destination) er
 		log.Errorf("Error: %v", err)
 		return err
 	}
-	log.Debugf("PagerDuty event triggered succesfully. Status: %v, Message: %v", response.Status, response.Message)
+	log.Debugf("PagerDuty event triggered successfully. Status: %v, Message: %v", response.Status, response.Message)
 	return nil
 }
 
