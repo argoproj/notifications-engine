@@ -82,7 +82,7 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 		if validEmoji.MatchString(r.opts.Icon) {
 			message.Emoji = r.opts.Icon
 		} else {
-			log.Warnf("Icon reference '%v' is not a valid emoij", r.opts.Icon)
+			log.Warnf("Icon reference '%v' is not a valid emoji", r.opts.Icon)
 		}
 	}
 	if r.opts.Avatar != "" {

@@ -83,7 +83,7 @@ func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]Cond
 		}
 
 		if prog, ok := svc.compiledConditions[condition.When]; !ok {
-			return nil, fmt.Errorf("trigger configiration has changed after initialization")
+			return nil, fmt.Errorf("trigger configuration has changed after initialization")
 		} else if val, err := expr.Run(prog, vars); err == nil {
 			boolRes, ok := val.(bool)
 			conditionResult.Triggered = ok && boolRes
