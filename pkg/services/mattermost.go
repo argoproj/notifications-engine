@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	texttemplate "text/template"
 
@@ -87,7 +87,7 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 	}
 	defer res.Body.Close()
 
-	data, err := ioutil.ReadAll(res.Body)
+	data, err := io.ReadAll(res.Body)
 	if err != nil {
 		return fmt.Errorf("failed to read body: %v", err)
 	}

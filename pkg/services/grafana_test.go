@@ -1,7 +1,7 @@
 package services
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,7 +14,7 @@ func TestGrafana_SuccessfullySendsNotification(t *testing.T) {
 	var receivedBody string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		receivedHeaders = request.Header
-		data, err := ioutil.ReadAll(request.Body)
+		data, err := io.ReadAll(request.Body)
 		assert.NoError(t, err)
 		receivedBody = string(data)
 	}))
@@ -39,7 +39,7 @@ func TestGrafana_SuccessfullySendsNotification(t *testing.T) {
 
 func TestGrafana_UnSuccessfullySendsNotification(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		_, err := ioutil.ReadAll(request.Body)
+		_, err := io.ReadAll(request.Body)
 		assert.NoError(t, err)
 		writer.WriteHeader(http.StatusInternalServerError)
 	}))

@@ -104,7 +104,7 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 		} else if isValidIconURL(opts.Icon) {
 			msgOptions = append(msgOptions, slack.MsgOptionIconURL(opts.Icon))
 		} else {
-			log.Warnf("Icon reference '%v' is not a valid emoij or url", opts.Icon)
+			log.Warnf("Icon reference '%v' is not a valid emoji or url", opts.Icon)
 		}
 	}
 	if notification.Slack != nil {

@@ -1,7 +1,7 @@
 package services
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -58,7 +58,7 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 func TestSend_Newrelic(t *testing.T) {
 	t.Run("revision deployment marker", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}
@@ -99,7 +99,7 @@ func TestSend_Newrelic(t *testing.T) {
 
 	t.Run("complete deployment marker", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			b, err := ioutil.ReadAll(r.Body)
+			b, err := io.ReadAll(r.Body)
 			if !assert.NoError(t, err) {
 				t.FailNow()
 			}
