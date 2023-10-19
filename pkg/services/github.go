@@ -302,8 +302,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		return fmt.Errorf("config is empty")
 	}
 
+	u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
+	if len(u) < 2 {
+		return fmt.Errorf("GitHub.repoURL (%s) does not have a `/`", notification.GitHub.repoURL)
+	}
 	if notification.GitHub.Status != nil {
-		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
 		_, _, err := g.client.Repositories.CreateStatus(
@@ -324,7 +327,6 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	if notification.GitHub.Deployment != nil {
-		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
 		deployment, _, err := g.client.Repositories.CreateDeployment(
@@ -360,7 +362,6 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	if notification.GitHub.PullRequestComment != nil {
-		u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
 		// maximum is 65536 characters
 		body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
 		comment := &github.IssueComment{
