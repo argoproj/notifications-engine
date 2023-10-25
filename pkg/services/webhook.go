@@ -3,12 +3,13 @@ package services
 import (
 	"bytes"
 	"fmt"
-	"github.com/hashicorp/go-retryablehttp"
 	"io"
 	"net/http"
 	"strings"
 	texttemplate "text/template"
 	"time"
+
+	"github.com/hashicorp/go-retryablehttp"
 
 	log "github.com/sirupsen/logrus"
 
