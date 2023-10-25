@@ -79,10 +79,10 @@ type BasicAuth struct {
 }
 
 type WebhookOptions struct {
-	URL                string     `json:"url"`
-	Headers            []Header   `json:"headers"`
-	BasicAuth          *BasicAuth `json:"basicAuth"`
-	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
+	URL                string        `json:"url"`
+	Headers            []Header      `json:"headers"`
+	BasicAuth          *BasicAuth    `json:"basicAuth"`
+	InsecureSkipVerify bool          `json:"insecureSkipVerify"`
 	RetryWaitMin       time.Duration `json:"retryWaitMin"`
 	RetryWaitMax       time.Duration `json:"retryWaitMax"`
 	RetryMax           int           `json:"retryMax"`
