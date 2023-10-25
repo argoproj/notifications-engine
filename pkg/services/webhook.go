@@ -3,10 +3,12 @@ package services
 import (
 	"bytes"
 	"fmt"
+	"github.com/hashicorp/go-retryablehttp"
 	"io"
 	"net/http"
 	"strings"
 	texttemplate "text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -81,9 +83,22 @@ type WebhookOptions struct {
 	Headers            []Header   `json:"headers"`
 	BasicAuth          *BasicAuth `json:"basicAuth"`
 	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
+	RetryWaitMin       time.Duration `json:"retryWaitMin"`
+	RetryWaitMax       time.Duration `json:"retryWaitMax"`
+	RetryMax           int           `json:"retryMax"`
 }
 
 func NewWebhookService(opts WebhookOptions) NotificationService {
+	// Set default values if fields are zero
+	if opts.RetryWaitMin == 0 {
+		opts.RetryWaitMin = 1 * time.Second
+	}
+	if opts.RetryWaitMax == 0 {
+		opts.RetryWaitMax = 5 * time.Second
+	}
+	if opts.RetryMax == 0 {
+		opts.RetryMax = 3
+	}
 	return &webhookService{opts: opts}
 }
 
@@ -133,31 +148,37 @@ func (r *request) applyOverridesFrom(notification WebhookNotification) {
 	}
 }
 
-func (r *request) intoHttpRequest(service *webhookService) (*http.Request, error) {
-	req, err := http.NewRequest(r.method, r.url, bytes.NewBufferString(r.body))
+func (r *request) intoRetryableHttpRequest(service *webhookService) (*retryablehttp.Request, error) {
+	retryReq, err := retryablehttp.NewRequest(r.method, r.url, bytes.NewBufferString(r.body))
 	if err != nil {
 		return nil, err
 	}
 	for _, header := range service.opts.Headers {
-		req.Header.Set(header.Name, header.Value)
+		retryReq.Header.Set(header.Name, header.Value)
 	}
 	if service.opts.BasicAuth != nil {
-		req.SetBasicAuth(service.opts.BasicAuth.Username, service.opts.BasicAuth.Password)
+		retryReq.SetBasicAuth(service.opts.BasicAuth.Username, service.opts.BasicAuth.Password)
 	}
-	return req, nil
+	return retryReq, nil
 }
 
 func (r *request) execute(service *webhookService) (*http.Response, error) {
-	req, err := r.intoHttpRequest(service)
+	req, err := r.intoRetryableHttpRequest(service)
 	if err != nil {
 		return nil, err
 	}
 
-	client := http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(r.url, service.opts.InsecureSkipVerify),
-			log.WithField("service", r.destService)),
+	transport := httputil.NewLoggingRoundTripper(
+		httputil.NewTransport(r.url, service.opts.InsecureSkipVerify),
+		log.WithField("service", r.destService))
+
+	client := retryablehttp.NewClient()
+	client.HTTPClient = &http.Client{
+		Transport: transport,
 	}
+	client.RetryWaitMin = service.opts.RetryWaitMin
+	client.RetryWaitMax = service.opts.RetryWaitMax
+	client.RetryMax = service.opts.RetryMax
 
 	return client.Do(req)
 }

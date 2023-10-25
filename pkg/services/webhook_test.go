@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -122,4 +123,41 @@ func TestGetTemplater_Webhook(t *testing.T) {
 	assert.Equal(t, notification.Webhook["github"].Method, "POST")
 	assert.Equal(t, notification.Webhook["github"].Body, "hello")
 	assert.Equal(t, notification.Webhook["github"].Path, "world")
+}
+
+func TestWebhookService_Send_Retry(t *testing.T) {
+	// Set up a mock server to receive requests
+	count := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count < 5 {
+			w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			w.WriteHeader(http.StatusOK)
+		}
+	}))
+	defer server.Close()
+
+	service := NewWebhookService(WebhookOptions{
+		BasicAuth:          &BasicAuth{Username: "testUsername", Password: "testPassword"},
+		URL:                server.URL,
+		Headers:            []Header{{Name: "testHeader", Value: "testHeaderValue"}},
+		InsecureSkipVerify: true,
+	})
+	err := service.Send(
+		Notification{
+			Webhook: map[string]WebhookNotification{
+				"test": {Body: "hello world", Method: http.MethodPost},
+			},
+		}, Destination{Recipient: "test", Service: "test"})
+
+	// Check if the error is due to a server error after retries
+	if !strings.Contains(err.Error(), "giving up after 4 attempts") {
+		t.Errorf("Expected giving up after 4 attempts, got %v", err)
+	}
+
+	// Check that the mock server received 4 requests
+	if count != 4 {
+		t.Errorf("Expected 4 requests, got %d", count)
+	}
 }
