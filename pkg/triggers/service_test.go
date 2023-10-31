@@ -72,12 +72,12 @@ func TestRun_OncePerSet(t *testing.T) {
 		return
 	}
 
-	conditionKey := fmt.Sprintf("%s:[0].%s", revision, hash("var1 == 'abc'"))
+	conditionKey := fmt.Sprintf("[0].%s", hash("var1 == 'abc'"))
 
 	t.Run("Triggered", func(t *testing.T) {
 		res, err := svc.Run("my-trigger", map[string]interface{}{"var1": "abc", "revision": "123"})
-		if assert.NoError(t, err) {
-			return
+		if !assert.NoError(t, err) {
+			t.FailNow()
 		}
 		assert.Equal(t, []ConditionResult{{
 			Key:       conditionKey,
@@ -89,16 +89,17 @@ func TestRun_OncePerSet(t *testing.T) {
 
 	t.Run("NotTriggered", func(t *testing.T) {
 		res, err := svc.Run("my-trigger", map[string]interface{}{"var1": "bcd"})
-		if assert.NoError(t, err) {
-			return
+		if !assert.NoError(t, err) {
+			t.FailNow()
 		}
 		assert.Equal(t, []ConditionResult{{
 			Key:       conditionKey,
 			Triggered: false,
 			Templates: []string{"my-template"},
-			OncePer:   revision,
+			OncePer:   "",
 		}}, res)
 	})
+
 }
 
 func TestRun_OncePer_Evaluate(t *testing.T) {

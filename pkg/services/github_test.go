@@ -107,6 +107,21 @@ func TestGetTemplater_GitHub_Custom_Resource(t *testing.T) {
 	assert.Equal(t, "", notification.GitHub.Status.TargetURL)
 }
 
+func TestSend_GitHubService_BadURL(t *testing.T) {
+	e := gitHubService{}.Send(
+		Notification{
+			GitHub: &GitHubNotification{
+				repoURL: "hello",
+			},
+		},
+		Destination{
+			Service:   "",
+			Recipient: "",
+		},
+	)
+	assert.ErrorContains(t, e, "does not have a `/`")
+}
+
 func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	f := false
 	n := Notification{

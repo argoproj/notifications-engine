@@ -113,7 +113,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.17.3
 	github.com/aws/aws-sdk-go-v2/config v1.18.8
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.5.3 // indirect
+	github.com/hashicorp/go-retryablehttp v0.5.3
 )
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.14.0

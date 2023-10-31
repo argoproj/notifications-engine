@@ -143,7 +143,7 @@ func main() {
 
 The full source code is available in [cli/main.go](./cli/main.go). Use the following command:
 
-* to list avilable templates:
+* to list available templates:
 
 ```
 go run examples/certmanager/cli/main.go template get --config-map ./examples/certmanager/config.yaml --secret :empty
