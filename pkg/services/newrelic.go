@@ -31,8 +31,12 @@ var (
 	ErrMissingApiKey = errors.New("apiKey is missing")
 )
 
+const (
+	newrelicRevisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
+)
+
 func (n *NewrelicNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
-	revision, err := texttemplate.New(name).Funcs(f).Parse(revisionTemplate)
+	revision, err := texttemplate.New(name).Funcs(f).Parse(newrelicRevisionTemplate)
 	if err != nil {
 		return nil, err
 	}

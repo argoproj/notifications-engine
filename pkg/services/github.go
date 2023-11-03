@@ -5,23 +5,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"regexp"
 	"strings"
 	texttemplate "text/template"
-	"unicode/utf8"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	"github.com/google/go-github/v41/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
-	giturls "github.com/whilp/git-urls"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-	"github.com/argoproj/notifications-engine/pkg/util/text"
-)
-
-var (
-	gitSuffix = regexp.MustCompile(`\.git$`)
 )
 
 type GitHubOptions struct {
@@ -61,16 +53,16 @@ type GitHubPullRequestComment struct {
 }
 
 const (
-	repoURLtemplate  = "{{.app.spec.source.repoURL}}"
-	revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
+	githubRepoURLtemplate  = "{{.app.spec.source.repoURL}}"
+	githubRevisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
 )
 
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	if g.RepoURLPath == "" {
-		g.RepoURLPath = repoURLtemplate
+		g.RepoURLPath = githubRepoURLtemplate
 	}
 	if g.RevisionPath == "" {
-		g.RevisionPath = revisionTemplate
+		g.RevisionPath = githubRevisionTemplate
 	}
 
 	repoURL, err := texttemplate.New(name).Funcs(f).Parse(g.RepoURLPath)
@@ -274,27 +266,6 @@ type gitHubService struct {
 	opts GitHubOptions
 
 	client *github.Client
-}
-
-func trunc(message string, n int) string {
-	if utf8.RuneCountInString(message) > n {
-		return string([]rune(message)[0:n-3]) + "..."
-	}
-	return message
-}
-
-func fullNameByRepoURL(rawURL string) string {
-	parsed, err := giturls.Parse(rawURL)
-	if err != nil {
-		panic(err)
-	}
-
-	path := gitSuffix.ReplaceAllString(parsed.Path, "")
-	if pathParts := text.SplitRemoveEmpty(path, "/"); len(pathParts) >= 2 {
-		return strings.Join(pathParts[:2], "/")
-	}
-
-	return path
 }
 
 func (g gitHubService) Send(notification Notification, _ Destination) error {

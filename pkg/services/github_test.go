@@ -213,7 +213,7 @@ func TestNewGitHubService_GitHubOptions(t *testing.T) {
 	}
 }
 
-func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
+func TestGetTemplater_GitHub_PullRequestComment(t *testing.T) {
 	n := Notification{
 		GitHub: &GitHubNotification{
 			RepoURLPath:  "{{.sync.spec.git.repo}}",
