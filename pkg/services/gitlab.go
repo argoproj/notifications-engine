@@ -20,14 +20,15 @@ type GitLabOptions struct {
 
 type GitLabNotification struct {
 	repoURL             string
+	RepoURLPath         string `json:"repoURLPath,omitempty"`
 	revision            string
+	RevisionPath        string `json:"revisionPath,omitempty"`
 	revisionIsTag       bool
+	RevisionIsTagPath   string                     `json:"revisionIsTagPath,omitempty"`
 	Status              *GitLabStatus              `json:"status,omitempty"`
 	Deployment          *GitLabDeployment          `json:"deployment,omitempty"`
+	StopEnvironment     *GitLabStopEnvironment     `json:"stopEnvironment,omitempty"`
 	MergeRequestComment *GitLabMergeRequestComment `json:"mergeRequestComment,omitempty"`
-	RepoURLPath         string                     `json:"repoURLPath,omitempty"`
-	RevisionPath        string                     `json:"revisionPath,omitempty"`
-	RevisionIsTagPath   string                     `json:"revisionIsTagPath,omitempty"`
 }
 
 type GitLabStatus struct {
@@ -37,9 +38,14 @@ type GitLabStatus struct {
 }
 
 type GitLabDeployment struct {
-	State          string `json:"state,omitempty"`
-	Environment    string `json:"environment,omitempty"`
-	EnvironmentURL string `json:"environmentURL,omitempty"`
+	State       string `json:"state,omitempty"`
+	Environment string `json:"environment,omitempty"`
+	ExternalURL string `json:"externalURL,omitempty"`
+	Tier        string `json:"tier,omitempty"`
+}
+
+type GitLabStopEnvironment struct {
+	Environment string `json:"environment,omitempty"`
 }
 
 type GitLabMergeRequestComment struct {
@@ -96,7 +102,7 @@ func (g *GitLabNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
-	var deploymentState, environment, environmentURL *texttemplate.Template
+	var deploymentState, environment, externalURL, tier *texttemplate.Template
 	if g.Deployment != nil {
 		deploymentState, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
 		if err != nil {
@@ -108,7 +114,12 @@ func (g *GitLabNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			return nil, err
 		}
 
-		environmentURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.EnvironmentURL)
+		externalURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.ExternalURL)
+		if err != nil {
+			return nil, err
+		}
+
+		tier, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.Tier)
 		if err != nil {
 			return nil, err
 		}
@@ -194,11 +205,17 @@ func (g *GitLabNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 			notification.GitLab.Deployment.Environment = environmentData.String()
 
-			var environmentURLData bytes.Buffer
-			if err := environmentURL.Execute(&environmentURLData, vars); err != nil {
+			var externalURLData bytes.Buffer
+			if err := externalURL.Execute(&externalURLData, vars); err != nil {
 				return err
 			}
-			notification.GitLab.Deployment.EnvironmentURL = environmentURLData.String()
+			notification.GitLab.Deployment.ExternalURL = externalURLData.String()
+
+			var tierData bytes.Buffer
+			if err := tier.Execute(&tierData, vars); err != nil {
+				return err
+			}
+			notification.GitLab.Deployment.Tier = tierData.String()
 		}
 
 		if g.MergeRequestComment != nil {
@@ -277,14 +294,64 @@ func (g GitLabService) Send(notification Notification, _ Destination) error {
 		}
 	}
 
+	if notification.GitLab.StopEnvironment != nil {
+		// maximum length for environment name is 255 characters
+		environmentName := trunc(notification.GitLab.StopEnvironment.Environment, 255)
+
+		environments, _, err := g.client.Environments.ListEnvironments(
+			pid,
+			&gitlab.ListEnvironmentsOptions{
+				Name: gitlab.String(environmentName),
+			},
+			gitlab.WithContext(context.TODO()),
+		)
+		if err != nil {
+			return fmt.Errorf("could not list gitlab environments: %w", err)
+		}
+		if len(environments) == 0 {
+			return fmt.Errorf("gitlab environment not found")
+		}
+
+		_, _, err = g.client.Environments.StopEnvironment(
+			pid,
+			environments[0].ID,
+			gitlab.WithContext(context.TODO()),
+		)
+		if err != nil {
+			return fmt.Errorf("could not stop gitlab environment: %w", err)
+		}
+	}
+
 	if notification.GitLab.Deployment != nil {
 		// maximum length for environment name is 255 characters
 		environmentName := trunc(notification.GitLab.Deployment.Environment, 255)
 
-		// TODO: If deployment already exists, update it
-		// find how to get deployment ID
+		envs, _, err := g.client.Environments.ListEnvironments(
+			pid,
+			&gitlab.ListEnvironmentsOptions{
+				Name: gitlab.String(environmentName),
+			},
+			gitlab.WithContext(context.TODO()),
+		)
+		if err != nil {
+			return fmt.Errorf("could not list gitlab environments: %w", err)
+		}
+		if len(envs) == 0 {
+			_, _, err := g.client.Environments.CreateEnvironment(
+				pid,
+				&gitlab.CreateEnvironmentOptions{
+					Name:        gitlab.String(environmentName),
+					ExternalURL: &notification.GitLab.Deployment.ExternalURL,
+					Tier:        &notification.GitLab.Deployment.Tier,
+				},
+				gitlab.WithContext(context.TODO()),
+			)
+			if err != nil {
+				return fmt.Errorf("could not create gitlab environment: %w", err)
+			}
+		}
 
-		_, _, err := g.client.Deployments.CreateProjectDeployment(
+		_, _, err = g.client.Deployments.CreateProjectDeployment(
 			pid,
 			&gitlab.CreateProjectDeploymentOptions{
 				Environment: gitlab.String(environmentName),
