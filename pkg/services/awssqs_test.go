@@ -174,7 +174,7 @@ func TestSetOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	// Will be overridden
 	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
-	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "http://localhost"
+	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
 
 	s := NewTypedAwsSqsService(AwsSqsOptions{
 		Region: finalRegion,
