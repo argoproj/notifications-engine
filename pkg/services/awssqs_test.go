@@ -195,9 +195,20 @@ func TestSetOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	assert.Equal(t, finalSecret, creds.SecretAccessKey)
 	assert.Equal(t, finalRegion, cfg.Region)
 
-	endpoint, _ := cfg.EndpointResolverWithOptions.ResolveEndpoint(sqs.ServiceID, finalRegion)
+	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		if service == sqs.ServiceID {
+			return aws.Endpoint{
+				PartitionID:   "aws",
+				URL:           s.opts.EndpointUrl,
+				SigningRegion: s.opts.Region,
+			}, nil
+		}
+		// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	})
+	endpoint, err := customResolver.ResolveEndpoint("SQS", "")
+	assert.NoError(t, err)
 	assert.Equal(t, finalEndpoint, endpoint.URL)
-
 }
 
 // Helpers
