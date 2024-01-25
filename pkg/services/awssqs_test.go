@@ -20,6 +20,7 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 			MessageAttributes: map[string]string{
 				"attributeKey": "{{.messageAttributeValue}}",
 			},
+			MessageGroupId: "{{.messageGroupId}}",
 		},
 	}
 
@@ -33,6 +34,7 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 	err = templater(&notification, map[string]interface{}{
 		"message":               "abcdef",
 		"messageAttributeValue": "123456",
+		"messageGroupId":        "a1b2c3",
 	})
 
 	if !assert.NoError(t, err) {
@@ -42,6 +44,7 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"attributeKey": "123456",
 	}, notification.AwsSqs.MessageAttributes)
+	assert.Equal(t, "a1b2c3", notification.AwsSqs.MessageGroupId)
 }
 
 func TestSend_AwsSqs(t *testing.T) {
