@@ -108,20 +108,25 @@ func (s awsSqsService) setOptions() []func(*config.LoadOptions) error {
 		if s.opts.Region != "" {
 			endpointRegion = s.opts.Region
 		}
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-			if service == sqs.ServiceID {
-				return aws.Endpoint{
-					PartitionID:   "aws",
-					URL:           s.opts.EndpointUrl,
-					SigningRegion: endpointRegion,
-				}, nil
-			}
-			// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
-			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-		})
+
+		customResolver := aws.EndpointResolverWithOptionsFunc(s.getCustomResolver(endpointRegion))
 		options = append(options, config.WithEndpointResolverWithOptions(customResolver))
 	}
 	return options
+}
+
+func (s awsSqsService) getCustomResolver(endpointRegion string) func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+	return func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		if service == sqs.ServiceID {
+			return aws.Endpoint{
+				PartitionID:   "aws",
+				URL:           s.opts.EndpointUrl,
+				SigningRegion: endpointRegion,
+			}, nil
+		}
+		// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	}
 }
 
 func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
