@@ -123,17 +123,19 @@ func TestSend_GitHubService_BadURL(t *testing.T) {
 
 func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	f := false
+	tr := true
 	n := Notification{
 		GitHub: &GitHubNotification{
 			RepoURLPath:  "{{.sync.spec.git.repo}}",
 			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
 			Deployment: &GitHubDeployment{
-				State:            "success",
-				Environment:      "production",
-				EnvironmentURL:   "https://argoproj.github.io",
-				LogURL:           "https://argoproj.github.io/log",
-				RequiredContexts: []string{},
-				AutoMerge:        &f,
+				State:                "success",
+				Environment:          "production",
+				EnvironmentURL:       "https://argoproj.github.io",
+				LogURL:               "https://argoproj.github.io/log",
+				RequiredContexts:     []string{},
+				AutoMerge:            &f,
+				TransientEnvironment: &tr,
 			},
 		},
 	}
@@ -174,6 +176,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Equal(t, "https://argoproj.github.io/log", notification.GitHub.Deployment.LogURL)
 	assert.Len(t, notification.GitHub.Deployment.RequiredContexts, 0)
 	assert.Equal(t, &f, notification.GitHub.Deployment.AutoMerge)
+	assert.Equal(t, &tr, notification.GitHub.Deployment.TransientEnvironment)
 }
 
 func TestNewGitHubService_GitHubOptions(t *testing.T) {

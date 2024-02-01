@@ -16,6 +16,7 @@ import (
 
 type AwsSqsNotification struct {
 	MessageAttributes map[string]string `json:"messageAttributes"`
+	MessageGroupId    string            `json:"messageGroupId,omitempty"`
 }
 
 type AwsSqsOptions struct {
@@ -108,23 +109,33 @@ func (s awsSqsService) setOptions() []func(*config.LoadOptions) error {
 		if s.opts.Region != "" {
 			endpointRegion = s.opts.Region
 		}
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-			if service == sqs.ServiceID {
-				return aws.Endpoint{
-					PartitionID:   "aws",
-					URL:           s.opts.EndpointUrl,
-					SigningRegion: endpointRegion,
-				}, nil
-			}
-			// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
-			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-		})
+
+		customResolver := aws.EndpointResolverWithOptionsFunc(s.getCustomResolver(endpointRegion))
 		options = append(options, config.WithEndpointResolverWithOptions(customResolver))
 	}
 	return options
 }
 
+func (s awsSqsService) getCustomResolver(endpointRegion string) func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+	return func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+		if service == sqs.ServiceID {
+			return aws.Endpoint{
+				PartitionID:   "aws",
+				URL:           s.opts.EndpointUrl,
+				SigningRegion: endpointRegion,
+			}, nil
+		}
+		// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
+		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+	}
+}
+
 func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	groupId, err := texttemplate.New(name).Funcs(f).Parse(n.MessageGroupId)
+	if err != nil {
+		return nil, err
+	}
+
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.AwsSqs == nil {
 			notification.AwsSqs = &AwsSqsNotification{}
@@ -135,6 +146,14 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			if err := notification.AwsSqs.parseMessageAttributes(name, f, vars); err != nil {
 				return err
 			}
+		}
+
+		var groupIdBuff bytes.Buffer
+		if err := groupId.Execute(&groupIdBuff, vars); err != nil {
+			return err
+		}
+		if val := groupIdBuff.String(); val != "" {
+			notification.AwsSqs.MessageGroupId = val
 		}
 
 		return nil

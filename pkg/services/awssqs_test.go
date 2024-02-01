@@ -20,6 +20,7 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 			MessageAttributes: map[string]string{
 				"attributeKey": "{{.messageAttributeValue}}",
 			},
+			MessageGroupId: "{{.messageGroupId}}",
 		},
 	}
 
@@ -33,6 +34,7 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 	err = templater(&notification, map[string]interface{}{
 		"message":               "abcdef",
 		"messageAttributeValue": "123456",
+		"messageGroupId":        "a1b2c3",
 	})
 
 	if !assert.NoError(t, err) {
@@ -42,6 +44,7 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 	assert.Equal(t, map[string]string{
 		"attributeKey": "123456",
 	}, notification.AwsSqs.MessageAttributes)
+	assert.Equal(t, "a1b2c3", notification.AwsSqs.MessageGroupId)
 }
 
 func TestSend_AwsSqs(t *testing.T) {
@@ -194,9 +197,45 @@ func TestSetOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	assert.Equal(t, finalKey, creds.AccessKeyID)
 	assert.Equal(t, finalSecret, creds.SecretAccessKey)
 	assert.Equal(t, finalRegion, cfg.Region)
+}
+func TestSetOptionsCustomResolverFunc(t *testing.T) {
 
-	endpoint, _ := cfg.EndpointResolverWithOptions.ResolveEndpoint(sqs.ServiceID, finalRegion)
+	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
+
+	s := NewTypedAwsSqsService(AwsSqsOptions{
+		Region: finalRegion,
+		AwsAccess: AwsAccess{
+			Key:    finalKey,
+			Secret: finalSecret,
+		},
+		EndpointUrl: finalEndpoint,
+	})
+
+	customResolver := s.getCustomResolver(finalRegion)
+	endpoint, err := customResolver(sqs.ServiceID, finalRegion)
+	assert.NoError(t, err)
 	assert.Equal(t, finalEndpoint, endpoint.URL)
+
+}
+
+func TestSetOptionsCustomResolverFuncReturnErr(t *testing.T) {
+
+	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
+
+	s := NewTypedAwsSqsService(AwsSqsOptions{
+		Region: finalRegion,
+		AwsAccess: AwsAccess{
+			Key:    finalKey,
+			Secret: finalSecret,
+		},
+		EndpointUrl: finalEndpoint,
+	})
+
+	customResolver := s.getCustomResolver(finalRegion)
+	_, err := customResolver("NotSQS", finalRegion)
+	assert.Error(t, err)
+	//assert that err is of type aws.EndpointNotFoundError
+	assert.IsType(t, &aws.EndpointNotFoundError{}, err)
 
 }
 
