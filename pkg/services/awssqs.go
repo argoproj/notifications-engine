@@ -16,6 +16,7 @@ import (
 
 type AwsSqsNotification struct {
 	MessageAttributes map[string]string `json:"messageAttributes"`
+	MessageGroupId    string            `json:"messageGroupId,omitempty"`
 }
 
 type AwsSqsOptions struct {
@@ -130,6 +131,11 @@ func (s awsSqsService) getCustomResolver(endpointRegion string) func(service, re
 }
 
 func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	groupId, err := texttemplate.New(name).Funcs(f).Parse(n.MessageGroupId)
+	if err != nil {
+		return nil, err
+	}
+
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.AwsSqs == nil {
 			notification.AwsSqs = &AwsSqsNotification{}
@@ -140,6 +146,14 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			if err := notification.AwsSqs.parseMessageAttributes(name, f, vars); err != nil {
 				return err
 			}
+		}
+
+		var groupIdBuff bytes.Buffer
+		if err := groupId.Execute(&groupIdBuff, vars); err != nil {
+			return err
+		}
+		if val := groupIdBuff.String(); val != "" {
+			notification.AwsSqs.MessageGroupId = val
 		}
 
 		return nil
