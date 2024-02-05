@@ -48,7 +48,7 @@ The Slack notification service configuration includes following settings:
       apiVersion: v1
       kind: ConfigMap
       metadata:
-        name: <config-map-name>
+        name: argocd-notifications-cm
       data:
         service.slack: |
           token: $slack-token

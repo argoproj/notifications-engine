@@ -30,7 +30,7 @@ metadata:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: <config-map-name>
+  name: argocd-notifications-cm
 data:
   service.awssqs: |
     region: "us-east-2"
@@ -89,7 +89,7 @@ metadata:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: <config-map-name>
+  name: argocd-notifications-cm
 data:
   service.awssqs: |
     queue: "myqueue"
