@@ -20,7 +20,7 @@ To be able to send notifications with argocd-notifications you have to create an
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: <config-map-name>
+  name: argocd-notifications-cm
 data:
   service.opsgenie: |
     apiUrl: <api-url>
