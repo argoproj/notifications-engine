@@ -79,6 +79,7 @@ type SlackOptions struct {
 	Channels           []string `json:"channels"`
 	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
 	ApiURL             string   `json:"apiURL"`
+	DisableUnfurl      bool     `json:"disableUnfurl"`
 }
 
 type slackService struct {
@@ -123,6 +124,10 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 		}
 		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
 		slackNotification = notification.Slack
+	}
+
+	if opts.DisableUnfurl {
+		msgOptions = append(msgOptions, slack.MsgOptionDisableLinkUnfurl(), slack.MsgOptionDisableMediaUnfurl())
 	}
 
 	return slackNotification, msgOptions, nil

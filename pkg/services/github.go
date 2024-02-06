@@ -48,12 +48,13 @@ type GitHubStatus struct {
 }
 
 type GitHubDeployment struct {
-	State            string   `json:"state,omitempty"`
-	Environment      string   `json:"environment,omitempty"`
-	EnvironmentURL   string   `json:"environmentURL,omitempty"`
-	LogURL           string   `json:"logURL,omitempty"`
-	RequiredContexts []string `json:"requiredContexts"`
-	AutoMerge        *bool    `json:"autoMerge,omitempty"`
+	State                string   `json:"state,omitempty"`
+	Environment          string   `json:"environment,omitempty"`
+	EnvironmentURL       string   `json:"environmentURL,omitempty"`
+	LogURL               string   `json:"logURL,omitempty"`
+	RequiredContexts     []string `json:"requiredContexts"`
+	AutoMerge            *bool    `json:"autoMerge,omitempty"`
+	TransientEnvironment *bool    `json:"transientEnvironment,omitempty"`
 }
 
 type GitHubPullRequestComment struct {
@@ -211,6 +212,14 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			} else {
 				notification.GitHub.Deployment.AutoMerge = g.Deployment.AutoMerge
 			}
+
+			if g.Deployment.TransientEnvironment == nil {
+				deploymentTransientEnvironmentDefault := false
+				notification.GitHub.Deployment.TransientEnvironment = &deploymentTransientEnvironmentDefault
+			} else {
+				notification.GitHub.Deployment.TransientEnvironment = g.Deployment.TransientEnvironment
+			}
+
 			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 		}
 
@@ -334,10 +343,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			u[0],
 			u[1],
 			&github.DeploymentRequest{
-				Ref:              &notification.GitHub.revision,
-				Environment:      &notification.GitHub.Deployment.Environment,
-				RequiredContexts: &notification.GitHub.Deployment.RequiredContexts,
-				AutoMerge:        notification.GitHub.Deployment.AutoMerge,
+				Ref:                  &notification.GitHub.revision,
+				Environment:          &notification.GitHub.Deployment.Environment,
+				RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
+				AutoMerge:            notification.GitHub.Deployment.AutoMerge,
+				TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
 			},
 		)
 		if err != nil {
