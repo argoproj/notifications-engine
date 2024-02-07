@@ -338,20 +338,38 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub.Deployment != nil {
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
-		deployment, _, err := g.client.Repositories.CreateDeployment(
+		deployments, _, err := g.client.Repositories.ListDeployments(
 			context.Background(),
 			u[0],
 			u[1],
-			&github.DeploymentRequest{
-				Ref:                  &notification.GitHub.revision,
-				Environment:          &notification.GitHub.Deployment.Environment,
-				RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
-				AutoMerge:            notification.GitHub.Deployment.AutoMerge,
-				TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
+			&github.DeploymentsListOptions{
+				Ref:         notification.GitHub.revision,
+				Environment: notification.GitHub.Deployment.Environment,
 			},
 		)
 		if err != nil {
 			return err
+		}
+
+		var deployment *github.Deployment
+		if len(deployments) != 0 {
+			deployment = deployments[0]
+		} else {
+			deployment, _, err = g.client.Repositories.CreateDeployment(
+				context.Background(),
+				u[0],
+				u[1],
+				&github.DeploymentRequest{
+					Ref:                  &notification.GitHub.revision,
+					Environment:          &notification.GitHub.Deployment.Environment,
+					RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
+					AutoMerge:            notification.GitHub.Deployment.AutoMerge,
+					TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
+				},
+			)
+			if err != nil {
+				return err
+			}
 		}
 		_, _, err = g.client.Repositories.CreateDeploymentStatus(
 			context.Background(),
