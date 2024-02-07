@@ -26,7 +26,9 @@ func (s telegramService) Send(notification Notification, dest Destination) error
 	}
 
 	if strings.HasPrefix(dest.Recipient, "-") {
-		chatID, err := strconv.ParseInt(dest.Recipient, 10, 64)
+		chatChannel := strings.Split(dest.Recipient, "|")
+
+		chatID, err := strconv.ParseInt(chatChannel[0], 10, 64)
 		if err != nil {
 			return err
 		}
@@ -34,6 +36,14 @@ func (s telegramService) Send(notification Notification, dest Destination) error
 		// Init message with ParseMode is 'Markdown'
 		msg := tgbotapi.NewMessage(chatID, notification.Message)
 		msg.ParseMode = "Markdown"
+
+		if len(chatChannel) > 1 {
+			threadID, err := strconv.Atoi(chatChannel[1])
+			if err != nil {
+				return err
+			}
+			msg.MessageThreadID = threadID
+		}
 
 		_, err = bot.Send(msg)
 		if err != nil {
