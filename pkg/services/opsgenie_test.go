@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	texttemplate "text/template"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -32,6 +33,53 @@ func (s *mockOpsgenieService) Send(notification Notification, destination Destin
 	}
 	// Return nil to simulate successful sending of notification
 	return nil
+}
+func TestOpsgenieNotification_GetTemplater(t *testing.T) {
+	// Prepare test data
+	name := "testTemplate"
+	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
+	f := texttemplate.FuncMap{}
+
+	t.Run("ValidTemplate", func(t *testing.T) {
+		// Create a new OpsgenieNotification instance
+		notification := OpsgenieNotification{
+			Description: descriptionTemplate,
+		}
+
+		// Call the GetTemplater method
+		templater, err := notification.GetTemplater(name, f)
+
+		// Assert that no error occurred during the call
+		assert.NoError(t, err)
+
+		// Prepare mock data for the Templater function
+		mockNotification := &Notification{}
+		vars := map[string]interface{}{
+			"foo": "bar",
+		}
+
+		// Call the Templater function returned by GetTemplater
+		err = templater(mockNotification, vars)
+
+		// Assert that no error occurred during the execution of the Templater function
+		assert.NoError(t, err)
+
+		// Assert that the OpsgenieNotification's description field was correctly updated
+		assert.Equal(t, "Test Opsgenie alert: bar", mockNotification.Opsgenie.Description)
+	})
+
+	t.Run("InvalidTemplate", func(t *testing.T) {
+		// Create a new OpsgenieNotification instance with an invalid description template
+		notification := OpsgenieNotification{
+			Description: "{{.invalid", // Invalid template syntax
+		}
+
+		// Call the GetTemplater method with the invalid template
+		_, err := notification.GetTemplater(name, f)
+
+		// Assert that an error occurred during the call
+		assert.Error(t, err)
+	})
 }
 
 func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
