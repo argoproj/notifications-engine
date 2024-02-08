@@ -21,6 +21,7 @@ type OpsgenieOptions struct {
 
 type OpsgenieNotification struct {
 	Description string `json:"description"`
+	Priority    string `json:"priority,omitempty"`
 }
 
 func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -63,13 +64,25 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 		},
 	})
 	description := ""
+	priority := ""
 	if notification.Opsgenie != nil {
+		if notification.Opsgenie.Description == "" {
+			return fmt.Errorf("Opsgenie notification description is missing")
+		}
+
 		description = notification.Opsgenie.Description
+
+		if notification.Opsgenie.Priority != "" {
+			priority = notification.Opsgenie.Priority
+		}
 	}
+
+	alertPriority := alert.Priority(priority)
 
 	_, err := alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
 		Message:     notification.Message,
 		Description: description,
+		Priority:    alertPriority,
 		Responders: []alert.Responder{
 			{
 				Type: "team",
