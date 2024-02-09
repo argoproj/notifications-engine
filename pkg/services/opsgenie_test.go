@@ -38,12 +38,14 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 	// Prepare test data
 	name := "testTemplate"
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
+	aliasTemplate := "Test alias: {{.foo}}"
 	f := texttemplate.FuncMap{}
 
 	t.Run("ValidTemplate", func(t *testing.T) {
 		// Create a new OpsgenieNotification instance
 		notification := OpsgenieNotification{
 			Description: descriptionTemplate,
+			Alias:       aliasTemplate,
 		}
 
 		// Call the GetTemplater method
@@ -66,12 +68,16 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 
 		// Assert that the OpsgenieNotification's description field was correctly updated
 		assert.Equal(t, "Test Opsgenie alert: bar", mockNotification.Opsgenie.Description)
+
+		// Assert that the OpsgenieNotification's alias field was correctly updated
+		assert.Equal(t, "Test alias: bar", mockNotification.Opsgenie.Alias)
 	})
 
 	t.Run("InvalidTemplate", func(t *testing.T) {
 		// Create a new OpsgenieNotification instance with an invalid description template
 		notification := OpsgenieNotification{
 			Description: "{{.invalid", // Invalid template syntax
+			Alias:       "{{.invalid",
 		}
 
 		// Call the GetTemplater method with the invalid template
@@ -101,12 +107,14 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	recipient := "testRecipient"
 	message := "Test message"
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
+	aliasTemplate := "Test alias: {{.foo}}"
 
 	// Create test notification with description
 	notification := Notification{
 		Message: message,
 		Opsgenie: &OpsgenieNotification{
 			Description: descriptionTemplate,
+			Alias:       aliasTemplate,
 		},
 	}
 
@@ -117,7 +125,7 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "No API key configured for recipient")
 }
-func TestOpsgenie_SendNotification_MissingDescriptionAndPriority(t *testing.T) {
+func TestOpsgenie_SendNotification_WithMessageOnly(t *testing.T) {
 	// Create a mock HTTP server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -218,6 +226,47 @@ func TestOpsgenie_SendNotification_WithDescriptionAndPriority(t *testing.T) {
 		Opsgenie: &OpsgenieNotification{
 			Description: descriptionTemplate,
 			Priority:    priority,
+		},
+	}
+
+	// Execute the service method with description and priority
+	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
+
+	// Assert the result for description and priority present
+	assert.NoError(t, err) // Expect no error
+}
+
+func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
+	// Create a mock HTTP server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	// Replace the HTTP client in the Opsgenie service with a mock client
+	mockClient := &http.Client{
+		Transport: &http.Transport{},
+	}
+	service := NewOpsgenieServiceWithClient(OpsgenieOptions{
+		ApiUrl: server.URL,
+		ApiKeys: map[string]string{
+			"testRecipient": "testApiKey",
+		}}, mockClient)
+
+	// Prepare test data
+	recipient := "testRecipient"
+	message := "Test message"
+	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
+	aliasTemplate := "Test alias: {{.foo}}"
+	priority := "P1"
+
+	// Create test notification with description and priority
+	notification := Notification{
+		Message: message,
+		Opsgenie: &OpsgenieNotification{
+			Description: descriptionTemplate,
+			Priority:    priority,
+			Alias:       aliasTemplate,
 		},
 	}
 
