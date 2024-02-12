@@ -73,11 +73,23 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		assert.Equal(t, "Test alias: bar", mockNotification.Opsgenie.Alias)
 	})
 
-	t.Run("InvalidTemplate", func(t *testing.T) {
+	t.Run("InvalidTemplateDescription", func(t *testing.T) {
 		// Create a new OpsgenieNotification instance with an invalid description template
 		notification := OpsgenieNotification{
 			Description: "{{.invalid", // Invalid template syntax
-			Alias:       "{{.invalid",
+		}
+
+		// Call the GetTemplater method with the invalid template
+		_, err := notification.GetTemplater(name, f)
+
+		// Assert that an error occurred during the call
+		assert.Error(t, err)
+	})
+
+	t.Run("InvalidTemplateAlias", func(t *testing.T) {
+		// Create a new OpsgenieNotification instance with an invalid alias template
+		notification := OpsgenieNotification{
+			Alias: "{{.invalid", // Invalid template syntax
 		}
 
 		// Call the GetTemplater method with the invalid template
@@ -95,13 +107,9 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	}))
 	defer server.Close()
 
-	// Replace the HTTP client in the Opsgenie service with a mock client
-	mockClient := &http.Client{
-		Transport: &http.Transport{},
-	}
-	service := NewOpsgenieServiceWithClient(OpsgenieOptions{
+	service := NewOpsgenieService(OpsgenieOptions{
 		ApiUrl:  server.URL,
-		ApiKeys: map[string]string{}}, mockClient)
+		ApiKeys: map[string]string{}})
 
 	// Prepare test data
 	recipient := "testRecipient"
@@ -123,7 +131,7 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 
 	// Assert the result for missing API Key
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "No API key configured for recipient")
+	assert.Contains(t, err.Error(), "no API key configured for recipient testRecipient")
 }
 func TestOpsgenie_SendNotification_WithMessageOnly(t *testing.T) {
 	// Create a mock HTTP server
