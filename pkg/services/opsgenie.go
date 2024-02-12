@@ -22,10 +22,15 @@ type OpsgenieOptions struct {
 type OpsgenieNotification struct {
 	Description string `json:"description"`
 	Priority    string `json:"priority,omitempty"`
+	Alias       string `json:"alias,omitempty"`
 }
 
 func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	desc, err := texttemplate.New(name).Funcs(f).Parse(n.Description)
+	if err != nil {
+		return nil, err
+	}
+	alias, err := texttemplate.New(name).Funcs(f).Parse(n.Alias)
 	if err != nil {
 		return nil, err
 	}
@@ -38,6 +43,11 @@ func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap)
 			return err
 		}
 		notification.Opsgenie.Description = descData.String()
+		var aliasData bytes.Buffer
+		if err := alias.Execute(&aliasData, vars); err != nil {
+			return err
+		}
+		notification.Opsgenie.Alias = aliasData.String()
 		return nil
 	}, nil
 }
@@ -65,6 +75,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 	})
 	description := ""
 	priority := ""
+	alias := ""
 	if notification.Opsgenie != nil {
 		if notification.Opsgenie.Description == "" {
 			return fmt.Errorf("Opsgenie notification description is missing")
@@ -75,6 +86,10 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 		if notification.Opsgenie.Priority != "" {
 			priority = notification.Opsgenie.Priority
 		}
+
+		if notification.Opsgenie.Alias != "" {
+			alias = notification.Opsgenie.Alias
+		}
 	}
 
 	alertPriority := alert.Priority(priority)
@@ -83,6 +98,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 		Message:     notification.Message,
 		Description: description,
 		Priority:    alertPriority,
+		Alias:       alias,
 		Responders: []alert.Responder{
 			{
 				Type: "team",
