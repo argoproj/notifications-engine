@@ -24,6 +24,7 @@ require (
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.4
 	github.com/whilp/git-urls v0.0.0-20191001220047-6db9661140c0
+	github.com/xanzy/go-gitlab v0.93.2
 	golang.org/x/time v0.3.0
 	gomodules.xyz/notify v0.1.1
 	google.golang.org/api v0.132.0
@@ -114,7 +115,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.24.1
 	github.com/aws/aws-sdk-go-v2/config v1.25.12
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
-	github.com/hashicorp/go-retryablehttp v0.5.3
+	github.com/hashicorp/go-retryablehttp v0.7.2
 )
 
 replace github.com/prometheus/client_golang => github.com/prometheus/client_golang v1.14.0
