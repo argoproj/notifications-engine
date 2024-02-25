@@ -23,6 +23,7 @@ To be able to send notifications with argocd-notifications you have to create an
 | `description` | True         | `string` | Description field of the alert that is generally used to provide a detailed information about the alert. | `Hello from Argo CD!`            |
 | `priority`    | False        | `string` | Priority level of the alert. Possible values are P1, P2, P3, P4 and P5. Default value is P3.             | `P1`                             |
 | `alias`       | False        | `string` | Client-defined identifier of the alert, that is also the key element of Alert De-Duplication.            | `Life is too short for no alias` |
+| `note`       | False        | `string` | Additional note that will be added while creating the alert.            | `Error from Argo CD!` |
 
 ```yaml
 apiVersion: v1
@@ -45,6 +46,7 @@ data:
         Sync Status: {{.app.status.sync.status}}
       priority: P1
       alias: {{.app.metadata.name}}
+      note: Error from Argo CD!
   trigger.on-a-problem: |
     - description: Application has a problem.
       send:

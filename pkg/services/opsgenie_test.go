@@ -39,6 +39,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 	name := "testTemplate"
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
 	aliasTemplate := "Test alias: {{.foo}}"
+	noteTemplate := "Test note: {{.foo}}"
 	f := texttemplate.FuncMap{}
 
 	t.Run("ValidTemplate", func(t *testing.T) {
@@ -46,6 +47,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		notification := OpsgenieNotification{
 			Description: descriptionTemplate,
 			Alias:       aliasTemplate,
+			Note:        noteTemplate,
 		}
 
 		// Call the GetTemplater method
@@ -71,6 +73,9 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 
 		// Assert that the OpsgenieNotification's alias field was correctly updated
 		assert.Equal(t, "Test alias: bar", mockNotification.Opsgenie.Alias)
+
+		// Assert that the OpsgenieNotification's note field was correctly updated
+		assert.Equal(t, "Test note: bar", mockNotification.Opsgenie.Note)
 	})
 
 	t.Run("InvalidTemplateDescription", func(t *testing.T) {
@@ -98,6 +103,19 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		// Assert that an error occurred during the call
 		assert.Error(t, err)
 	})
+
+	t.Run("InvalidTemplateNote", func(t *testing.T) {
+		// Create a new OpsgenieNotification instance with an invalid note template
+		notification := OpsgenieNotification{
+			Note: "{{.invalid", // Invalid template syntax
+		}
+
+		// Call the GetTemplater method with the invalid template
+		_, err := notification.GetTemplater(name, f)
+
+		// Assert that an error occurred during the call
+		assert.Error(t, err)
+	})
 }
 
 func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
@@ -116,6 +134,7 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	message := "Test message"
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
 	aliasTemplate := "Test alias: {{.foo}}"
+	noteTemplate := "Test note: {{.foo}}"
 
 	// Create test notification with description
 	notification := Notification{
@@ -123,6 +142,7 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 		Opsgenie: &OpsgenieNotification{
 			Description: descriptionTemplate,
 			Alias:       aliasTemplate,
+			Note:        noteTemplate,
 		},
 	}
 
@@ -267,6 +287,7 @@ func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
 	aliasTemplate := "Test alias: {{.foo}}"
 	priority := "P1"
+	noteTemplate := "Test note: {{.foo}}"
 
 	// Create test notification with description and priority
 	notification := Notification{
@@ -275,6 +296,7 @@ func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
 			Description: descriptionTemplate,
 			Priority:    priority,
 			Alias:       aliasTemplate,
+			Note:        noteTemplate,
 		},
 	}
 
