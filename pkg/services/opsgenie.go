@@ -21,10 +21,21 @@ type OpsgenieOptions struct {
 
 type OpsgenieNotification struct {
 	Description string `json:"description"`
+	Priority    string `json:"priority,omitempty"`
+	Alias       string `json:"alias,omitempty"`
+	Note        string `json:"note,omitempty"`
 }
 
 func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	desc, err := texttemplate.New(name).Funcs(f).Parse(n.Description)
+	if err != nil {
+		return nil, err
+	}
+	alias, err := texttemplate.New(name).Funcs(f).Parse(n.Alias)
+	if err != nil {
+		return nil, err
+	}
+	note, err := texttemplate.New(name).Funcs(f).Parse(n.Note)
 	if err != nil {
 		return nil, err
 	}
@@ -37,6 +48,16 @@ func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap)
 			return err
 		}
 		notification.Opsgenie.Description = descData.String()
+		var aliasData bytes.Buffer
+		if err := alias.Execute(&aliasData, vars); err != nil {
+			return err
+		}
+		notification.Opsgenie.Alias = aliasData.String()
+		var noteData bytes.Buffer
+		if err := note.Execute(&noteData, vars); err != nil {
+			return err
+		}
+		notification.Opsgenie.Note = noteData.String()
 		return nil
 	}, nil
 }
@@ -62,14 +83,37 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 				httputil.NewTransport(s.opts.ApiUrl, false), log.WithField("service", "opsgenie")),
 		},
 	})
-	description := ""
+
+	var description, priority, alias, note string
+
 	if notification.Opsgenie != nil {
+		if notification.Opsgenie.Description == "" {
+			return fmt.Errorf("Opsgenie notification description is missing")
+		}
+
 		description = notification.Opsgenie.Description
+
+		if notification.Opsgenie.Priority != "" {
+			priority = notification.Opsgenie.Priority
+		}
+
+		if notification.Opsgenie.Alias != "" {
+			alias = notification.Opsgenie.Alias
+		}
+
+		if notification.Opsgenie.Note != "" {
+			note = notification.Opsgenie.Note
+		}
 	}
+
+	alertPriority := alert.Priority(priority)
 
 	_, err := alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
 		Message:     notification.Message,
 		Description: description,
+		Priority:    alertPriority,
+		Alias:       alias,
+		Note:        note,
 		Responders: []alert.Responder{
 			{
 				Type: "team",
