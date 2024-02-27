@@ -4,6 +4,7 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/google/go-github/v41/github"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -258,4 +259,51 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
 	assert.Equal(t, "0123456789", notification.GitHub.revision)
 	assert.Equal(t, "This is a comment", notification.GitHub.PullRequestComment.Content)
+}
+
+func TestGetTemplater_Github_CheckRun(t *testing.T) {
+	title := "{{.sync.status.lastSyncedCommit}}"
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			CheckRun: &GitHubCheckRun{
+				Output: &github.CheckRunOutput{
+					Title: &title,
+				},
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{
+		"sync": map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name": "root-sync-test",
+			},
+			"spec": map[string]interface{}{
+				"git": map[string]interface{}{
+					"repo": "https://github.com/argoproj-labs/argocd-notifications.git",
+				},
+			},
+			"status": map[string]interface{}{
+				"lastSyncedCommit": "0123456789",
+			},
+		},
+	})
+
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	assert.Equal(t, "{{.sync.spec.git.repo}}", notification.GitHub.RepoURLPath)
+	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
+	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
+	assert.Equal(t, "0123456789", notification.GitHub.revision)
+	assert.Equal(t, "0123456789", *notification.GitHub.CheckRun.Output.Title)
 }
