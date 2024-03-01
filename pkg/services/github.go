@@ -55,6 +55,7 @@ type GitHubDeployment struct {
 	RequiredContexts     []string `json:"requiredContexts"`
 	AutoMerge            *bool    `json:"autoMerge,omitempty"`
 	TransientEnvironment *bool    `json:"transientEnvironment,omitempty"`
+	Reference            string   `json:"reference,omitempty"`
 }
 
 type GitHubPullRequestComment struct {
@@ -102,7 +103,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
-	var deploymentState, environment, environmentURL, logURL *texttemplate.Template
+	var deploymentState, environment, environmentURL, reference, logURL *texttemplate.Template
 	if g.Deployment != nil {
 		deploymentState, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
 		if err != nil {
@@ -115,6 +116,11 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 
 		environmentURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.EnvironmentURL)
+		if err != nil {
+			return nil, err
+		}
+
+		reference, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.Reference)
 		if err != nil {
 			return nil, err
 		}
@@ -220,6 +226,11 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 				notification.GitHub.Deployment.TransientEnvironment = g.Deployment.TransientEnvironment
 			}
 
+			var referenceData bytes.Buffer
+			if err := reference.Execute(&referenceData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.Deployment.Reference = referenceData.String()
 			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
 		}
 
@@ -351,6 +362,12 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			return err
 		}
 
+		// if no reference is provided, use the revision
+		ref := notification.GitHub.Deployment.Reference
+		if ref == "" {
+			ref = notification.GitHub.revision
+		}
+
 		var deployment *github.Deployment
 		if len(deployments) != 0 {
 			deployment = deployments[0]
@@ -360,7 +377,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				u[0],
 				u[1],
 				&github.DeploymentRequest{
-					Ref:                  &notification.GitHub.revision,
+					Ref:                  &ref,
 					Environment:          &notification.GitHub.Deployment.Environment,
 					RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
 					AutoMerge:            notification.GitHub.Deployment.AutoMerge,

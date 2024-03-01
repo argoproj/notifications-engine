@@ -129,6 +129,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 			RepoURLPath:  "{{.sync.spec.git.repo}}",
 			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
 			Deployment: &GitHubDeployment{
+				Reference:            "v0.0.1",
 				State:                "success",
 				Environment:          "production",
 				EnvironmentURL:       "https://argoproj.github.io",
@@ -177,6 +178,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Len(t, notification.GitHub.Deployment.RequiredContexts, 0)
 	assert.Equal(t, &f, notification.GitHub.Deployment.AutoMerge)
 	assert.Equal(t, &tr, notification.GitHub.Deployment.TransientEnvironment)
+	assert.Equal(t, "v0.0.1", notification.GitHub.Deployment.Reference)
 }
 
 func TestNewGitHubService_GitHubOptions(t *testing.T) {
