@@ -10,6 +10,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.16.16
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.29.7
 	github.com/bradleyfalzon/ghinstallation/v2 v2.5.0
+	github.com/chainguard-dev/git-urls v1.0.2
 	github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.5.9
@@ -23,7 +24,6 @@ require (
 	github.com/spf13/cast v1.6.0
 	github.com/spf13/cobra v1.6.1
 	github.com/stretchr/testify v1.8.4
-	github.com/whilp/git-urls v0.0.0-20191001220047-6db9661140c0
 	golang.org/x/time v0.5.0
 	gomodules.xyz/notify v0.1.1
 	google.golang.org/api v0.132.0

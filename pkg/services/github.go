@@ -11,10 +11,10 @@ import (
 	"unicode/utf8"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
+	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/google/go-github/v41/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
-	giturls "github.com/whilp/git-urls"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	"github.com/argoproj/notifications-engine/pkg/util/text"
