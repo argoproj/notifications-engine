@@ -70,9 +70,8 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   annotations:
-    notifications.argoproj.io/subscribe.<trigger-name>.github: "status"
-    notifications.argoproj.io/subscribe.<trigger-name>.github: "deployment"
-    notifications.argoproj.io/subscribe.<trigger-name>.github: "comment"
+    notifications.argoproj.io/subscribe.<trigger-name>.github: "status" # or deployment or comment
+    notifications.argoproj.io/subscribe.<trigger-name>.github: "status;deployment" # 2 of the 3 types
 ```
 
 ## Templates
