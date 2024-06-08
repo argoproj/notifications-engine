@@ -20,9 +20,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
-var (
-	gitSuffix = regexp.MustCompile(`\.git$`)
-)
+var gitSuffix = regexp.MustCompile(`\.git$`)
 
 type GitHubOptions struct {
 	AppID             interface{} `json:"appID"`
@@ -317,7 +315,7 @@ func fullNameByRepoURL(rawURL string) string {
 	return path
 }
 
-func (g gitHubService) Send(notification Notification, _ Destination) error {
+func (g gitHubService) Send(notification Notification, dest Destination) error {
 	if notification.GitHub == nil {
 		return fmt.Errorf("config is empty")
 	}
@@ -326,7 +324,29 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if len(u) < 2 {
 		return fmt.Errorf("GitHub.repoURL (%s) does not have a `/`", notification.GitHub.repoURL)
 	}
-	if notification.GitHub.Status != nil {
+
+	var (
+		sendStatus     bool
+		sendDeployment bool
+		sendComment    bool
+	)
+
+	switch dest.Recipient {
+	case "status":
+		sendStatus = true
+	case "deployment":
+		sendDeployment = true
+	case "comment":
+		sendComment = true
+	default:
+		// match previous behavior: send all notifications if a destination is
+		// not specified
+		sendStatus = true
+		sendDeployment = true
+		sendComment = true
+	}
+
+	if notification.GitHub.Status != nil && sendStatus {
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
 		_, _, err := g.client.Repositories.CreateStatus(
@@ -346,7 +366,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		}
 	}
 
-	if notification.GitHub.Deployment != nil {
+	if notification.GitHub.Deployment != nil && sendDeployment {
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
 		deployments, _, err := g.client.Repositories.ListDeployments(
@@ -406,7 +426,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		}
 	}
 
-	if notification.GitHub.PullRequestComment != nil {
+	if notification.GitHub.PullRequestComment != nil && sendComment {
 		// maximum is 65536 characters
 		body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
 		comment := &github.IssueComment{
