@@ -2,7 +2,13 @@
 
 ## Parameters
 
-The GitHub notification service changes commit status using [GitHub Apps](https://docs.github.com/en/developers/apps) and requires specifying the following settings:
+The GitHub notification service can notify the following notification types:
+
+- Commit statuses
+- Deployments
+- Pull request comments
+
+It uses a [GitHub App](https://docs.github.com/en/developers/apps) and requires specifying the following settings:
 
 - `appID` - the app id
 - `installationID` - the app installation id
@@ -46,7 +52,7 @@ stringData:
     -----END RSA PRIVATE KEY-----
 ```
 
-6. Create subscription for your GitHub integration
+1. Create subscription for your GitHub integration
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -54,6 +60,19 @@ kind: Application
 metadata:
   annotations:
     notifications.argoproj.io/subscribe.<trigger-name>.github: ""
+```
+
+By default, the integration updates all configured notification types.
+If you have multiple GitHub notification types configured, you can subscribe to a specific type by setting it as the annotation value:
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.<trigger-name>.github: "status"
+    notifications.argoproj.io/subscribe.<trigger-name>.github: "deployment"
+    notifications.argoproj.io/subscribe.<trigger-name>.github: "comment"
 ```
 
 ## Templates
