@@ -325,136 +325,151 @@ func (g gitHubService) Send(notification Notification, dest Destination) error {
 		return fmt.Errorf("GitHub.repoURL (%s) does not have a `/`", notification.GitHub.repoURL)
 	}
 
-	var (
-		sendStatus     bool
-		sendDeployment bool
-		sendComment    bool
+	// match previous behavior:
+	// send all notifications if a destination is not specified
+	sendAll := dest.Recipient == ""
+
+	if dest.Recipient == "status" || sendAll {
+		err := g.sendStatus(u[0], u[1], notification)
+		if err != nil {
+			return err
+		}
+	}
+
+	if dest.Recipient == "deployment" || sendAll {
+		err := g.sendDeployment(u[0], u[1], notification)
+		if err != nil {
+			return err
+		}
+	}
+
+	if dest.Recipient == "comment" || sendAll {
+		err := g.sendComment(u[0], u[1], notification)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (g gitHubService) sendStatus(owner, repo string, notification Notification) error {
+	if notification.GitHub.Status == nil {
+		return nil
+	}
+
+	// maximum is 140 characters
+	description := trunc(notification.Message, 140)
+	_, _, err := g.client.Repositories.CreateStatus(
+		context.Background(),
+		owner,
+		repo,
+		notification.GitHub.revision,
+		&github.RepoStatus{
+			State:       &notification.GitHub.Status.State,
+			Description: &description,
+			Context:     &notification.GitHub.Status.Label,
+			TargetURL:   &notification.GitHub.Status.TargetURL,
+		},
+	)
+	return err
+}
+
+func (g gitHubService) sendDeployment(owner, repo string, notification Notification) error {
+	if notification.GitHub.Deployment == nil {
+		return nil
+	}
+
+	// maximum is 140 characters
+	description := trunc(notification.Message, 140)
+	deployments, _, err := g.client.Repositories.ListDeployments(
+		context.Background(),
+		owner,
+		repo,
+		&github.DeploymentsListOptions{
+			Ref:         notification.GitHub.revision,
+			Environment: notification.GitHub.Deployment.Environment,
+		},
+	)
+	if err != nil {
+		return err
+	}
+
+	// if no reference is provided, use the revision
+	ref := notification.GitHub.Deployment.Reference
+	if ref == "" {
+		ref = notification.GitHub.revision
+	}
+
+	var deployment *github.Deployment
+	if len(deployments) != 0 {
+		deployment = deployments[0]
+	} else {
+		deployment, _, err = g.client.Repositories.CreateDeployment(
+			context.Background(),
+			owner,
+			repo,
+			&github.DeploymentRequest{
+				Ref:                  &ref,
+				Environment:          &notification.GitHub.Deployment.Environment,
+				RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
+				AutoMerge:            notification.GitHub.Deployment.AutoMerge,
+				TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+	_, _, err = g.client.Repositories.CreateDeploymentStatus(
+		context.Background(),
+		owner,
+		repo,
+		*deployment.ID,
+		&github.DeploymentStatusRequest{
+			State:          &notification.GitHub.Deployment.State,
+			LogURL:         &notification.GitHub.Deployment.LogURL,
+			Description:    &description,
+			Environment:    &notification.GitHub.Deployment.Environment,
+			EnvironmentURL: &notification.GitHub.Deployment.EnvironmentURL,
+		},
 	)
 
-	switch dest.Recipient {
-	case "status":
-		sendStatus = true
-	case "deployment":
-		sendDeployment = true
-	case "comment":
-		sendComment = true
-	default:
-		// match previous behavior: send all notifications if a destination is
-		// not specified
-		sendStatus = true
-		sendDeployment = true
-		sendComment = true
+	return err
+}
+
+func (g gitHubService) sendComment(owner, repo string, notification Notification) error {
+	if notification.GitHub.PullRequestComment == nil {
+		return nil
 	}
 
-	if notification.GitHub.Status != nil && sendStatus {
-		// maximum is 140 characters
-		description := trunc(notification.Message, 140)
-		_, _, err := g.client.Repositories.CreateStatus(
-			context.Background(),
-			u[0],
-			u[1],
-			notification.GitHub.revision,
-			&github.RepoStatus{
-				State:       &notification.GitHub.Status.State,
-				Description: &description,
-				Context:     &notification.GitHub.Status.Label,
-				TargetURL:   &notification.GitHub.Status.TargetURL,
-			},
-		)
-		if err != nil {
-			return err
-		}
+	// maximum is 65536 characters
+	body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
+	comment := &github.IssueComment{
+		Body: &body,
 	}
 
-	if notification.GitHub.Deployment != nil && sendDeployment {
-		// maximum is 140 characters
-		description := trunc(notification.Message, 140)
-		deployments, _, err := g.client.Repositories.ListDeployments(
-			context.Background(),
-			u[0],
-			u[1],
-			&github.DeploymentsListOptions{
-				Ref:         notification.GitHub.revision,
-				Environment: notification.GitHub.Deployment.Environment,
-			},
-		)
-		if err != nil {
-			return err
-		}
-
-		// if no reference is provided, use the revision
-		ref := notification.GitHub.Deployment.Reference
-		if ref == "" {
-			ref = notification.GitHub.revision
-		}
-
-		var deployment *github.Deployment
-		if len(deployments) != 0 {
-			deployment = deployments[0]
-		} else {
-			deployment, _, err = g.client.Repositories.CreateDeployment(
-				context.Background(),
-				u[0],
-				u[1],
-				&github.DeploymentRequest{
-					Ref:                  &ref,
-					Environment:          &notification.GitHub.Deployment.Environment,
-					RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
-					AutoMerge:            notification.GitHub.Deployment.AutoMerge,
-					TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
-				},
-			)
-			if err != nil {
-				return err
-			}
-		}
-		_, _, err = g.client.Repositories.CreateDeploymentStatus(
-			context.Background(),
-			u[0],
-			u[1],
-			*deployment.ID,
-			&github.DeploymentStatusRequest{
-				State:          &notification.GitHub.Deployment.State,
-				LogURL:         &notification.GitHub.Deployment.LogURL,
-				Description:    &description,
-				Environment:    &notification.GitHub.Deployment.Environment,
-				EnvironmentURL: &notification.GitHub.Deployment.EnvironmentURL,
-			},
-		)
-		if err != nil {
-			return err
-		}
+	prs, _, err := g.client.PullRequests.ListPullRequestsWithCommit(
+		context.Background(),
+		owner,
+		repo,
+		notification.GitHub.revision,
+		nil,
+	)
+	if err != nil {
+		return err
 	}
 
-	if notification.GitHub.PullRequestComment != nil && sendComment {
-		// maximum is 65536 characters
-		body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
-		comment := &github.IssueComment{
-			Body: &body,
-		}
-
-		prs, _, err := g.client.PullRequests.ListPullRequestsWithCommit(
+	for _, pr := range prs {
+		_, _, err = g.client.Issues.CreateComment(
 			context.Background(),
-			u[0],
-			u[1],
-			notification.GitHub.revision,
-			nil,
+			owner,
+			repo,
+			pr.GetNumber(),
+			comment,
 		)
 		if err != nil {
 			return err
-		}
-
-		for _, pr := range prs {
-			_, _, err = g.client.Issues.CreateComment(
-				context.Background(),
-				u[0],
-				u[1],
-				pr.GetNumber(),
-				comment,
-			)
-			if err != nil {
-				return err
-			}
 		}
 	}
 
