@@ -65,7 +65,7 @@ func newResource(name string, modifiers ...func(app *unstructured.Unstructured))
 	return &app
 }
 
-func newController(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, *mocks.MockAPI, error) {
+func newController(t *testing.T, ctx context.Context, client dynamic.Interface, factorySupport bool, opts ...Opts) (*notificationController, *mocks.MockAPI, error) {
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -89,7 +89,12 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 
 	go informer.Run(ctx.Done())
 
-	c := NewControllerWithNamespaceSupport(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
+	var c *notificationController
+	if factorySupport {
+		c = NewControllerWithFactorySupport(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
+	} else {
+		c = NewControllerWithNamespaceSupport(resourceClient, informer, &mocks.FakeFactory{Api: mockAPI}, opts...)
+	}
 	if !cache.WaitForCacheSync(ctx.Done(), informer.HasSynced) {
 		return nil, nil, errors.New("failed to sync informers")
 	}
@@ -143,7 +148,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 	}))
 
-	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	ctrl, api, err := newController(t, ctx, newFakeClient(app), false)
 	assert.NoError(t, err)
 
 	receivedObj := map[string]interface{}{}
@@ -175,7 +180,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 		notifiedAnnotationKey: mustToJson(state),
 	}))
-	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	ctrl, api, err := newController(t, ctx, newFakeClient(app), false)
 	assert.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
@@ -198,7 +203,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 		notifiedAnnotationKey: mustToJson(state),
 	}))
-	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	ctrl, api, err := newController(t, ctx, newFakeClient(app), false)
 	assert.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
@@ -214,6 +219,14 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 }
 
 func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
+	controllerRunAndVerifyResult(t, false)
+}
+
+func TestSendsNotificationUsingAPIFromFactory(t *testing.T) {
+	controllerRunAndVerifyResult(t, true)
+}
+
+func controllerRunAndVerifyResult(t *testing.T, factorySupport bool) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
@@ -232,7 +245,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 		patchCh <- action.(kubetesting.PatchAction).GetPatch()
 		return true, nil, nil
 	})
-	ctrl, api, err := newController(t, ctx, client)
+	ctrl, api, err := newController(t, ctx, client, factorySupport)
 	assert.NoError(t, err)
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
@@ -364,7 +377,7 @@ func TestWithEventCallback(t *testing.T) {
 				subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
 			}))
 
-			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
+			ctrl, api, err := newController(t, ctx, newFakeClient(app), false, WithEventCallback(mockEventCallback))
 			ctrl.namespaceSupport = false
 			api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 			assert.NoError(t, err)
