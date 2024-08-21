@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strings"
 	texttemplate "text/template"
 
 	"github.com/opsgenie/opsgenie-go-sdk-v2/alert"
@@ -39,10 +40,18 @@ func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap)
 	if err != nil {
 		return nil, err
 	}
+
+	priority := strings.ToUpper(n.Priority)
+
+	if err := alert.ValidatePriority(alert.Priority(priority)); err != nil {
+		return nil, err
+	}
+
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.Opsgenie == nil {
 			notification.Opsgenie = &OpsgenieNotification{}
 		}
+
 		var descData bytes.Buffer
 		if err := desc.Execute(&descData, vars); err != nil {
 			return err
@@ -58,6 +67,9 @@ func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap)
 			return err
 		}
 		notification.Opsgenie.Note = noteData.String()
+
+		notification.Opsgenie.Priority = priority
+
 		return nil
 	}, nil
 }
@@ -88,7 +100,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 
 	if notification.Opsgenie != nil {
 		if notification.Opsgenie.Description == "" {
-			return fmt.Errorf("Opsgenie notification description is missing")
+			return fmt.Errorf("opsgenie notification description is missing")
 		}
 
 		description = notification.Opsgenie.Description
