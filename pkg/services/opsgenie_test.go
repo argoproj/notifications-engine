@@ -38,6 +38,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 	// Prepare test data
 	name := "testTemplate"
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
+	priority := "P1"
 	aliasTemplate := "Test alias: {{.foo}}"
 	noteTemplate := "Test note: {{.foo}}"
 	f := texttemplate.FuncMap{}
@@ -46,6 +47,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		// Create a new OpsgenieNotification instance
 		notification := OpsgenieNotification{
 			Description: descriptionTemplate,
+			Priority:    priority,
 			Alias:       aliasTemplate,
 			Note:        noteTemplate,
 		}
@@ -71,6 +73,9 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		// Assert that the OpsgenieNotification's description field was correctly updated
 		assert.Equal(t, "Test Opsgenie alert: bar", mockNotification.Opsgenie.Description)
 
+		// Assert that the OpsgenieNotification's priority field was correctly updated
+		assert.Equal(t, "P1", mockNotification.Opsgenie.Priority)
+
 		// Assert that the OpsgenieNotification's alias field was correctly updated
 		assert.Equal(t, "Test alias: bar", mockNotification.Opsgenie.Alias)
 
@@ -82,6 +87,32 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		// Create a new OpsgenieNotification instance with an invalid description template
 		notification := OpsgenieNotification{
 			Description: "{{.invalid", // Invalid template syntax
+		}
+
+		// Call the GetTemplater method with the invalid template
+		_, err := notification.GetTemplater(name, f)
+
+		// Assert that an error occurred during the call
+		assert.Error(t, err)
+	})
+
+	t.Run("InvalidPriorityP0", func(t *testing.T) {
+		// Create a new OpsgenieNotification instance with an invalid priority value
+		notification := OpsgenieNotification{
+			Priority: "P0", // Invalid priority value
+		}
+
+		// Call the GetTemplater method with the invalid template
+		_, err := notification.GetTemplater(name, f)
+
+		// Assert that an error occurred during the call
+		assert.Error(t, err)
+	})
+
+	t.Run("InvalidPriorityP8", func(t *testing.T) {
+		// Create a new OpsgenieNotification instance with an invalid priority value
+		notification := OpsgenieNotification{
+			Priority: "P8", // Invalid priority value
 		}
 
 		// Call the GetTemplater method with the invalid template
@@ -133,6 +164,7 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	recipient := "testRecipient"
 	message := "Test message"
 	descriptionTemplate := "Test Opsgenie alert: {{.foo}}"
+	priority := "P1"
 	aliasTemplate := "Test alias: {{.foo}}"
 	noteTemplate := "Test note: {{.foo}}"
 
@@ -141,6 +173,7 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 		Message: message,
 		Opsgenie: &OpsgenieNotification{
 			Description: descriptionTemplate,
+			Priority:    priority,
 			Alias:       aliasTemplate,
 			Note:        noteTemplate,
 		},
