@@ -37,6 +37,7 @@ type GitHubNotification struct {
 	Status             *GitHubStatus             `json:"status,omitempty"`
 	Deployment         *GitHubDeployment         `json:"deployment,omitempty"`
 	PullRequestComment *GitHubPullRequestComment `json:"pullRequestComment,omitempty"`
+	InstallationID     string                    `json:"installationID,omitempty"`
 	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
 	RevisionPath       string                    `json:"revisionPath,omitempty"`
 }
@@ -73,6 +74,11 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}
 	if g.RevisionPath == "" {
 		g.RevisionPath = revisionTemplate
+	}
+
+	installationID, err := texttemplate.New(name).Funcs(f).Parse(g.InstallationID)
+	if err != nil {
+		return nil, err
 	}
 
 	repoURL, err := texttemplate.New(name).Funcs(f).Parse(g.RepoURLPath)
@@ -142,10 +148,17 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.GitHub == nil {
 			notification.GitHub = &GitHubNotification{
-				RepoURLPath:  g.RepoURLPath,
-				RevisionPath: g.RevisionPath,
+				RepoURLPath:    g.RepoURLPath,
+				RevisionPath:   g.RevisionPath,
+				InstallationID: g.InstallationID,
 			}
 		}
+
+		var installationData bytes.Buffer
+		if err := installationID.Execute(&installationData, vars); err != nil {
+			return err
+		}
+		notification.GitHub.InstallationID = installationData.String()
 
 		var repoData bytes.Buffer
 		if err := repoURL.Execute(&repoData, vars); err != nil {
@@ -284,10 +297,7 @@ func NewGitHubService(opts GitHubOptions) (NotificationService, error) {
 		}
 	}
 
-	return &gitHubService{
-		opts:   opts,
-		client: client,
-	}, nil
+	return &gitHubService{opts: opts, client: client}, nil
 }
 
 type gitHubService struct {
@@ -326,6 +336,48 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if len(u) < 2 {
 		return fmt.Errorf("GitHub.repoURL (%s) does not have a `/`", notification.GitHub.repoURL)
 	}
+	if g.opts.InstallationID == nil {
+		if notification.GitHub.InstallationID == "" {
+			return fmt.Errorf("GitHub Installation ID not found")
+		}
+	}
+	// If an alternate InstallationID is being provided create a new GitHub app client and use that instead
+	if notification.GitHub.InstallationID != "" {
+		url := "https://api.github.com"
+		if g.opts.EnterpriseBaseURL != "" {
+			url = g.opts.EnterpriseBaseURL
+		}
+
+		appID, err := cast.ToInt64E(g.opts.AppID)
+		if err != nil {
+			return nil
+		}
+
+		installationID, err := cast.ToInt64E(g.opts.InstallationID)
+		if err != nil {
+			return nil
+		}
+
+		tr := httputil.NewLoggingRoundTripper(
+			httputil.NewTransport(url, false), log.WithField("service", "github"))
+		itr, err := ghinstallation.New(tr, appID, installationID, []byte(g.opts.PrivateKey))
+		if err != nil {
+			return nil
+		}
+
+		var client *github.Client
+		if g.opts.EnterpriseBaseURL == "" {
+			client = github.NewClient(&http.Client{Transport: itr})
+		} else {
+			itr.BaseURL = g.opts.EnterpriseBaseURL
+			client, err = github.NewEnterpriseClient(g.opts.EnterpriseBaseURL, "", &http.Client{Transport: itr})
+			if err != nil {
+				return nil
+			}
+		}
+		g.client = client
+	}
+
 	if notification.GitHub.Status != nil {
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)

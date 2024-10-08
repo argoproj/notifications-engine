@@ -121,13 +121,29 @@ func TestSend_GitHubService_BadURL(t *testing.T) {
 	assert.ErrorContains(t, e, "does not have a `/`")
 }
 
+func TestGetTemplater_GithubNotification_MissingInstallationID(t *testing.T) {
+	e := gitHubService{}.Send(
+		Notification{
+			GitHub: &GitHubNotification{
+				repoURL: "https://github.com/",
+			},
+		},
+		Destination{
+			Service:   "test",
+			Recipient: "test",
+		},
+	)
+	assert.ErrorContains(t, e, "Installation ID not found")
+}
+
 func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	f := false
 	tr := true
 	n := Notification{
 		GitHub: &GitHubNotification{
-			RepoURLPath:  "{{.sync.spec.git.repo}}",
-			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			InstallationID: "12345",
+			RepoURLPath:    "{{.sync.spec.git.repo}}",
+			RevisionPath:   "{{.sync.status.lastSyncedCommit}}",
 			Deployment: &GitHubDeployment{
 				Reference:            "v0.0.1",
 				State:                "success",
@@ -167,6 +183,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 		return
 	}
 
+	assert.Equal(t, "12345", notification.GitHub.InstallationID)
 	assert.Equal(t, "{{.sync.spec.git.repo}}", notification.GitHub.RepoURLPath)
 	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
 	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
