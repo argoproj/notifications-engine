@@ -95,3 +95,7 @@ template.app-deployed: |
   For more information see the [GitHub Deployment API Docs](https://docs.github.com/en/rest/deployments/deployments?apiVersion=2022-11-28#create-a-deployment).
 - If `github.pullRequestComment.content` is set to 65536 characters or more, it will be truncated.
 - Reference is optional. When set, it will be used as the ref to deploy. If not set, the revision will be used as the ref to deploy.
+
+## Commit Statuses
+
+The [method for generating commit statuses](https://docs.github.com/en/rest/commits/statuses?apiVersion=2022-11-28#create-a-commit-status) only allows a maximum of 1000 attempts using the same commit SHA and context. Once this limit is hit, the API begins to produce validation errors (HTTP 422). The notification engine disregards these errors and labels these notification attempts as completed.
