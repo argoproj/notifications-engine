@@ -489,7 +489,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			}
 		}
 
-		g.client.Checks.UpdateCheckRun(
+		_, _, err = g.client.Checks.UpdateCheckRun(
 			context.Background(),
 			u[0],
 			u[1],
