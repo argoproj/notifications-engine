@@ -181,6 +181,66 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Equal(t, "v0.0.1", notification.GitHub.Deployment.Reference)
 }
 
+func TestGetTemplater_GitHub_CheckRun(t *testing.T) {
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			CheckRun: &GitHubCheckRun{
+				Name:       "test-check-run",
+				Status:     "completed",
+				Conclusion: "success",
+				DetailsURL: "https://example.com/details",
+				Output: &GitHubCheckRunOutput{
+					Title:   "Check Run Title",
+					Summary: "Check Run Summary",
+					Text:    "Check Run Text",
+				},
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+
+	if !assert.NoError(t, err) {
+		t.Fatalf("Failed to get templater: %v", err)
+		return
+	}
+
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{
+		"sync": map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"name": "root-sync-test",
+			},
+			"spec": map[string]interface{}{
+				"git": map[string]interface{}{
+					"repo": "https://github.com/argoproj-labs/argocd-notifications.git",
+				},
+			},
+			"status": map[string]interface{}{
+				"lastSyncedCommit": "0123456789",
+			},
+		},
+	})
+
+	if !assert.NoError(t, err) {
+		t.Fatalf("Failed to execute templater: %v", err)
+		return
+	}
+
+	assert.Equal(t, "{{.sync.spec.git.repo}}", notification.GitHub.RepoURLPath)
+	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
+	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
+	assert.Equal(t, "0123456789", notification.GitHub.revision)
+	assert.Equal(t, "test-check-run", notification.GitHub.CheckRun.Name)
+	assert.Equal(t, "completed", notification.GitHub.CheckRun.Status)
+	assert.Equal(t, "success", notification.GitHub.CheckRun.Conclusion)
+	assert.Equal(t, "https://example.com/details", notification.GitHub.CheckRun.DetailsURL)
+	assert.Equal(t, "Check Run Title", notification.GitHub.CheckRun.Output.Title)
+	assert.Equal(t, "Check Run Summary", notification.GitHub.CheckRun.Output.Summary)
+	assert.Equal(t, "Check Run Text", notification.GitHub.CheckRun.Output.Text)
+}
+
 func TestNewGitHubService_GitHubOptions(t *testing.T) {
 	tests := []struct {
 		name                  string

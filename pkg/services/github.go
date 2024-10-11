@@ -35,6 +35,7 @@ type GitHubNotification struct {
 	repoURL            string
 	revision           string
 	Status             *GitHubStatus             `json:"status,omitempty"`
+	CheckRun           *GitHubCheckRun           `json:"checkRun,omitempty"`
 	Deployment         *GitHubDeployment         `json:"deployment,omitempty"`
 	PullRequestComment *GitHubPullRequestComment `json:"pullRequestComment,omitempty"`
 	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
@@ -45,6 +46,20 @@ type GitHubStatus struct {
 	State     string `json:"state,omitempty"`
 	Label     string `json:"label,omitempty"`
 	TargetURL string `json:"targetURL,omitempty"`
+}
+
+type GitHubCheckRun struct {
+	Name       string                `json:"name,omitempty"`
+	Status     string                `json:"status,omitempty"`
+	Conclusion string                `json:"conclusion,omitempty"`
+	DetailsURL string                `json:"detailsURL,omitempty"`
+	Output     *GitHubCheckRunOutput `json:"output,omitempty"`
+}
+
+type GitHubCheckRunOutput struct {
+	Title   string `json:"title,omitempty"`
+	Summary string `json:"summary,omitempty"`
+	Text    string `json:"text,omitempty"`
 }
 
 type GitHubDeployment struct {
@@ -83,6 +98,47 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	revision, err := texttemplate.New(name).Funcs(f).Parse(g.RevisionPath)
 	if err != nil {
 		return nil, err
+	}
+
+	var checkRunName, checkRunStatus, conclusion, detailsURL, title, summary, text *texttemplate.Template
+	if g.CheckRun != nil {
+		checkRunName, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Name)
+		if err != nil {
+			return nil, err
+		}
+
+		checkRunStatus, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Status)
+		if err != nil {
+			return nil, err
+		}
+
+		conclusion, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Conclusion)
+		if err != nil {
+			return nil, err
+		}
+
+		detailsURL, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.DetailsURL)
+		if err != nil {
+			return nil, err
+		}
+
+		if g.CheckRun.Output != nil {
+			title, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Output.Title)
+			if err != nil {
+				return nil, err
+			}
+
+			summary, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Output.Summary)
+			if err != nil {
+				return nil, err
+			}
+
+			text, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Output.Text)
+			if err != nil {
+				return nil, err
+			}
+		}
+
 	}
 
 	var statusState, label, targetURL *texttemplate.Template
@@ -158,6 +214,60 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			return err
 		}
 		notification.GitHub.revision = revisionData.String()
+
+		if g.CheckRun != nil {
+			if notification.GitHub.CheckRun == nil {
+				notification.GitHub.CheckRun = &GitHubCheckRun{}
+			}
+
+			var nameData bytes.Buffer
+			if err := checkRunName.Execute(&nameData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Name = nameData.String()
+
+			var statusData bytes.Buffer
+			if err := checkRunStatus.Execute(&statusData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Status = statusData.String()
+
+			var conclusionData bytes.Buffer
+			if err := conclusion.Execute(&conclusionData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Conclusion = conclusionData.String()
+
+			var detailsURLData bytes.Buffer
+			if err := detailsURL.Execute(&detailsURLData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.DetailsURL = detailsURLData.String()
+
+			if g.CheckRun.Output != nil {
+				if notification.GitHub.CheckRun.Output == nil {
+					notification.GitHub.CheckRun.Output = &GitHubCheckRunOutput{}
+				}
+
+				var titleData bytes.Buffer
+				if err := title.Execute(&titleData, vars); err != nil {
+					return err
+				}
+				notification.GitHub.CheckRun.Output.Title = titleData.String()
+
+				var summaryData bytes.Buffer
+				if err := summary.Execute(&summaryData, vars); err != nil {
+					return err
+				}
+				notification.GitHub.CheckRun.Output.Summary = summaryData.String()
+
+				var textData bytes.Buffer
+				if err := text.Execute(&textData, vars); err != nil {
+					return err
+				}
+				notification.GitHub.CheckRun.Output.Text = textData.String()
+			}
+		}
 
 		if g.Status != nil {
 			if notification.GitHub.Status == nil {
@@ -341,6 +451,62 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				TargetURL:   &notification.GitHub.Status.TargetURL,
 			},
 		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if notification.GitHub.CheckRun != nil {
+		checkRuns, _, err := g.client.Checks.ListCheckRunsForRef(
+			context.Background(),
+			u[0],
+			u[1],
+			notification.GitHub.revision,
+			&github.ListCheckRunsOptions{
+				CheckName: &notification.GitHub.CheckRun.Name,
+			},
+		)
+
+		if err != nil {
+			return err
+		}
+
+		var checkRun *github.CheckRun
+		if len(checkRuns.CheckRuns) != 0 {
+			checkRun = checkRuns.CheckRuns[0]
+		} else {
+			checkRun, _, err = g.client.Checks.CreateCheckRun(
+				context.Background(),
+				u[0],
+				u[1],
+				github.CreateCheckRunOptions{
+					Name:    notification.GitHub.CheckRun.Name,
+					HeadSHA: notification.GitHub.revision,
+				},
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		g.client.Checks.UpdateCheckRun(
+			context.Background(),
+			u[0],
+			u[1],
+			*checkRun.ID,
+			github.UpdateCheckRunOptions{
+				Name:       notification.GitHub.CheckRun.Name,
+				DetailsURL: &notification.GitHub.CheckRun.DetailsURL,
+				Status:     &notification.GitHub.CheckRun.Status,
+				Conclusion: &notification.GitHub.CheckRun.Conclusion,
+				Output: &github.CheckRunOutput{
+					Title:   &notification.GitHub.CheckRun.Output.Title,
+					Summary: &notification.GitHub.CheckRun.Output.Summary,
+					Text:    &notification.GitHub.CheckRun.Output.Text,
+				},
+			},
+		)
+
 		if err != nil {
 			return err
 		}
