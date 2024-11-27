@@ -192,11 +192,17 @@ type SQSSendMessageAPI interface {
 }
 
 var GetQueueURL = func(c context.Context, api SQSSendMessageAPI, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
-	log.Infof("[GetQueueUrl] queue_name: %s, account_id: %s", *input.QueueName, *input.QueueOwnerAWSAccountId)
+	// QueueName is required, QueueOwnerAWSAccountId is optional
+	accountIdStr := ""
+	if input.QueueOwnerAWSAccountId != nil {
+		accountIdStr = ", account_id: " + *input.QueueOwnerAWSAccountId
+	}
+	log.Infof("[GetQueueUrl] queue_name: %s%s", *input.QueueName, accountIdStr)	
 	return api.GetQueueUrl(c, input)
 }
 
 var SendMsg = func(c context.Context, api SQSSendMessageAPI, input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
+	// QueueUrl & MessageBody are required fields.
 	log.Infof("[SendMsg] queue_url: %s, message_body: %s", *input.QueueUrl, *input.MessageBody)
 	return api.SendMessage(c, input)
 }
