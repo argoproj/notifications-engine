@@ -197,7 +197,7 @@ var GetQueueURL = func(c context.Context, api SQSSendMessageAPI, input *sqs.GetQ
 	if input.QueueOwnerAWSAccountId != nil {
 		accountIdStr = ", account_id: " + *input.QueueOwnerAWSAccountId
 	}
-	log.Infof("[GetQueueUrl] queue_name: %s%s", *input.QueueName, accountIdStr)	
+	log.Infof("[GetQueueUrl] queue_name: %s%s", *input.QueueName, accountIdStr)
 	return api.GetQueueUrl(c, input)
 }
 
