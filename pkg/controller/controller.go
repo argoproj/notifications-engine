@@ -204,7 +204,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 	for trigger, destinations := range destinations {
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
-			logEntry.Debugf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
+			logEntry.Errorf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
 			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace))
 		}
 		logEntry.Infof("Trigger %s result: %v", trigger, res)
