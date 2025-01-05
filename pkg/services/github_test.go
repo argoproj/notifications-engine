@@ -3,6 +3,7 @@ package services
 import (
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -260,4 +261,56 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
 	assert.Equal(t, "0123456789", notification.GitHub.revision)
 	assert.Equal(t, "This is a comment", notification.GitHub.PullRequestComment.Content)
+}
+
+func TestGitHubCheckRunNotification(t *testing.T) {
+	checkRun := &GitHubCheckRun{
+		Name:        "ArgoCD GitHub Check Run",
+		DetailsURL:  "http://example.com/build/status",
+		Status:      "completed",
+		Conclusion:  "success",
+		StartedAt:   time.Now().Format(time.RFC3339),
+		CompletedAt: time.Now().Add(5 * time.Minute).Format(time.RFC3339),
+		Output: &GitHubCheckRunOutput{
+			Title:   "Test Check Run",
+			Summary: "All tests passed.",
+			Text:    "All unit tests and integration tests passed successfully.",
+		},
+	}
+
+	githubNotification := &GitHubNotification{
+		CheckRun: checkRun,
+	}
+
+	vars := map[string]interface{}{
+		"app": map[string]interface{}{
+			"spec": map[string]interface{}{
+				"source": map[string]interface{}{
+					"repoURL": "https://github.com/argoproj/argo-cd.git",
+				},
+			},
+			"status": map[string]interface{}{
+				"operationState": map[string]interface{}{
+					"syncResult": map[string]interface{}{
+						"revision": "abc123",
+					},
+				},
+			},
+		},
+	}
+
+	templater, err := githubNotification.GetTemplater("checkRun", nil)
+	assert.NoError(t, err)
+
+	notification := &Notification{}
+
+	err = templater(notification, vars)
+	assert.NoError(t, err)
+
+	assert.NotNil(t, notification.GitHub)
+	assert.NotNil(t, notification.GitHub.CheckRun)
+	assert.Equal(t, "ArgoCD GitHub Check Run", notification.GitHub.CheckRun.Name)
+	assert.Equal(t, "completed", notification.GitHub.CheckRun.Status)
+	assert.Equal(t, "success", notification.GitHub.CheckRun.Conclusion)
+	assert.Equal(t, "All tests passed.", notification.GitHub.CheckRun.Output.Summary)
 }

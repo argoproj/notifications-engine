@@ -22,6 +22,8 @@ import (
 var slackState = slackutil.NewState(rate.NewLimiter(rate.Inf, 1))
 
 type SlackNotification struct {
+	Username        string                   `json:"username,omitempty"`
+	Icon            string                   `json:"icon,omitempty"`
 	Attachments     string                   `json:"attachments,omitempty"`
 	Blocks          string                   `json:"blocks,omitempty"`
 	GroupingKey     string                   `json:"groupingKey"`
@@ -30,6 +32,16 @@ type SlackNotification struct {
 }
 
 func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	slackUsername, err := texttemplate.New(name).Funcs(f).Parse(n.Username)
+	if err != nil {
+		return nil, err
+	}
+
+	slackIcon, err := texttemplate.New(name).Funcs(f).Parse(n.Icon)
+	if err != nil {
+		return nil, err
+	}
+
 	slackAttachments, err := texttemplate.New(name).Funcs(f).Parse(n.Attachments)
 	if err != nil {
 		return nil, err
@@ -47,6 +59,18 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		if notification.Slack == nil {
 			notification.Slack = &SlackNotification{}
 		}
+		var slackUsernameData bytes.Buffer
+		if err := slackUsername.Execute(&slackUsernameData, vars); err != nil {
+			return err
+		}
+		notification.Slack.Username = slackUsernameData.String()
+
+		var slackIconData bytes.Buffer
+		if err := slackIcon.Execute(&slackIconData, vars); err != nil {
+			return err
+		}
+		notification.Slack.Icon = slackIconData.String()
+
 		var slackAttachmentsData bytes.Buffer
 		if err := slackAttachments.Execute(&slackAttachmentsData, vars); err != nil {
 			return err
@@ -96,18 +120,29 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
 	slackNotification := &SlackNotification{}
 
-	if opts.Username != "" {
+	if notification.Slack != nil && notification.Slack.Username != "" {
+		msgOptions = append(msgOptions, slack.MsgOptionUsername(notification.Slack.Username))
+	} else if opts.Username != "" {
 		msgOptions = append(msgOptions, slack.MsgOptionUsername(opts.Username))
 	}
-	if opts.Icon != "" {
-		if validIconEmoji.MatchString(opts.Icon) {
-			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(opts.Icon))
-		} else if isValidIconURL(opts.Icon) {
-			msgOptions = append(msgOptions, slack.MsgOptionIconURL(opts.Icon))
+
+	if opts.Icon != "" || (notification.Slack != nil && notification.Slack.Icon != "") {
+		var icon string
+		if notification.Slack != nil && notification.Slack.Icon != "" {
+			icon = notification.Slack.Icon
 		} else {
-			log.Warnf("Icon reference '%v' is not a valid emoji or url", opts.Icon)
+			icon = opts.Icon
+		}
+
+		if validIconEmoji.MatchString(icon) {
+			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(icon))
+		} else if isValidIconURL(icon) {
+			msgOptions = append(msgOptions, slack.MsgOptionIconURL(icon))
+		} else {
+			log.Warnf("Icon reference '%v' is not a valid emoji or url", icon)
 		}
 	}
+
 	if notification.Slack != nil {
 		attachments := make([]slack.Attachment, 0)
 		if notification.Slack.Attachments != "" {
