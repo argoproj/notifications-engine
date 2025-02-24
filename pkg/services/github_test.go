@@ -452,3 +452,40 @@ func (m *mockIssuesService) EditComment(ctx context.Context, owner, repo string,
 	}
 	return nil, nil, nil
 }
+
+func TestGitHubService_Send_UpdateExistingComment(t *testing.T) {
+	issues := &mockIssuesService{
+		comments: []*github.IssueComment{
+			{
+				ID:   github.Int64(1),
+				Body: github.String("old comment\n<!-- argocd-notifications test-tag -->"),
+			},
+		},
+	}
+	pulls := &mockPullRequestsService{
+		prs: []*github.PullRequest{{Number: github.Int(1)}},
+	}
+	client := &mockGitHubClientImpl{
+		issues: issues,
+		prs:    pulls,
+		repos:  &mockRepositoriesService{},
+		checks: &mockChecksService{},
+	}
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			PullRequestComment: &GitHubPullRequestComment{
+				Content:    "updated comment",
+				CommentTag: "test-tag",
+			},
+		},
+	}, Destination{})
+
+	assert.NoError(t, err)
+	assert.Len(t, issues.comments, 1)
+	assert.Equal(t, "updated comment\n<!-- argocd-notifications test-tag -->", *issues.comments[0].Body)
+}
