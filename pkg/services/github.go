@@ -78,7 +78,8 @@ type GitHubDeployment struct {
 }
 
 type GitHubPullRequestComment struct {
-	Content string `json:"content,omitempty"`
+	Content    string `json:"content,omitempty"`
+	CommentTag string `json:"commentTag,omitempty"`
 }
 
 const (
@@ -306,6 +307,11 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 				return err
 			}
 			notification.GitHub.PullRequestComment.Content = contentData.String()
+			notification.GitHub.PullRequestComment.CommentTag = g.PullRequestComment.CommentTag
+
+			if g.PullRequestComment.CommentTag != "" {
+				notification.GitHub.PullRequestComment.Content = notification.GitHub.PullRequestComment.Content + "\n<!-- argocd-notifications " + g.PullRequestComment.CommentTag + " -->"
+			}
 		}
 
 		if g.CheckRun != nil {
@@ -528,9 +534,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub.PullRequestComment != nil {
 		// maximum is 65536 characters
 		body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
-		comment := &github.IssueComment{
-			Body: &body,
-		}
+		commentTag := notification.GitHub.PullRequestComment.CommentTag
 
 		prs, _, err := g.client.PullRequests.ListPullRequestsWithCommit(
 			context.Background(),
@@ -544,6 +548,53 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		}
 
 		for _, pr := range prs {
+			if commentTag != "" {
+				// If comment tag is provided, try to find and update existing comment
+				tagPattern := fmt.Sprintf("<!-- argocd-notifications %s -->", commentTag)
+				comments, _, err := g.client.Issues.ListComments(
+					context.Background(),
+					u[0],
+					u[1],
+					pr.GetNumber(),
+					nil,
+				)
+				if err != nil {
+					return err
+				}
+
+				var existingComment *github.IssueComment
+				for _, comment := range comments {
+					if strings.Contains(comment.GetBody(), tagPattern) {
+						existingComment = comment
+						break
+					}
+				}
+
+				if existingComment != nil {
+					// Update existing comment
+					updatedBody := fmt.Sprintf("%s\n%s", body, tagPattern)
+					existingComment.Body = &updatedBody
+					_, _, err = g.client.Issues.EditComment(
+						context.Background(),
+						u[0],
+						u[1],
+						existingComment.GetID(),
+						existingComment,
+					)
+					if err != nil {
+						return err
+					}
+					continue
+				}
+
+				// If no existing comment found, create new one with tag
+				body = fmt.Sprintf("%s\n%s", body, tagPattern)
+			}
+
+			// Create new comment
+			comment := &github.IssueComment{
+				Body: &body,
+			}
 			_, _, err = g.client.Issues.CreateComment(
 				context.Background(),
 				u[0],

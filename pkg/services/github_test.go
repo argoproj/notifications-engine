@@ -263,6 +263,37 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 	assert.Equal(t, "This is a comment", notification.GitHub.PullRequestComment.Content)
 }
 
+func TestGetTemplater_Github_PullRequestCommentWithTag(t *testing.T) {
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			PullRequestComment: &GitHubPullRequestComment{
+				Content:    "This is a comment",
+				CommentTag: "test-tag",
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+	assert.NoError(t, err)
+
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{
+		"sync": map[string]interface{}{
+			"spec": map[string]interface{}{
+				"git": map[string]interface{}{
+					"repo": "https://github.com/owner/repo",
+				},
+			},
+			"status": map[string]interface{}{
+				"lastSyncedCommit": "abc123",
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "This is a comment\n<!-- argocd-notifications test-tag -->", notification.GitHub.PullRequestComment.Content)
+}
+
 func TestGitHubCheckRunNotification(t *testing.T) {
 	checkRun := &GitHubCheckRun{
 		Name:        "ArgoCD GitHub Check Run",
