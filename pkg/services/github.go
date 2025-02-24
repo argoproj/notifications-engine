@@ -85,6 +85,8 @@ type GitHubPullRequestComment struct {
 const (
 	repoURLtemplate  = "{{.app.spec.source.repoURL}}"
 	revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
+	commentTagFormat = "<!-- argocd-notifications %s -->"
+	contentFormat    = "%s\n%s"
 )
 
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -310,7 +312,9 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.PullRequestComment.CommentTag = g.PullRequestComment.CommentTag
 
 			if g.PullRequestComment.CommentTag != "" {
-				notification.GitHub.PullRequestComment.Content = notification.GitHub.PullRequestComment.Content + "\n<!-- argocd-notifications " + g.PullRequestComment.CommentTag + " -->"
+				notification.GitHub.PullRequestComment.Content = fmt.Sprintf(contentFormat,
+					notification.GitHub.PullRequestComment.Content,
+					fmt.Sprintf(commentTagFormat, g.PullRequestComment.CommentTag))
 			}
 		}
 
@@ -599,7 +603,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		for _, pr := range prs {
 			if commentTag != "" {
 				// If comment tag is provided, try to find and update existing comment
-				tagPattern := fmt.Sprintf("<!-- argocd-notifications %s -->", commentTag)
+				tagPattern := fmt.Sprintf(commentTagFormat, commentTag)
 				comments, _, err := g.client.GetIssues().ListComments(
 					context.Background(),
 					u[0],
@@ -621,7 +625,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 
 				if existingComment != nil {
 					// Update existing comment
-					updatedBody := fmt.Sprintf("%s\n%s", body, tagPattern)
+					updatedBody := fmt.Sprintf(contentFormat, body, tagPattern)
 					existingComment.Body = &updatedBody
 					_, _, err = g.client.GetIssues().EditComment(
 						context.Background(),
@@ -637,7 +641,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				}
 
 				// If no existing comment found, create new one with tag
-				body = fmt.Sprintf("%s\n%s", body, tagPattern)
+				body = fmt.Sprintf(contentFormat, body, tagPattern)
 			}
 
 			// Create new comment
