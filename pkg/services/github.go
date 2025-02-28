@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	texttemplate "text/template"
+	"time"
 	"unicode/utf8"
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
@@ -37,12 +38,30 @@ type GitHubNotification struct {
 	PullRequestComment *GitHubPullRequestComment `json:"pullRequestComment,omitempty"`
 	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
 	RevisionPath       string                    `json:"revisionPath,omitempty"`
+	CheckRun           *GitHubCheckRun           `json:"checkRun,omitempty"`
 }
 
 type GitHubStatus struct {
 	State     string `json:"state,omitempty"`
 	Label     string `json:"label,omitempty"`
 	TargetURL string `json:"targetURL,omitempty"`
+}
+
+type GitHubCheckRun struct {
+	// head_sha  - this will be the revision path
+	// external_id - this should have the details of argocd server
+	Name        string                `json:"name,omitempty"`
+	DetailsURL  string                `json:"details_url,omitempty"`
+	Status      string                `json:"status,omitempty"`
+	Conclusion  string                `json:"conclusion,omitempty"`
+	StartedAt   string                `json:"started_at,omitempty"`
+	CompletedAt string                `json:"completed_at,omitempty"`
+	Output      *GitHubCheckRunOutput `json:"output,omitempty"`
+}
+type GitHubCheckRunOutput struct {
+	Title   string `json:"title,omitempty"`
+	Summary string `json:"summary,omitempty"`
+	Text    string `json:"text,omitempty"`
 }
 
 type GitHubDeployment struct {
@@ -132,6 +151,49 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	var pullRequestCommentContent *texttemplate.Template
 	if g.PullRequestComment != nil {
 		pullRequestCommentContent, err = texttemplate.New(name).Funcs(f).Parse(g.PullRequestComment.Content)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var checkRunName, detailsURL, status, conclusion, startedAt, completedAt *texttemplate.Template
+	if g.CheckRun != nil {
+		checkRunName, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Name)
+		if err != nil {
+			return nil, err
+		}
+		detailsURL, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.DetailsURL)
+		if err != nil {
+			return nil, err
+		}
+		status, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Status)
+		if err != nil {
+			return nil, err
+		}
+		conclusion, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Conclusion)
+		if err != nil {
+			return nil, err
+		}
+		startedAt, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.StartedAt)
+		if err != nil {
+			return nil, err
+		}
+		completedAt, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.CompletedAt)
+		if err != nil {
+			return nil, err
+		}
+	}
+	var checkRunTitle, summary, text *texttemplate.Template
+	if g.CheckRun != nil && g.CheckRun.Output != nil {
+		checkRunTitle, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Output.Title)
+		if err != nil {
+			return nil, err
+		}
+		summary, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Output.Summary)
+		if err != nil {
+			return nil, err
+		}
+		text, err = texttemplate.New(name).Funcs(f).Parse(g.CheckRun.Output.Text)
 		if err != nil {
 			return nil, err
 		}
@@ -242,6 +304,63 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 				return err
 			}
 			notification.GitHub.PullRequestComment.Content = contentData.String()
+		}
+
+		if g.CheckRun != nil {
+			if notification.GitHub.CheckRun == nil {
+				notification.GitHub.CheckRun = &GitHubCheckRun{}
+			}
+			var checkRunNameData bytes.Buffer
+			if err := checkRunName.Execute(&checkRunNameData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Name = checkRunNameData.String()
+			var detailsURLData bytes.Buffer
+			if err := detailsURL.Execute(&detailsURLData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.DetailsURL = detailsURLData.String()
+
+			var statusData bytes.Buffer
+			if err := status.Execute(&statusData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Status = statusData.String()
+			var conclusionData bytes.Buffer
+			if err := conclusion.Execute(&conclusionData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Conclusion = conclusionData.String()
+			var startedAtData bytes.Buffer
+			if err := startedAt.Execute(&startedAtData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.StartedAt = startedAtData.String()
+			var completedAtData bytes.Buffer
+			if err := completedAt.Execute(&completedAtData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.CompletedAt = completedAtData.String()
+		}
+		if g.CheckRun != nil && g.CheckRun.Output != nil {
+			if notification.GitHub.CheckRun.Output == nil {
+				notification.GitHub.CheckRun.Output = &GitHubCheckRunOutput{}
+			}
+			var checkRunTitleData bytes.Buffer
+			if err := checkRunTitle.Execute(&checkRunTitleData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Output.Title = checkRunTitleData.String()
+			var summaryData bytes.Buffer
+			if err := summary.Execute(&summaryData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Output.Summary = summaryData.String()
+			var textData bytes.Buffer
+			if err := text.Execute(&textData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.CheckRun.Output.Text = textData.String()
 		}
 
 		return nil
@@ -468,6 +587,45 @@ func (g gitHubService) sendComment(owner, repo string, notification Notification
 			pr.GetNumber(),
 			comment,
 		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if notification.GitHub.CheckRun != nil {
+		startedTime, err := time.Parse("YYYY-MM-DDTHH:MM:SSZ", notification.GitHub.CheckRun.StartedAt)
+		if err != nil {
+			return err
+		}
+		completedTime, err := time.Parse("YYYY-MM-DDTHH:MM:SSZ", notification.GitHub.CheckRun.CompletedAt)
+		if err != nil {
+			return err
+		}
+		externalID := "argocd-notifications"
+		checkRunOutput := &github.CheckRunOutput{}
+		if notification.GitHub.CheckRun.Output != nil {
+			checkRunOutput = &github.CheckRunOutput{
+				Title:   &notification.GitHub.CheckRun.Output.Title,
+				Text:    &notification.GitHub.CheckRun.Output.Text,
+				Summary: &notification.GitHub.CheckRun.Output.Summary,
+			}
+		}
+
+		_, _, err = g.client.Checks.CreateCheckRun(
+			context.Background(),
+			u[0],
+			u[1],
+			github.CreateCheckRunOptions{
+				HeadSHA:     notification.GitHub.revision,
+				ExternalID:  &externalID,
+				Name:        notification.GitHub.CheckRun.Name,
+				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL,
+				StartedAt:   &github.Timestamp{Time: startedTime},
+				CompletedAt: &github.Timestamp{Time: completedTime},
+				Output:      checkRunOutput,
+			},
+		)
+
 		if err != nil {
 			return err
 		}
