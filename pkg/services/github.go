@@ -13,7 +13,7 @@ import (
 
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	giturls "github.com/chainguard-dev/git-urls"
-	"github.com/google/go-github/v41/github"
+	"github.com/google/go-github/v69/github"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 
@@ -397,7 +397,7 @@ func NewGitHubService(opts GitHubOptions) (NotificationService, error) {
 		client = github.NewClient(&http.Client{Transport: itr})
 	} else {
 		itr.BaseURL = opts.EnterpriseBaseURL
-		client, err = github.NewEnterpriseClient(opts.EnterpriseBaseURL, "", &http.Client{Transport: itr})
+		client, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
 		if err != nil {
 			return nil, err
 		}

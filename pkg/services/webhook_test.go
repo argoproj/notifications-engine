@@ -152,8 +152,8 @@ func TestWebhookService_Send_Retry(t *testing.T) {
 		}, Destination{Recipient: "test", Service: "test"})
 
 	// Check if the error is due to a server error after retries
-	if !strings.Contains(err.Error(), "giving up after 4 attempts") {
-		t.Errorf("Expected giving up after 4 attempts, got %v", err)
+	if !strings.Contains(err.Error(), "giving up after 4 attempt(s)") {
+		t.Errorf("Expected 'giving up after 4 attempt(s)' substring, got %v", err)
 	}
 
 	// Check that the mock server received 4 requests

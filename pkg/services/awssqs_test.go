@@ -121,6 +121,7 @@ func TestSetOptions_AwsSqs(t *testing.T) {
 	assert.Equal(t, s.opts.AwsAccess.Key, creds.AccessKeyID)
 	assert.Equal(t, s.opts.AwsAccess.Secret, creds.SecretAccessKey)
 	// Verify custom resolver is used
+	//nolint:staticcheck // SA1019 Migration needed
 	var resolverType aws.EndpointResolverWithOptionsFunc
 	assert.IsType(t, resolverType, options.EndpointResolverWithOptions)
 }
