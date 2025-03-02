@@ -57,7 +57,7 @@ func NewFactory(settings Settings, defaultNamespace string, secretsInformer cach
 		apiMap:       make(map[string]API),
 	}
 
-	_, _ := secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			factory.invalidateIfHasName(settings.SecretName, obj)
 		},
