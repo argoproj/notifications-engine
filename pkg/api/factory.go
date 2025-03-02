@@ -57,7 +57,7 @@ func NewFactory(settings Settings, defaultNamespace string, secretsInformer cach
 		apiMap:       make(map[string]API),
 	}
 
-	_, err := secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ := secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			factory.invalidateIfHasName(settings.SecretName, obj)
 		},
@@ -67,11 +67,8 @@ func NewFactory(settings Settings, defaultNamespace string, secretsInformer cach
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			factory.invalidateIfHasName(settings.SecretName, newObj)
 		}})
-	if err != nil {
-		log.Errorf("Error adding event handler to the secrets informer: %v", err)
-	}
 
-	_, err = cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
+	_, _ = cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
 		AddFunc: func(obj interface{}) {
 			factory.invalidateIfHasName(settings.ConfigMapName, obj)
 		},
@@ -81,9 +78,6 @@ func NewFactory(settings Settings, defaultNamespace string, secretsInformer cach
 		UpdateFunc: func(oldObj, newObj interface{}) {
 			factory.invalidateIfHasName(settings.ConfigMapName, newObj)
 		}})
-	if err != nil {
-		log.Errorf("Error adding event handler to the cm informer: %v", err)
-	}
 
 	return factory
 }

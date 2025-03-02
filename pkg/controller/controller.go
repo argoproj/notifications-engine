@@ -105,7 +105,7 @@ func NewController(
 	opts ...Opts,
 ) *notificationController {
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
-	_, err := informer.AddEventHandler(
+	_, _ = informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -121,9 +121,6 @@ func NewController(
 			},
 		},
 	)
-	if err != nil {
-		log.Errorf("Error adding event handler to the informer: %v", err)
-	}
 
 	ctrl := &notificationController{
 		client:          client,
