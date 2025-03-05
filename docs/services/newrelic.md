@@ -34,7 +34,7 @@ stringData:
   newrelic-apiKey: apiKey
 ```
 
-3. Copy [Application ID](https://docs.newrelic.com/docs/apis/rest-api-v2/get-started/get-app-other-ids-new-relic-one/#apm)
+3. Copy [Application ID](https://docs.newrelic.com/docs/apis/rest-api-v2/get-started/get-app-other-ids-new-relic-one/#apm) or [Application Name](https://docs.newrelic.com/docs/apm/agents/manage-apm-agents/app-naming/name-your-application/#app-alias)
 4. Create subscription for your NewRelic integration
 
 ```yaml
@@ -42,8 +42,13 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   annotations:
-    notifications.argoproj.io/subscribe.<trigger-name>.newrelic: <app-id>
+    notifications.argoproj.io/subscribe.<trigger-name>.newrelic: <app-id> || <app-name>
 ```
+
+**Notes**
+
+- If you use an application name, `app_id` will be looked up by name.
+- If multiple applications matching the application name are returned by NewRelic, then no deployment marker will be created.
 
 ## Templates
 
