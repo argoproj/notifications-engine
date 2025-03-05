@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	texttemplate "text/template"
 
@@ -29,8 +30,10 @@ type NewrelicNotification struct {
 }
 
 var (
-	ErrMissingConfig = errors.New("config is missing")
-	ErrMissingApiKey = errors.New("apiKey is missing")
+	ErrMissingConfig        = errors.New("config is missing")
+	ErrMissingApiKey        = errors.New("apiKey is missing")
+	ErrAppIdMultipleMatches = errors.New("multiple matches found for application name")
+	ErrAppIdNoMatches       = errors.New("no matches found for application name")
 )
 
 func (n *NewrelicNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -116,6 +119,43 @@ type newrelicService struct {
 type newrelicDeploymentMarkerRequest struct {
 	Deployment NewrelicNotification `json:"deployment"`
 }
+type newrelicApplicationsResponse struct {
+	Applications []struct {
+		ID json.Number `json:"id"`
+	} `json:"applications"`
+}
+
+func (s newrelicService) getApplicationId(client *http.Client, appName string) (string, error) {
+	applicationsApi := fmt.Sprintf("%s/v2/applications.json?filter[name]=%s", s.opts.ApiURL, appName)
+	req, err := http.NewRequest(http.MethodGet, applicationsApi, nil)
+	if err != nil {
+		return "", fmt.Errorf("Failed to create filtered application request: %s", err)
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Api-Key", s.opts.ApiKey)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	var data newrelicApplicationsResponse
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		return "", fmt.Errorf("Failed to decode applications response: %s", err)
+	}
+
+	if len(data.Applications) == 0 {
+		return "", ErrAppIdNoMatches
+	}
+
+	if len(data.Applications) > 1 {
+		return "", ErrAppIdMultipleMatches
+	}
+
+	return data.Applications[0].ID.String(), nil
+}
 
 func (s newrelicService) Send(notification Notification, dest Destination) (err error) {
 	if s.opts.ApiKey == "" {
@@ -149,7 +189,22 @@ func (s newrelicService) Send(notification Notification, dest Destination) (err 
 		return err
 	}
 
-	markerApi := fmt.Sprintf(s.opts.ApiURL+"/v2/applications/%s/deployments.json", dest.Recipient)
+	var appId = dest.Recipient
+	if dest.Recipient != "" {
+		_, err := strconv.Atoi(dest.Recipient)
+		if err != nil {
+			log.Debugf(
+				"Recipient was provided by application name. Looking up the application id for %s",
+				dest.Recipient,
+			)
+			appId, err = s.getApplicationId(client, dest.Recipient)
+			if err != nil {
+				log.Errorf("Failed to lookup application %s by name: %s", dest.Recipient, err)
+				return err
+			}
+		}
+	}
+	markerApi := fmt.Sprintf(s.opts.ApiURL+"/v2/applications/%s/deployments.json", appId)
 	req, err := http.NewRequest(http.MethodPost, markerApi, bytes.NewBuffer(jsonValue))
 	if err != nil {
 		log.Errorf("Failed to create deployment marker request: %s", err)
