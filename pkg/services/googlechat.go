@@ -131,6 +131,7 @@ func (c *googlechatClient) sendMessage(message *googleChatMessage, threadKey str
 	if threadKey != "" {
 		q := u.Query()
 		q.Add("threadKey", threadKey)
+		q.Add("messageReplyOption", "REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD")
 		u.RawQuery = q.Encode()
 	}
 	response, err := c.httpClient.Post(u.String(), "application/json", bytes.NewReader(jsonMessage))
