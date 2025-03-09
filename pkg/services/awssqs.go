@@ -109,16 +109,20 @@ func (s awsSqsService) setOptions() []func(*config.LoadOptions) error {
 		if s.opts.Region != "" {
 			endpointRegion = s.opts.Region
 		}
-
+		//nolint:staticcheck // SA1019 Migration needed
 		customResolver := aws.EndpointResolverWithOptionsFunc(s.getCustomResolver(endpointRegion))
+		//nolint:staticcheck // SA1019 Migration needed
 		options = append(options, config.WithEndpointResolverWithOptions(customResolver))
 	}
 	return options
 }
 
+//nolint:staticcheck // SA1019 Migration needed
 func (s awsSqsService) getCustomResolver(endpointRegion string) func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+	//nolint:staticcheck // SA1019 Migration needed
 	return func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 		if service == sqs.ServiceID {
+			//nolint:staticcheck // SA1019 Migration needed
 			return aws.Endpoint{
 				PartitionID:   "aws",
 				URL:           s.opts.EndpointUrl,
@@ -126,6 +130,7 @@ func (s awsSqsService) getCustomResolver(endpointRegion string) func(service, re
 			}, nil
 		}
 		// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
+		//nolint:staticcheck // SA1019 Migration needed
 		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
 	}
 }

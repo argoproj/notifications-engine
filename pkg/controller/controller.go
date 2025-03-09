@@ -104,8 +104,8 @@ func NewController(
 	apiFactory api.Factory,
 	opts ...Opts,
 ) *notificationController {
-	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
-	informer.AddEventHandler(
+	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
+	_, _ = informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
 			AddFunc: func(obj interface{}) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
@@ -157,7 +157,7 @@ func NewControllerWithNamespaceSupport(
 type notificationController struct {
 	client            dynamic.NamespaceableResourceInterface
 	informer          cache.SharedIndexInformer
-	queue             workqueue.RateLimitingInterface
+	queue             workqueue.TypedRateLimitingInterface[string]
 	apiFactory        api.Factory
 	metricsRegistry   *MetricsRegistry
 	skipProcessing    func(obj v1.Object) (bool, string)
@@ -275,14 +275,14 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		c.queue.Done(key)
 	}()
 
-	eventSequence := NotificationEventSequence{Key: key.(string)}
+	eventSequence := NotificationEventSequence{Key: key}
 	defer func() {
 		if c.eventCallback != nil {
 			c.eventCallback(eventSequence)
 		}
 	}()
 
-	obj, exists, err := c.informer.GetIndexer().GetByKey(key.(string))
+	obj, exists, err := c.informer.GetIndexer().GetByKey(key)
 	if err != nil {
 		log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
 		eventSequence.addError(err)
@@ -327,7 +327,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 			c.processResource(api, resource, logEntry, &eventSequence)
 
 			//refresh
-			obj, exists, err := c.informer.GetIndexer().GetByKey(key.(string))
+			obj, exists, err := c.informer.GetIndexer().GetByKey(key)
 			if err != nil {
 				log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
 				eventSequence.addError(err)
