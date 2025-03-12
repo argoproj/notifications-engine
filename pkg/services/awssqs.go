@@ -41,13 +41,14 @@ type awsSqsService struct {
 }
 
 func (s awsSqsService) Send(notif Notification, dest Destination) error {
-	options := s.setOptions()
-	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
+	cfgOptions := s.getConfigOptions()
+	cfg, err := config.LoadDefaultConfig(context.TODO(), cfgOptions...)
 	if err != nil {
 		log.Fatalf("failed to load configuration, %v", err)
 	}
 
-	client := sqs.NewFromConfig(cfg)
+	clientOptions := s.getClientOptions()
+	client := sqs.NewFromConfig(cfg, clientOptions...)
 
 	queueUrl, err := GetQueueURL(context.TODO(), client, s.getQueueInput(dest))
 	if err != nil {
@@ -89,7 +90,7 @@ func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
 	return result
 }
 
-func (s awsSqsService) setOptions() []func(*config.LoadOptions) error {
+func (s awsSqsService) getConfigOptions() []func(*config.LoadOptions) error {
 	// Slice for AWS config options
 	var options []func(*config.LoadOptions) error
 
@@ -103,36 +104,26 @@ func (s awsSqsService) setOptions() []func(*config.LoadOptions) error {
 		options = append(options, config.WithRegion(s.opts.Region))
 	}
 
-	// Useful for testing with localstack
-	if s.opts.EndpointUrl != "" {
-		endpointRegion := os.Getenv("AWS_DEFAULT_REGION")
-		if s.opts.Region != "" {
-			endpointRegion = s.opts.Region
-		}
-		//nolint:staticcheck // SA1019 Migration needed
-		customResolver := aws.EndpointResolverWithOptionsFunc(s.getCustomResolver(endpointRegion))
-		//nolint:staticcheck // SA1019 Migration needed
-		options = append(options, config.WithEndpointResolverWithOptions(customResolver))
-	}
 	return options
 }
 
-//nolint:staticcheck // SA1019 Migration needed
-func (s awsSqsService) getCustomResolver(endpointRegion string) func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-	//nolint:staticcheck // SA1019 Migration needed
-	return func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-		if service == sqs.ServiceID {
-			//nolint:staticcheck // SA1019 Migration needed
-			return aws.Endpoint{
-				PartitionID:   "aws",
-				URL:           s.opts.EndpointUrl,
-				SigningRegion: endpointRegion,
-			}, nil
-		}
-		// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
-		//nolint:staticcheck // SA1019 Migration needed
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+func (s awsSqsService) getClientOptions() []func(*sqs.Options) {
+	clientOptions := []func(o *sqs.Options){}
+	if s.opts.EndpointUrl != "" {
+		clientOptions = append(clientOptions, func(o *sqs.Options) {
+			o.BaseEndpoint = aws.String(s.opts.EndpointUrl)
+		})
 	}
+	endpointRegion := os.Getenv("AWS_DEFAULT_REGION")
+	if s.opts.Region != "" {
+		endpointRegion = s.opts.Region
+	}
+	if endpointRegion != "" {
+		clientOptions = append(clientOptions, func(o *sqs.Options) {
+			o.Region = endpointRegion
+		})
+	}
+	return clientOptions
 }
 
 func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {

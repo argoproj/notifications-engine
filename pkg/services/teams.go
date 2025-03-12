@@ -218,7 +218,7 @@ func teamsNotificationToMessage(n Notification) (*teamsMessage, error) {
 		unmarshalledSections := make([]teamsSection, 2)
 		err := json.Unmarshal([]byte(n.Teams.Sections), &unmarshalledSections)
 		if err != nil {
-			return nil, fmt.Errorf("teams facts unmarshalling error %w", err)
+			return nil, fmt.Errorf("teams sections unmarshalling error %w", err)
 		}
 		message.Sections = unmarshalledSections
 	}
@@ -238,7 +238,7 @@ func teamsNotificationToMessage(n Notification) (*teamsMessage, error) {
 		unmarshalledActions := make([]teamsAction, 2)
 		err := json.Unmarshal([]byte(n.Teams.PotentialAction), &unmarshalledActions)
 		if err != nil {
-			return nil, fmt.Errorf("teams actions unmarshalling error %w", err)
+			return nil, fmt.Errorf("teams potential action unmarshalling error %w", err)
 		}
 		message.PotentialAction = unmarshalledActions
 	}
