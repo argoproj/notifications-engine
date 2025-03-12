@@ -439,7 +439,7 @@ type issuesService interface {
 }
 
 type pullRequestsService interface {
-	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.ListOptions) ([]*github.PullRequest, *github.Response, error)
 }
 
 type repositoriesService interface {
