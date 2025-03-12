@@ -368,7 +368,7 @@ func (m *mockRepositoriesService) ListDeployments(ctx context.Context, owner, re
 }
 
 func (m *mockRepositoriesService) CreateDeployment(ctx context.Context, owner, repo string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
-	return &github.Deployment{ID: github.Int64(1)}, nil, nil
+	return &github.Deployment{ID: github.Ptr(int64(1))}, nil, nil
 }
 
 func (m *mockRepositoriesService) CreateDeploymentStatus(ctx context.Context, owner, repo string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error) {
@@ -396,7 +396,7 @@ func (m *mockGitHubClientImpl) GetChecks() checksService             { return m.
 
 func setupMockServices() (*mockIssuesService, *mockPullRequestsService, githubClient) {
 	issues := &mockIssuesService{comments: []*github.IssueComment{}}
-	pulls := &mockPullRequestsService{prs: []*github.PullRequest{{Number: github.Int(1)}}}
+	pulls := &mockPullRequestsService{prs: []*github.PullRequest{{Number: github.Ptr(1)}}}
 	client := &mockGitHubClientImpl{
 		issues: issues,
 		prs:    pulls,
@@ -429,7 +429,7 @@ func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
 }
 
 // Update mock implementation to match the interface from github.go
-func (m *mockPullRequestsService) ListPullRequestsWithCommit(ctx context.Context, owner, repo, sha string, opts *github.ListOptions) ([]*github.PullRequest, *github.Response, error) {
+func (m *mockPullRequestsService) ListPullRequestsWithCommit(ctx context.Context, owner, repo, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
 	return m.prs, nil, nil
 }
 
@@ -457,13 +457,13 @@ func TestGitHubService_Send_UpdateExistingComment(t *testing.T) {
 	issues := &mockIssuesService{
 		comments: []*github.IssueComment{
 			{
-				ID:   github.Int64(1),
-				Body: github.String("old comment\n<!-- argocd-notifications test-tag -->"),
+				ID:   github.Ptr(int64(1)),
+				Body: github.Ptr("old comment\n<!-- argocd-notifications test-tag -->"),
 			},
 		},
 	}
 	pulls := &mockPullRequestsService{
-		prs: []*github.PullRequest{{Number: github.Int(1)}},
+		prs: []*github.PullRequest{{Number: github.Ptr(1)}},
 	}
 	client := &mockGitHubClientImpl{
 		issues: issues,
