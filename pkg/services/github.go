@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -79,6 +80,15 @@ type GitHubDeployment struct {
 
 type GitHubPullRequestComment struct {
 	Content string `json:"content,omitempty"`
+}
+
+type TooManyCommitStatusesError struct {
+	Sha     string
+	Context string
+}
+
+func (e *TooManyCommitStatusesError) Error() string {
+	return fmt.Sprintf("too many commit statuses for sha %s and context %s", e.Sha, e.Context)
 }
 
 const (
@@ -460,7 +470,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				TargetURL:   &notification.GitHub.Status.TargetURL,
 			},
 		)
-		if err != nil {
+
+		var ghErr *github.ErrorResponse
+		if ok := errors.As(err, &ghErr); ok && ghErr.Response.StatusCode == 422 {
+			return &TooManyCommitStatusesError{Sha: notification.GitHub.revision, Context: notification.GitHub.Status.Label}
+		} else if err != nil {
 			return err
 		}
 	}

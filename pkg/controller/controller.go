@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"reflect"
 	"runtime/debug"
@@ -232,9 +233,16 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 					if err := api.Send(un.Object, cr.Templates, to); err != nil {
 						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
 							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
-						notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
-						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
-						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
+
+						var ghErr *services.TooManyCommitStatusesError
+						if ok := errors.As(err, &ghErr); ok {
+							logEntry.Warnf("We seem to have created too many commit statuses for sha %s and context %s. Abandoning the notification.", ghErr.Sha, ghErr.Context)
+						} else {
+							notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
+							c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
+							eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
+						}
+
 					} else {
 						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
