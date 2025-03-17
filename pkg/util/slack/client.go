@@ -3,6 +3,7 @@ package slack
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	sl "github.com/slack-go/slack"
 	"golang.org/x/time/rate"
@@ -62,6 +63,8 @@ type timestampMap map[string]map[string]string
 type channelMap map[string]string
 
 type state struct {
+	lock sync.Mutex
+
 	Limiter    *rate.Limiter
 	ThreadTSs  timestampMap
 	ChannelIDs channelMap
@@ -85,6 +88,9 @@ func NewThreadedClient(client SlackClient, s *state) *threadedClient {
 }
 
 func (c *threadedClient) getChannelID(recipient string) string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	if id, ok := c.ChannelIDs[recipient]; ok {
 		return id
 	}
@@ -92,6 +98,9 @@ func (c *threadedClient) getChannelID(recipient string) string {
 }
 
 func (c *threadedClient) getThreadTimestamp(recipient string, groupingKey string) string {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	thread, ok := c.ThreadTSs[recipient]
 	if !ok {
 		return ""
@@ -100,6 +109,9 @@ func (c *threadedClient) getThreadTimestamp(recipient string, groupingKey string
 }
 
 func (c *threadedClient) setThreadTimestamp(recipient string, groupingKey string, ts string) {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+
 	thread, ok := c.ThreadTSs[recipient]
 	if !ok {
 		thread = map[string]string{}
@@ -147,7 +159,10 @@ func (c *threadedClient) SendMessage(ctx context.Context, recipient string, grou
 		if groupingKey != "" && ts == "" {
 			c.setThreadTimestamp(recipient, groupingKey, newTs)
 		}
+
+		c.lock.Lock()
 		c.ChannelIDs[recipient] = channelID
+		c.lock.Unlock()
 	}
 
 	return nil

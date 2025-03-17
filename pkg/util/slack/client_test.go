@@ -170,7 +170,14 @@ func TestThreadedClient(t *testing.T) {
 				expectedFunctionCall.MaxTimes(0)
 			}
 
-			client := NewThreadedClient(m, &state{rate.NewLimiter(rate.Inf, 1), tc.threadTSs, channelMap{}})
+			client := NewThreadedClient(
+				m,
+				&state{
+					Limiter:    rate.NewLimiter(rate.Inf, 1),
+					ThreadTSs:  tc.threadTSs,
+					ChannelIDs: channelMap{},
+				},
+			)
 			err := client.SendMessage(context.TODO(), channel, tc.groupingKey, false, tc.policy, []slack.MsgOption{})
 			assert.NoError(t, err)
 			assert.Equal(t, tc.wantThreadTSs, client.ThreadTSs)

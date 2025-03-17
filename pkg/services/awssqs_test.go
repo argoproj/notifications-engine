@@ -98,7 +98,7 @@ func TestSendFail_AwsSqs(t *testing.T) {
 	}
 }
 
-func TestSetOptions_AwsSqs(t *testing.T) {
+func TestGetConfigOptions_AwsSqs(t *testing.T) {
 	s := NewTypedAwsSqsService(AwsSqsOptions{
 		Region: "us-east-1",
 		AwsAccess: AwsAccess{
@@ -109,7 +109,7 @@ func TestSetOptions_AwsSqs(t *testing.T) {
 	})
 
 	options := &config.LoadOptions{}
-	optionsF := SetOptions(s)
+	optionsF := GetConfigOptions(s)
 
 	for _, f := range optionsF {
 		assert.NoError(t, f(options))
@@ -120,12 +120,9 @@ func TestSetOptions_AwsSqs(t *testing.T) {
 	creds, _ := options.Credentials.Retrieve(context.TODO())
 	assert.Equal(t, s.opts.AwsAccess.Key, creds.AccessKeyID)
 	assert.Equal(t, s.opts.AwsAccess.Secret, creds.SecretAccessKey)
-	// Verify custom resolver is used
-	var resolverType aws.EndpointResolverWithOptionsFunc
-	assert.IsType(t, resolverType, options.EndpointResolverWithOptions)
 }
 
-func TestSetOptionsFromEnv_AwsSqs(t *testing.T) {
+func TestGetConfigOptionsFromEnv_AwsSqs(t *testing.T) {
 	// Applying override via parameters instead of the ENV Variables
 	finalKey, finalSecret, finalRegion := "key", "secret", "us-east-1"
 
@@ -135,7 +132,7 @@ func TestSetOptionsFromEnv_AwsSqs(t *testing.T) {
 
 	s := NewTypedAwsSqsService(AwsSqsOptions{})
 
-	options := SetOptions(s)
+	options := GetConfigOptions(s)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
 	assert.NoError(t, err)
 
@@ -146,7 +143,7 @@ func TestSetOptionsFromEnv_AwsSqs(t *testing.T) {
 	assert.Equal(t, finalRegion, cfg.Region)
 }
 
-func TestSetOptionsOverrideCredentials_AwsSqs(t *testing.T) {
+func TestGetConfigOptionsOverrideCredentials_AwsSqs(t *testing.T) {
 	os.Setenv("AWS_ACCESS_KEY_ID", "env_key")
 	os.Setenv("AWS_SECRET_ACCESS_KEY", "env_secret")
 	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
@@ -162,7 +159,7 @@ func TestSetOptionsOverrideCredentials_AwsSqs(t *testing.T) {
 		},
 	})
 
-	options := SetOptions(s)
+	options := GetConfigOptions(s)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
 	assert.NoError(t, err)
 
@@ -173,7 +170,7 @@ func TestSetOptionsOverrideCredentials_AwsSqs(t *testing.T) {
 	assert.Equal(t, finalRegion, cfg.Region)
 }
 
-func TestSetOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
+func TestGetConfigOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	// Will be overridden
 	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
@@ -188,7 +185,7 @@ func TestSetOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 		EndpointUrl: finalEndpoint,
 	})
 
-	options := SetOptions(s)
+	options := GetConfigOptions(s)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
 	assert.NoError(t, err)
 
@@ -198,7 +195,10 @@ func TestSetOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	assert.Equal(t, finalSecret, creds.SecretAccessKey)
 	assert.Equal(t, finalRegion, cfg.Region)
 }
-func TestSetOptionsCustomResolverFunc(t *testing.T) {
+
+func TestGetClientOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
+	// Will be overridden
+	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
 
@@ -211,36 +211,13 @@ func TestSetOptionsCustomResolverFunc(t *testing.T) {
 		EndpointUrl: finalEndpoint,
 	})
 
-	customResolver := s.getCustomResolver(finalRegion)
-	endpoint, err := customResolver(sqs.ServiceID, finalRegion)
-	assert.NoError(t, err)
-	assert.Equal(t, finalEndpoint, endpoint.URL)
-
-}
-
-func TestSetOptionsCustomResolverFuncReturnErr(t *testing.T) {
-
-	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
-
-	s := NewTypedAwsSqsService(AwsSqsOptions{
-		Region: finalRegion,
-		AwsAccess: AwsAccess{
-			Key:    finalKey,
-			Secret: finalSecret,
-		},
-		EndpointUrl: finalEndpoint,
-	})
-
-	customResolver := s.getCustomResolver(finalRegion)
-	_, err := customResolver("NotSQS", finalRegion)
-	assert.Error(t, err)
-	//assert that err is of type aws.EndpointNotFoundError
-	assert.IsType(t, &aws.EndpointNotFoundError{}, err)
-
+	options := GetClientOptions(s)
+	assert.Equal(t, 2, len(options))
 }
 
 // Helpers
-var SetOptions = (*awsSqsService).setOptions
+var GetConfigOptions = (*awsSqsService).getConfigOptions
+var GetClientOptions = (*awsSqsService).getClientOptions
 var SendMessageInput = (*awsSqsService).sendMessageInput
 
 var NewTypedAwsSqsService = func(opts AwsSqsOptions) *awsSqsService {
