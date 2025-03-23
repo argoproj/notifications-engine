@@ -78,12 +78,15 @@ type GitHubDeployment struct {
 }
 
 type GitHubPullRequestComment struct {
-	Content string `json:"content,omitempty"`
+	Content    string `json:"content,omitempty"`
+	CommentTag string `json:"commentTag,omitempty"`
 }
 
 const (
 	repoURLtemplate  = "{{.app.spec.source.repoURL}}"
 	revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
+	commentTagFormat = "<!-- argocd-notifications %s -->"
+	contentFormat    = "%s\n%s"
 )
 
 func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -306,6 +309,13 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 				return err
 			}
 			notification.GitHub.PullRequestComment.Content = contentData.String()
+			notification.GitHub.PullRequestComment.CommentTag = g.PullRequestComment.CommentTag
+
+			if g.PullRequestComment.CommentTag != "" {
+				notification.GitHub.PullRequestComment.Content = fmt.Sprintf(contentFormat,
+					notification.GitHub.PullRequestComment.Content,
+					fmt.Sprintf(commentTagFormat, g.PullRequestComment.CommentTag))
+			}
 		}
 
 		if g.CheckRun != nil {
@@ -369,7 +379,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}, nil
 }
 
-func NewGitHubService(opts GitHubOptions) (NotificationService, error) {
+func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	url := "https://api.github.com"
 	if opts.EnterpriseBaseURL != "" {
 		url = opts.EnterpriseBaseURL
@@ -405,14 +415,63 @@ func NewGitHubService(opts GitHubOptions) (NotificationService, error) {
 
 	return &gitHubService{
 		opts:   opts,
-		client: client,
+		client: &githubClientAdapter{client: client},
 	}, nil
 }
 
 type gitHubService struct {
-	opts GitHubOptions
+	opts   GitHubOptions
+	client githubClient
+}
 
+// Define interfaces for the GitHub client
+type githubClient interface {
+	GetIssues() issuesService
+	GetPullRequests() pullRequestsService
+	GetRepositories() repositoriesService
+	GetChecks() checksService
+}
+
+type issuesService interface {
+	ListComments(ctx context.Context, owner, repo string, number int, opts *github.IssueListCommentsOptions) ([]*github.IssueComment, *github.Response, error)
+	CreateComment(ctx context.Context, owner, repo string, number int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error)
+	EditComment(ctx context.Context, owner, repo string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error)
+}
+
+type pullRequestsService interface {
+	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+}
+
+type repositoriesService interface {
+	CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error)
+	ListDeployments(ctx context.Context, owner, repo string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error)
+	CreateDeployment(ctx context.Context, owner, repo string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error)
+	CreateDeploymentStatus(ctx context.Context, owner, repo string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error)
+}
+
+type checksService interface {
+	CreateCheckRun(ctx context.Context, owner, repo string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error)
+}
+
+// Adapter implementation
+type githubClientAdapter struct {
 	client *github.Client
+}
+
+func (g *githubClientAdapter) GetIssues() issuesService {
+	return g.client.Issues
+}
+
+func (g *githubClientAdapter) GetPullRequests() pullRequestsService {
+	return &pullRequestsServiceAdapter{service: g.client.PullRequests}
+}
+
+func (g *githubClientAdapter) GetRepositories() repositoriesService {
+	return g.client.Repositories
+}
+
+func (g *githubClientAdapter) GetChecks() checksService {
+	return g.client.Checks
 }
 
 func trunc(message string, n int) string {
@@ -448,7 +507,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub.Status != nil {
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
-		_, _, err := g.client.Repositories.CreateStatus(
+		_, _, err := g.client.GetRepositories().CreateStatus(
 			context.Background(),
 			u[0],
 			u[1],
@@ -468,7 +527,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub.Deployment != nil {
 		// maximum is 140 characters
 		description := trunc(notification.Message, 140)
-		deployments, _, err := g.client.Repositories.ListDeployments(
+		deployments, _, err := g.client.GetRepositories().ListDeployments(
 			context.Background(),
 			u[0],
 			u[1],
@@ -491,7 +550,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		if len(deployments) != 0 {
 			deployment = deployments[0]
 		} else {
-			deployment, _, err = g.client.Repositories.CreateDeployment(
+			deployment, _, err = g.client.GetRepositories().CreateDeployment(
 				context.Background(),
 				u[0],
 				u[1],
@@ -507,7 +566,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				return err
 			}
 		}
-		_, _, err = g.client.Repositories.CreateDeploymentStatus(
+		_, _, err = g.client.GetRepositories().CreateDeploymentStatus(
 			context.Background(),
 			u[0],
 			u[1],
@@ -528,11 +587,9 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub.PullRequestComment != nil {
 		// maximum is 65536 characters
 		body := trunc(notification.GitHub.PullRequestComment.Content, 65536)
-		comment := &github.IssueComment{
-			Body: &body,
-		}
+		commentTag := notification.GitHub.PullRequestComment.CommentTag
 
-		prs, _, err := g.client.PullRequests.ListPullRequestsWithCommit(
+		prs, _, err := g.client.GetPullRequests().ListPullRequestsWithCommit(
 			context.Background(),
 			u[0],
 			u[1],
@@ -544,7 +601,54 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		}
 
 		for _, pr := range prs {
-			_, _, err = g.client.Issues.CreateComment(
+			if commentTag != "" {
+				// If comment tag is provided, try to find and update existing comment
+				tagPattern := fmt.Sprintf(commentTagFormat, commentTag)
+				comments, _, err := g.client.GetIssues().ListComments(
+					context.Background(),
+					u[0],
+					u[1],
+					pr.GetNumber(),
+					nil,
+				)
+				if err != nil {
+					return err
+				}
+
+				var existingComment *github.IssueComment
+				for _, comment := range comments {
+					if strings.Contains(comment.GetBody(), tagPattern) {
+						existingComment = comment
+						break
+					}
+				}
+
+				if existingComment != nil {
+					// Update existing comment
+					updatedBody := fmt.Sprintf(contentFormat, body, tagPattern)
+					existingComment.Body = &updatedBody
+					_, _, err = g.client.GetIssues().EditComment(
+						context.Background(),
+						u[0],
+						u[1],
+						existingComment.GetID(),
+						existingComment,
+					)
+					if err != nil {
+						return err
+					}
+					continue
+				}
+
+				// If no existing comment found, create new one with tag
+				body = fmt.Sprintf(contentFormat, body, tagPattern)
+			}
+
+			// Create new comment
+			comment := &github.IssueComment{
+				Body: &body,
+			}
+			_, _, err = g.client.GetIssues().CreateComment(
 				context.Background(),
 				u[0],
 				u[1],
@@ -576,7 +680,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			}
 		}
 
-		_, _, err = g.client.Checks.CreateCheckRun(
+		_, _, err = g.client.GetChecks().CreateCheckRun(
 			context.Background(),
 			u[0],
 			u[1],
@@ -597,4 +701,18 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	return nil
+}
+
+// PullRequestsServiceAdapter adapts GitHub's PullRequestsService to our interface
+type pullRequestsServiceAdapter struct {
+	service *github.PullRequestsService
+}
+
+func (a *pullRequestsServiceAdapter) ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
+	// Convert PullRequestListOptions to ListOptions
+	listOpts := &github.ListOptions{
+		Page:    opts.Page,
+		PerPage: opts.PerPage,
+	}
+	return a.service.ListPullRequestsWithCommit(ctx, owner, repo, sha, listOpts)
 }

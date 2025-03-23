@@ -1,10 +1,12 @@
 package services
 
 import (
+	"context"
 	"testing"
 	"text/template"
 	"time"
 
+	"github.com/google/go-github/v69/github"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -263,6 +265,37 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 	assert.Equal(t, "This is a comment", notification.GitHub.PullRequestComment.Content)
 }
 
+func TestGetTemplater_Github_PullRequestCommentWithTag(t *testing.T) {
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			PullRequestComment: &GitHubPullRequestComment{
+				Content:    "This is a comment",
+				CommentTag: "test-tag",
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+	assert.NoError(t, err)
+
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{
+		"sync": map[string]interface{}{
+			"spec": map[string]interface{}{
+				"git": map[string]interface{}{
+					"repo": "https://github.com/owner/repo",
+				},
+			},
+			"status": map[string]interface{}{
+				"lastSyncedCommit": "abc123",
+			},
+		},
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "This is a comment\n<!-- argocd-notifications test-tag -->", notification.GitHub.PullRequestComment.Content)
+}
+
 func TestGitHubCheckRunNotification(t *testing.T) {
 	checkRun := &GitHubCheckRun{
 		Name:        "ArgoCD GitHub Check Run",
@@ -313,4 +346,146 @@ func TestGitHubCheckRunNotification(t *testing.T) {
 	assert.Equal(t, "completed", notification.GitHub.CheckRun.Status)
 	assert.Equal(t, "success", notification.GitHub.CheckRun.Conclusion)
 	assert.Equal(t, "All tests passed.", notification.GitHub.CheckRun.Output.Summary)
+}
+
+// Mock implementations
+type mockIssuesService struct {
+	comments []*github.IssueComment
+}
+
+type mockPullRequestsService struct {
+	prs []*github.PullRequest
+}
+
+type mockRepositoriesService struct{}
+
+func (m *mockRepositoriesService) CreateStatus(ctx context.Context, owner, repo, ref string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
+	return status, nil, nil
+}
+
+func (m *mockRepositoriesService) ListDeployments(ctx context.Context, owner, repo string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error) {
+	return nil, nil, nil
+}
+
+func (m *mockRepositoriesService) CreateDeployment(ctx context.Context, owner, repo string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
+	return &github.Deployment{ID: github.Ptr(int64(1))}, nil, nil
+}
+
+func (m *mockRepositoriesService) CreateDeploymentStatus(ctx context.Context, owner, repo string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error) {
+	return &github.DeploymentStatus{}, nil, nil
+}
+
+type mockChecksService struct{}
+
+func (m *mockChecksService) CreateCheckRun(ctx context.Context, owner, repo string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+	return &github.CheckRun{}, nil, nil
+}
+
+// Mock client implementation
+type mockGitHubClientImpl struct {
+	issues *mockIssuesService
+	prs    *mockPullRequestsService
+	repos  *mockRepositoriesService
+	checks *mockChecksService
+}
+
+func (m *mockGitHubClientImpl) GetIssues() issuesService             { return m.issues }
+func (m *mockGitHubClientImpl) GetPullRequests() pullRequestsService { return m.prs }
+func (m *mockGitHubClientImpl) GetRepositories() repositoriesService { return m.repos }
+func (m *mockGitHubClientImpl) GetChecks() checksService             { return m.checks }
+
+func setupMockServices() (*mockIssuesService, *mockPullRequestsService, githubClient) {
+	issues := &mockIssuesService{comments: []*github.IssueComment{}}
+	pulls := &mockPullRequestsService{prs: []*github.PullRequest{{Number: github.Ptr(1)}}}
+	client := &mockGitHubClientImpl{
+		issues: issues,
+		prs:    pulls,
+		repos:  &mockRepositoriesService{},
+		checks: &mockChecksService{},
+	}
+	return issues, pulls, client
+}
+
+func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
+	issues, _, client := setupMockServices()
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			PullRequestComment: &GitHubPullRequestComment{
+				Content:    "test comment",
+				CommentTag: "test-tag",
+			},
+		},
+	}, Destination{})
+
+	assert.NoError(t, err)
+	assert.Len(t, issues.comments, 1)
+	assert.Contains(t, *issues.comments[0].Body, "test comment")
+	assert.Contains(t, *issues.comments[0].Body, "<!-- argocd-notifications test-tag -->")
+}
+
+// Update mock implementation to match the interface from github.go
+func (m *mockPullRequestsService) ListPullRequestsWithCommit(ctx context.Context, owner, repo, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
+	return m.prs, nil, nil
+}
+
+// Add these methods back
+func (m *mockIssuesService) ListComments(ctx context.Context, owner, repo string, number int, opts *github.IssueListCommentsOptions) ([]*github.IssueComment, *github.Response, error) {
+	return m.comments, nil, nil
+}
+
+func (m *mockIssuesService) CreateComment(ctx context.Context, owner, repo string, number int, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
+	m.comments = append(m.comments, comment)
+	return comment, nil, nil
+}
+
+func (m *mockIssuesService) EditComment(ctx context.Context, owner, repo string, commentID int64, comment *github.IssueComment) (*github.IssueComment, *github.Response, error) {
+	for i, c := range m.comments {
+		if c.ID != nil && *c.ID == commentID {
+			m.comments[i] = comment
+			return comment, nil, nil
+		}
+	}
+	return nil, nil, nil
+}
+
+func TestGitHubService_Send_UpdateExistingComment(t *testing.T) {
+	issues := &mockIssuesService{
+		comments: []*github.IssueComment{
+			{
+				ID:   github.Ptr(int64(1)),
+				Body: github.Ptr("old comment\n<!-- argocd-notifications test-tag -->"),
+			},
+		},
+	}
+	pulls := &mockPullRequestsService{
+		prs: []*github.PullRequest{{Number: github.Ptr(1)}},
+	}
+	client := &mockGitHubClientImpl{
+		issues: issues,
+		prs:    pulls,
+		repos:  &mockRepositoriesService{},
+		checks: &mockChecksService{},
+	}
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			PullRequestComment: &GitHubPullRequestComment{
+				Content:    "updated comment",
+				CommentTag: "test-tag",
+			},
+		},
+	}, Destination{})
+
+	assert.NoError(t, err)
+	assert.Len(t, issues.comments, 1)
+	assert.Equal(t, "updated comment\n<!-- argocd-notifications test-tag -->", *issues.comments[0].Body)
 }
