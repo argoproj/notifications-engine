@@ -126,7 +126,25 @@ func (c *threadedClient) SendMessage(ctx context.Context, recipient string, grou
 		options = append(options, sl.MsgOptionTS(ts))
 	}
 
-	if ts == "" || policy == Post || policy == PostAndUpdate {
+	// Updating an existing message
+	if ts != "" && (policy == Update || policy == PostAndUpdate) {
+		_, _, err := SendMessageRateLimited(
+			c.Client,
+			ctx,
+			c.Limiter,
+			c.getChannelID(recipient),
+			sl.MsgOptionUpdate(ts),
+			sl.MsgOptionAsUser(true),
+			sl.MsgOptionCompose(options...),
+		)
+		if err != nil {
+			return err
+		}
+		return nil
+	}
+
+	// Posting a new message
+	if policy == Post || policy == PostAndUpdate {
 		newTs, channelID, err := SendMessageRateLimited(
 			c.Client,
 			ctx,
@@ -145,21 +163,6 @@ func (c *threadedClient) SendMessage(ctx context.Context, recipient string, grou
 		c.lock.Lock()
 		c.ChannelIDs[recipient] = channelID
 		c.lock.Unlock()
-	}
-
-	if ts != "" && (policy == Update || policy == PostAndUpdate) {
-		_, _, err := SendMessageRateLimited(
-			c.Client,
-			ctx,
-			c.Limiter,
-			c.getChannelID(recipient),
-			sl.MsgOptionUpdate(ts),
-			sl.MsgOptionAsUser(true),
-			sl.MsgOptionCompose(options...),
-		)
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
