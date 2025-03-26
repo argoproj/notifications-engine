@@ -27,6 +27,7 @@ type Notification struct {
 	Pagerduty    *PagerDutyNotification    `json:"pagerduty,omitempty"`
 	PagerdutyV2  *PagerDutyV2Notification  `json:"pagerdutyv2,omitempty"`
 	Newrelic     *NewrelicNotification     `json:"newrelic,omitempty"`
+	Datadog      *DatadogNotification      `json:"datadog,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -102,6 +103,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.Newrelic != nil {
 		sources = append(sources, n.Newrelic)
+	}
+	if n.Datadog != nil {
+		sources = append(sources, n.Datadog)
 	}
 	return n.getTemplater(name, f, sources)
 }
@@ -223,6 +227,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewWebexService(opts), nil
+	case "datadpg":
+		var opts DatadogOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewDatadogService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
