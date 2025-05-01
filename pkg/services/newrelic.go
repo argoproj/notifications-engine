@@ -32,6 +32,11 @@ var (
 )
 
 func (n *NewrelicNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	revisionTemplate := n.Revision
+	if revisionTemplate == "" {
+		revisionTemplate = "{{.app.status.operationState.syncResult.revision}}"
+	}
+
 	revision, err := texttemplate.New(name).Funcs(f).Parse(revisionTemplate)
 	if err != nil {
 		return nil, err

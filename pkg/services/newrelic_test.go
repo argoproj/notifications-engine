@@ -11,48 +11,94 @@ import (
 )
 
 func TestGetTemplater_Newrelic(t *testing.T) {
-	n := Notification{
-		Newrelic: &NewrelicNotification{
-			Changelog:   "Added: /v2/deployments.rb",
-			Description: "Deployment finished for {{.app.metadata.name}}. Visit: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
-			User:        "{{.context.user}}",
-		},
-	}
-
-	templater, err := n.GetTemplater("newrelic", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	var notification Notification
-
-	err = templater(&notification, map[string]interface{}{
-		"context": map[string]interface{}{
-			"argocdUrl": "https://example.com",
-			"user":      "somebot",
-		},
-		"app": map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"name": "argocd-notifications",
+	t.Run("default revision template", func(t *testing.T) {
+		n := Notification{
+			Newrelic: &NewrelicNotification{
+				Changelog:   "Added: /v2/deployments.rb",
+				Description: "Deployment finished for {{.app.metadata.name}}. Visit: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+				User:        "{{.context.user}}",
 			},
-			"status": map[string]interface{}{
-				"operationState": map[string]interface{}{
-					"syncResult": map[string]interface{}{
-						"revision": "0123456789",
+		}
+
+		templater, err := n.GetTemplater("newrelic", template.FuncMap{})
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		var notification Notification
+
+		err = templater(&notification, map[string]interface{}{
+			"context": map[string]interface{}{
+				"argocdUrl": "https://example.com",
+				"user":      "somebot",
+			},
+			"app": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "argocd-notifications",
+				},
+				"status": map[string]interface{}{
+					"operationState": map[string]interface{}{
+						"syncResult": map[string]interface{}{
+							"revision": "0123456789",
+						},
 					},
 				},
 			},
-		},
+		})
+
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		assert.Equal(t, "0123456789", notification.Newrelic.Revision)
+		assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
+		assert.Equal(t, "Deployment finished for argocd-notifications. Visit: https://example.com/applications/argocd-notifications", notification.Newrelic.Description)
+		assert.Equal(t, "somebot", notification.Newrelic.User)
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	t.Run("custom revision template", func(t *testing.T) {
+		n := Notification{
+			Newrelic: &NewrelicNotification{
+				Revision:    "{{.app.status.custom.revision}}",
+				Changelog:   "Added: /v2/deployments.rb",
+				Description: "Deployment finished for {{.app.metadata.name}}. Visit: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+				User:        "{{.context.user}}",
+			},
+		}
 
-	assert.Equal(t, "0123456789", notification.Newrelic.Revision)
-	assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
-	assert.Equal(t, "Deployment finished for argocd-notifications. Visit: https://example.com/applications/argocd-notifications", notification.Newrelic.Description)
-	assert.Equal(t, "somebot", notification.Newrelic.User)
+		templater, err := n.GetTemplater("newrelic", template.FuncMap{})
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		var notification Notification
+
+		err = templater(&notification, map[string]interface{}{
+			"context": map[string]interface{}{
+				"argocdUrl": "https://example.com",
+				"user":      "somebot",
+			},
+			"app": map[string]interface{}{
+				"metadata": map[string]interface{}{
+					"name": "argocd-notifications",
+				},
+				"status": map[string]interface{}{
+					"custom": map[string]interface{}{
+						"revision": "custom-revision-123",
+					},
+				},
+			},
+		})
+
+		if !assert.NoError(t, err) {
+			return
+		}
+
+		assert.Equal(t, "custom-revision-123", notification.Newrelic.Revision)
+		assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
+		assert.Equal(t, "Deployment finished for argocd-notifications. Visit: https://example.com/applications/argocd-notifications", notification.Newrelic.Description)
+		assert.Equal(t, "somebot", notification.Newrelic.User)
+	})
 }
 
 func TestSend_Newrelic(t *testing.T) {
