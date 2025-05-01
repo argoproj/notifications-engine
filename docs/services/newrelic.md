@@ -2,8 +2,8 @@
 
 ## Parameters
 
-* `apiURL` - the api server url, e.g. https://api.newrelic.com
-* `apiKey` - a [NewRelic ApiKey](https://docs.newrelic.com/docs/apis/rest-api-v2/get-started/introduction-new-relic-rest-api-v2/#api_key)
+- `apiURL` - the api server url, e.g. https://api.newrelic.com
+- `apiKey` - a [NewRelic ApiKey](https://docs.newrelic.com/docs/apis/rest-api-v2/get-started/introduction-new-relic-rest-api-v2/#api_key)
 
 ## Configuration
 
@@ -43,12 +43,14 @@ metadata:
 
 ## Templates
 
-* `description` - __optional__, high-level description of this deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/monitoring/apm-overview-page) page and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select an individual deployment.
-  * Defaults to `message`
-* `changelog` - __optional__, A summary of what changed in this deployment, visible in the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select (selected deployment) > Change log.
-  * Defaults to `{{(call .repo.GetCommitMetadata .app.status.sync.revision).Message}}`
-* `user` - __optional__, A username to associate with the deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page).
-  * Defaults to `{{(call .repo.GetCommitMetadata .app.status.sync.revision).Author}}`
+- `revision` - **optional**, The revision being deployed. Can contain a custom template to extract the revision from your specific application status structure.
+  - Defaults to `{{.app.status.operationState.syncResult.revision}}`
+- `description` - **optional**, high-level description of this deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/monitoring/apm-overview-page) page and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select an individual deployment.
+  - Defaults to `message`
+- `changelog` - **optional**, A summary of what changed in this deployment, visible in the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) page when you select (selected deployment) > Change log.
+  - Defaults to `{{(call .repo.GetCommitMetadata .app.status.sync.revision).Message}}`
+- `user` - **optional**, A username to associate with the deployment, visible in the [Summary](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page) and on the [Deployments](https://docs.newrelic.com/docs/apm/applications-menu/events/deployments-page).
+  - Defaults to `{{(call .repo.GetCommitMetadata .app.status.sync.revision).Author}}`
 
 ```yaml
 context: |
