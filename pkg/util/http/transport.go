@@ -15,7 +15,11 @@ func SetCertResolver(resolver func(serverName string) ([]string, error)) {
 
 func NewTransport(rawURL string, insecureSkipVerify bool) *http.Transport {
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy:               http.ProxyFromEnvironment,
+		MaxIdleConns:        0,
+		MaxIdleConnsPerHost: 0,
+		MaxConnsPerHost:     0,
+		IdleConnTimeout:     0,
 	}
 	if insecureSkipVerify {
 		transport.TLSClientConfig = &tls.Config{
