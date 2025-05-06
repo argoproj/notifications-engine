@@ -26,10 +26,11 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID             interface{} `json:"appID"`
-	InstallationID    interface{} `json:"installationID"`
-	PrivateKey        string      `json:"privateKey"`
-	EnterpriseBaseURL string      `json:"enterpriseBaseURL"`
+	AppID             interface{}                    `json:"appID"`
+	InstallationID    interface{}                    `json:"installationID"`
+	PrivateKey        string                         `json:"privateKey"`
+	EnterpriseBaseURL string                         `json:"enterpriseBaseURL"`
+	Transport         httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type GitHubNotification struct {
@@ -396,7 +397,7 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	}
 
 	tr := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(url, false), log.WithField("service", "github"))
+		httputil.NewTransport(url, opts.Transport), log.WithField("service", "github"))
 	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err

@@ -33,13 +33,13 @@ type AlertmanagerNotification struct {
 
 // AlertmanagerOptions cluster configuration
 type AlertmanagerOptions struct {
-	Targets            []string   `json:"targets"`
-	Scheme             string     `json:"scheme"`
-	APIPath            string     `json:"apiPath"`
-	BasicAuth          *BasicAuth `json:"basicAuth"`
-	BearerToken        string     `json:"bearerToken"`
-	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
-	Timeout            int        `json:"timeout"`
+	Targets     []string                       `json:"targets"`
+	Scheme      string                         `json:"scheme"`
+	APIPath     string                         `json:"apiPath"`
+	BasicAuth   *BasicAuth                     `json:"basicAuth"`
+	BearerToken string                         `json:"bearerToken"`
+	Transport   httputil.HTTPTransportSettings `json:"transport"`
+	Timeout     int                            `json:"timeout"`
 }
 
 // NewAlertmanagerService new service
@@ -207,7 +207,7 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	transport := httputil.NewTransport(rawURL, s.opts.InsecureSkipVerify)
+	transport := httputil.NewTransport(rawURL, s.opts.Transport)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, s.entry),
 	}
