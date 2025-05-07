@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,9 +23,11 @@ func TestGrafana_SuccessfullySendsNotification(t *testing.T) {
 	defer server.Close()
 
 	service := NewGrafanaService(GrafanaOptions{
-		ApiUrl:             server.URL,
-		ApiKey:             "something-secret-but-not-relevant-in-this-test",
-		InsecureSkipVerify: true,
+		ApiUrl: server.URL,
+		ApiKey: "something-secret-but-not-relevant-in-this-test",
+		Transport: httputil.HTTPTransportSettings{
+			InsecureSkipVerify: true,
+		},
 	})
 	err := service.Send(
 		Notification{
@@ -46,9 +50,11 @@ func TestGrafana_UnSuccessfullySendsNotification(t *testing.T) {
 	defer server.Close()
 
 	service := NewGrafanaService(GrafanaOptions{
-		ApiUrl:             server.URL,
-		ApiKey:             "something-secret-but-not-relevant-in-this-test",
-		InsecureSkipVerify: true,
+		ApiUrl: server.URL,
+		ApiKey: "something-secret-but-not-relevant-in-this-test",
+		Transport: httputil.HTTPTransportSettings{
+			InsecureSkipVerify: true,
+		},
 	})
 	err := service.Send(
 		Notification{}, Destination{Recipient: "tag1|tag2", Service: "test-service"})

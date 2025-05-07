@@ -139,7 +139,8 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type TeamsOptions struct {
-	RecipientUrls map[string]string `json:"recipientUrls"`
+	RecipientUrls map[string]string              `json:"recipientUrls"`
+	Transport     httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type teamsService struct {
@@ -155,7 +156,8 @@ func (s teamsService) Send(notification Notification, dest Destination) error {
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
+	s.opts.Transport.InsecureSkipVerify = false
+	transport := httputil.NewTransport(webhookUrl, s.opts.Transport)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "teams")),
 	}

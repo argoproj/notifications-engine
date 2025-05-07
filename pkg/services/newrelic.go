@@ -15,8 +15,9 @@ import (
 )
 
 type NewrelicOptions struct {
-	ApiKey string `json:"apiKey"`
-	ApiURL string `json:"apiURL"`
+	ApiKey    string                         `json:"apiKey"`
+	ApiURL    string                         `json:"apiURL"`
+	Transport httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type NewrelicNotification struct {
@@ -132,9 +133,10 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 		},
 	}
 
+	s.opts.Transport.InsecureSkipVerify = false
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiURL, false), log.WithField("service", dest.Service)),
+			httputil.NewTransport(s.opts.ApiURL, s.opts.Transport), log.WithField("service", dest.Service)),
 	}
 
 	jsonValue, err := json.Marshal(deploymentMarker)

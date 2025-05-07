@@ -80,7 +80,8 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type GoogleChatOptions struct {
-	WebhookUrls map[string]string `json:"webhooks"`
+	WebhookUrls map[string]string              `json:"webhooks"`
+	Transport   httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type googleChatService struct {
@@ -103,10 +104,11 @@ type webhookError struct {
 
 func (s googleChatService) getClient(recipient string) (*googlechatClient, error) {
 	webhookUrl, ok := s.opts.WebhookUrls[recipient]
+	s.opts.Transport.InsecureSkipVerify = false
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
+	transport := httputil.NewTransport(webhookUrl, s.opts.Transport)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "googlechat")),
 	}

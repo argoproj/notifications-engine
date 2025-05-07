@@ -96,14 +96,14 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type SlackOptions struct {
-	Username           string   `json:"username"`
-	Icon               string   `json:"icon"`
-	Token              string   `json:"token"`
-	SigningSecret      string   `json:"signingSecret"`
-	Channels           []string `json:"channels"`
-	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
-	ApiURL             string   `json:"apiURL"`
-	DisableUnfurl      bool     `json:"disableUnfurl"`
+	Username      string                         `json:"username"`
+	Icon          string                         `json:"icon"`
+	Token         string                         `json:"token"`
+	SigningSecret string                         `json:"signingSecret"`
+	Channels      []string                       `json:"channels"`
+	ApiURL        string                         `json:"apiURL"`
+	DisableUnfurl bool                           `json:"disableUnfurl"`
+	Transport     httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type slackService struct {
@@ -196,7 +196,7 @@ func newSlackClient(opts SlackOptions) *slack.Client {
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	transport := httputil.NewTransport(apiURL, opts.InsecureSkipVerify)
+	transport := httputil.NewTransport(apiURL, opts.Transport)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
 	}
