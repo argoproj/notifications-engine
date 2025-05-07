@@ -37,9 +37,9 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type MattermostOptions struct {
-	ApiURL             string `json:"apiURL"`
-	Token              string `json:"token"`
-	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	ApiURL    string                         `json:"apiURL"`
+	Token     string                         `json:"token"`
+	Transport httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type mattermostService struct {
@@ -51,7 +51,7 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) error {
-	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.InsecureSkipVerify)
+	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.Transport)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "mattermost")),
 	}

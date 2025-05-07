@@ -15,8 +15,9 @@ import (
 )
 
 type OpsgenieOptions struct {
-	ApiUrl  string            `json:"apiUrl"`
-	ApiKeys map[string]string `json:"apiKeys"`
+	ApiUrl    string                         `json:"apiUrl"`
+	ApiKeys   map[string]string              `json:"apiKeys"`
+	Transport httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type OpsgenieNotification struct {
@@ -249,12 +250,13 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
+	s.opts.Transport.InsecureSkipVerify = false
 	alertClient, _ := alert.NewClient(&client.Config{
 		ApiKey:         apiKey,
 		OpsGenieAPIURL: client.ApiUrl(s.opts.ApiUrl),
 		HttpClient: &http.Client{
 			Transport: httputil.NewLoggingRoundTripper(
-				httputil.NewTransport(s.opts.ApiUrl, false), log.WithField("service", "opsgenie")),
+				httputil.NewTransport(s.opts.ApiUrl, s.opts.Transport), log.WithField("service", "opsgenie")),
 		},
 	})
 

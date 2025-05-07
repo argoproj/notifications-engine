@@ -382,6 +382,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 
 func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	url := "https://api.github.com"
+	opts.Transport.InsecureSkipVerify = false
 	if opts.EnterpriseBaseURL != "" {
 		url = opts.EnterpriseBaseURL
 	}

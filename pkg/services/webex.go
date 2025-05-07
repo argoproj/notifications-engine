@@ -15,8 +15,9 @@ import (
 )
 
 type WebexOptions struct {
-	Token  string `json:"token"`
-	ApiURL string `json:"apiURL"`
+	Token     string                         `json:"token"`
+	ApiURL    string                         `json:"apiURL"`
+	Transport httputil.HTTPTransportSettings `json:"transport"`
 }
 
 type webexService struct {
@@ -43,9 +44,10 @@ var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 func (w webexService) Send(notification Notification, dest Destination) error {
 	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
+	w.opts.Transport.InsecureSkipVerify = false
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(requestURL, false), log.WithField("service", dest.Service)),
+			httputil.NewTransport(requestURL, w.opts.Transport), log.WithField("service", dest.Service)),
 	}
 
 	message := webexMessage{
