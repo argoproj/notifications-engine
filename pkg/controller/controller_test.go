@@ -188,6 +188,79 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	assert.NoError(t, err)
 }
 
+func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	setAnnotations := func(notifiedAnnoationKeyValue string) func(obj *unstructured.Unstructured) {
+		return withAnnotations(map[string]string{
+			subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+			notifiedAnnotationKey: notifiedAnnoationKeyValue,
+		})
+	}
+
+	state := NotificationsState{}
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, false)
+	app := newResource("test", setAnnotations(mustToJson(state)))
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
+	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(&services.TooManyGitHubCommitStatusesError{Sha: "sha", Context: "context"}).Times(1)
+
+	// First attempt should hit the TooManyCommitStatusesError.
+	// Returned annotations1 should contain the information about processed notification
+	// as a result of hitting the ToomanyCommitStatusesError error.
+	annotations1, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+
+	assert.NoError(t, err)
+
+	// Persist the notification state in the annotations.
+	setAnnotations(annotations1[notifiedAnnotationKey])(app)
+
+	// The second attempt should see that the notification has already been processed
+	// and the value of the notification annotation should not change. In the second attempt api.Send is not called.
+	annotations2, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, annotations1[notifiedAnnotationKey], annotations2[notifiedAnnotationKey])
+}
+
+func TestRetriesNotificationIfSendThrows(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	setAnnotations := func(notifiedAnnoationKeyValue string) func(obj *unstructured.Unstructured) {
+		return withAnnotations(map[string]string{
+			subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+			notifiedAnnotationKey: notifiedAnnoationKeyValue,
+		})
+	}
+
+	state := NotificationsState{}
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, false)
+	app := newResource("test", setAnnotations(mustToJson(state)))
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
+	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("boom")).Times(2)
+
+	// First attempt. The returned annotations should not contain the notification state due to the error.
+	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+
+	assert.NoError(t, err)
+	assert.Empty(t, annotations[notifiedAnnotationKey])
+
+	// Second attempt. The returned annotations should not contain the notification state due to the error.
+	annotations, err = ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+
+	assert.NoError(t, err)
+	assert.Empty(t, annotations[notifiedAnnotationKey])
+}
+
 func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
