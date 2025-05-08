@@ -8,6 +8,7 @@ import (
 	texttemplate "text/template"
 	_ "time/tzdata"
 
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 )
 
@@ -111,6 +112,17 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 // NotificationService defines notification service interface
 type NotificationService interface {
 	Send(notification Notification, dest Destination) error
+}
+
+// HandleSendError inspects the error and signals the caller if the Send operation should be retried.
+func HandleSendError(err error, logEntry *logrus.Entry) (retry bool) {
+	switch e := err.(type) {
+	case *TooManyGitHubCommitStatusesError:
+		logEntry.Warn(e)
+		return false
+	default:
+		return true
+	}
 }
 
 func NewService(serviceType string, optsData []byte) (NotificationService, error) {
