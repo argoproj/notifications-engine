@@ -7,8 +7,6 @@ import (
 	"testing"
 	"text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -43,11 +41,9 @@ func TestSend_Mattermost(t *testing.T) {
 	defer ts.Close()
 
 	service := NewMattermostService(MattermostOptions{
-		ApiURL: ts.URL,
-		Token:  "token",
-		Transport: httputil.HTTPTransportSettings{
-			InsecureSkipVerify: true,
-		},
+		ApiURL:             ts.URL,
+		Token:              "token",
+		InsecureSkipVerify: true,
 	})
 	err := service.Send(Notification{
 		Message: "message",

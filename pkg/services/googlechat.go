@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	texttemplate "text/template"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -80,8 +81,12 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type GoogleChatOptions struct {
-	WebhookUrls map[string]string              `json:"webhooks"`
-	Transport   httputil.HTTPTransportSettings `json:"transport"`
+	WebhookUrls         map[string]string `json:"webhooks"`
+	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
+	MaxIdleConns        int               `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration     `json:"idleConnTimeout"`
 }
 
 type googleChatService struct {
@@ -104,11 +109,10 @@ type webhookError struct {
 
 func (s googleChatService) getClient(recipient string) (*googlechatClient, error) {
 	webhookUrl, ok := s.opts.WebhookUrls[recipient]
-	s.opts.Transport.InsecureSkipVerify = false
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, s.opts.Transport)
+	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, false)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "googlechat")),
 	}

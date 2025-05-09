@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	texttemplate "text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -37,9 +38,13 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type MattermostOptions struct {
-	ApiURL    string                         `json:"apiURL"`
-	Token     string                         `json:"token"`
-	Transport httputil.HTTPTransportSettings `json:"transport"`
+	ApiURL              string        `json:"apiURL"`
+	Token               string        `json:"token"`
+	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
 }
 
 type mattermostService struct {
@@ -51,7 +56,7 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) error {
-	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.Transport)
+	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, m.opts.IdleConnTimeout, m.opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "mattermost")),
 	}

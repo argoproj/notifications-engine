@@ -8,29 +8,21 @@ import (
 	"time"
 )
 
-type HTTPTransportSettings struct {
-	MaxIdleConns        int           `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
-	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
-}
-
 var certResolver func(serverName string) ([]string, error)
 
 func SetCertResolver(resolver func(serverName string) ([]string, error)) {
 	certResolver = resolver
 }
 
-func NewTransport(rawURL string, set HTTPTransportSettings) *http.Transport {
+func NewTransport(rawURL string, maxIdleConns int, maxIdleConnsPerHost int, maxConnsPerHost int, idleConnTimeout time.Duration, insecureSkipVerify bool) *http.Transport {
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		MaxIdleConns:        set.MaxIdleConns,
-		MaxIdleConnsPerHost: set.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     set.MaxConnsPerHost,
-		IdleConnTimeout:     set.IdleConnTimeout,
+		MaxIdleConns:        maxIdleConns,
+		MaxIdleConnsPerHost: maxConnsPerHost,
+		MaxConnsPerHost:     maxConnsPerHost,
+		IdleConnTimeout:     idleConnTimeout,
 	}
-	if set.InsecureSkipVerify {
+	if insecureSkipVerify {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
 		}

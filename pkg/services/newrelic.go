@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	texttemplate "text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -15,9 +16,13 @@ import (
 )
 
 type NewrelicOptions struct {
-	ApiKey    string                         `json:"apiKey"`
-	ApiURL    string                         `json:"apiURL"`
-	Transport httputil.HTTPTransportSettings `json:"transport"`
+	ApiKey              string        `json:"apiKey"`
+	ApiURL              string        `json:"apiURL"`
+	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
 }
 
 type NewrelicNotification struct {
@@ -133,10 +138,9 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 		},
 	}
 
-	s.opts.Transport.InsecureSkipVerify = false
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiURL, s.opts.Transport), log.WithField("service", dest.Service)),
+			httputil.NewTransport(s.opts.ApiURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, false), log.WithField("service", dest.Service)),
 	}
 
 	jsonValue, err := json.Marshal(deploymentMarker)
