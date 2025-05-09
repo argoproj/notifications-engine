@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	texttemplate "text/template"
+	"time"
 
 	"github.com/opsgenie/opsgenie-go-sdk-v2/alert"
 	"github.com/opsgenie/opsgenie-go-sdk-v2/client"
@@ -15,9 +16,13 @@ import (
 )
 
 type OpsgenieOptions struct {
-	ApiUrl    string                         `json:"apiUrl"`
-	ApiKeys   map[string]string              `json:"apiKeys"`
-	Transport httputil.HTTPTransportSettings `json:"transport"`
+	ApiUrl              string            `json:"apiUrl"`
+	ApiKeys             map[string]string `json:"apiKeys"`
+	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
+	MaxIdleConns        int               `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration     `json:"idleConnTimeout"`
 }
 
 type OpsgenieNotification struct {
@@ -250,13 +255,12 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
-	s.opts.Transport.InsecureSkipVerify = false
 	alertClient, _ := alert.NewClient(&client.Config{
 		ApiKey:         apiKey,
 		OpsGenieAPIURL: client.ApiUrl(s.opts.ApiUrl),
 		HttpClient: &http.Client{
 			Transport: httputil.NewLoggingRoundTripper(
-				httputil.NewTransport(s.opts.ApiUrl, s.opts.Transport), log.WithField("service", "opsgenie")),
+				httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, false), log.WithField("service", "opsgenie")),
 		},
 	})
 

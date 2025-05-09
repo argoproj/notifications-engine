@@ -17,9 +17,13 @@ import (
 )
 
 type GrafanaOptions struct {
-	ApiUrl    string                         `json:"apiUrl"`
-	ApiKey    string                         `json:"apiKey"`
-	Transport httputil.HTTPTransportSettings `json:"transport"`
+	ApiUrl              string        `json:"apiUrl"`
+	ApiKey              string        `json:"apiKey"`
+	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
 }
 
 type grafanaService struct {
@@ -51,7 +55,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiUrl, s.opts.Transport), log.WithField("service", "grafana")),
+			httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify), log.WithField("service", "grafana")),
 	}
 
 	jsonValue, _ := json.Marshal(ga)

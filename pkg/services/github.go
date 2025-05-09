@@ -26,11 +26,15 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID             interface{}                    `json:"appID"`
-	InstallationID    interface{}                    `json:"installationID"`
-	PrivateKey        string                         `json:"privateKey"`
-	EnterpriseBaseURL string                         `json:"enterpriseBaseURL"`
-	Transport         httputil.HTTPTransportSettings `json:"transport"`
+	AppID               interface{}   `json:"appID"`
+	InstallationID      interface{}   `json:"installationID"`
+	PrivateKey          string        `json:"privateKey"`
+	EnterpriseBaseURL   string        `json:"enterpriseBaseURL"`
+	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
 }
 
 type GitHubNotification struct {
@@ -382,7 +386,6 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 
 func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	url := "https://api.github.com"
-	opts.Transport.InsecureSkipVerify = false
 	if opts.EnterpriseBaseURL != "" {
 		url = opts.EnterpriseBaseURL
 	}
@@ -398,7 +401,7 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	}
 
 	tr := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(url, opts.Transport), log.WithField("service", "github"))
+		httputil.NewTransport(url, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, opts.IdleConnTimeout, false), log.WithField("service", "github"))
 	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err

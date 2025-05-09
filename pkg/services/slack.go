@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	texttemplate "text/template"
+	"time"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
@@ -96,14 +97,18 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type SlackOptions struct {
-	Username      string                         `json:"username"`
-	Icon          string                         `json:"icon"`
-	Token         string                         `json:"token"`
-	SigningSecret string                         `json:"signingSecret"`
-	Channels      []string                       `json:"channels"`
-	ApiURL        string                         `json:"apiURL"`
-	DisableUnfurl bool                           `json:"disableUnfurl"`
-	Transport     httputil.HTTPTransportSettings `json:"transport"`
+	Username            string        `json:"username"`
+	Icon                string        `json:"icon"`
+	Token               string        `json:"token"`
+	SigningSecret       string        `json:"signingSecret"`
+	Channels            []string      `json:"channels"`
+	ApiURL              string        `json:"apiURL"`
+	DisableUnfurl       bool          `json:"disableUnfurl"`
+	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
 }
 
 type slackService struct {
@@ -196,7 +201,7 @@ func newSlackClient(opts SlackOptions) *slack.Client {
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	transport := httputil.NewTransport(apiURL, opts.Transport)
+	transport := httputil.NewTransport(apiURL, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxIdleConns, opts.IdleConnTimeout, opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
 	}

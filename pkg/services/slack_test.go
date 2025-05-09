@@ -9,7 +9,6 @@ import (
 	"testing"
 	"text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 
 	"github.com/stretchr/testify/assert"
@@ -107,11 +106,9 @@ func TestSlack_SendNotification(t *testing.T) {
 		defer server.Close()
 
 		service := NewSlackService(SlackOptions{
-			ApiURL: server.URL + "/",
-			Token:  "something-token",
-			Transport: httputil.HTTPTransportSettings{
-				InsecureSkipVerify: true,
-			},
+			ApiURL:             server.URL + "/",
+			Token:              "something-token",
+			InsecureSkipVerify: true,
 		})
 
 		err := service.Send(
@@ -141,11 +138,9 @@ func TestSlack_SendNotification(t *testing.T) {
 		defer server.Close()
 
 		service := NewSlackService(SlackOptions{
-			ApiURL: server.URL + "/",
-			Token:  "something-token",
-			Transport: httputil.HTTPTransportSettings{
-				InsecureSkipVerify: true,
-			},
+			ApiURL:             server.URL + "/",
+			Token:              "something-token",
+			InsecureSkipVerify: true,
 		})
 
 		err := service.Send(
@@ -181,11 +176,9 @@ func TestSlack_SendNotification(t *testing.T) {
 		defer server.Close()
 
 		service := NewSlackService(SlackOptions{
-			ApiURL: server.URL + "/",
-			Token:  "something-token",
-			Transport: httputil.HTTPTransportSettings{
-				InsecureSkipVerify: true,
-			},
+			ApiURL:             server.URL + "/",
+			Token:              "something-token",
+			InsecureSkipVerify: true,
 		})
 
 		err := service.Send(
@@ -229,11 +222,9 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 		defer server.Close()
 
 		service := NewSlackService(SlackOptions{
-			ApiURL: server.URL + "/",
-			Token:  "something-token",
-			Transport: httputil.HTTPTransportSettings{
-				InsecureSkipVerify: true,
-			},
+			ApiURL:             server.URL + "/",
+			Token:              "something-token",
+			InsecureSkipVerify: true,
 		})
 
 		err := service.Send(
@@ -267,13 +258,11 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 		defer server.Close()
 
 		service := NewSlackService(SlackOptions{
-			ApiURL:   server.URL + "/",
-			Token:    "something-token",
-			Username: "foo",
-			Icon:     ":smile:",
-			Transport: httputil.HTTPTransportSettings{
-				InsecureSkipVerify: true,
-			},
+			ApiURL:             server.URL + "/",
+			Token:              "something-token",
+			Username:           "foo",
+			Icon:               ":smile:",
+			InsecureSkipVerify: true,
 		})
 
 		err := service.Send(
@@ -308,13 +297,11 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 		defer server.Close()
 
 		service := NewSlackService(SlackOptions{
-			ApiURL:   server.URL + "/",
-			Token:    "something-token",
-			Username: "foo",
-			Icon:     ":smile:",
-			Transport: httputil.HTTPTransportSettings{
-				InsecureSkipVerify: true,
-			},
+			ApiURL:             server.URL + "/",
+			Token:              "something-token",
+			Username:           "foo",
+			Icon:               ":smile:",
+			InsecureSkipVerify: true,
 		})
 
 		err := service.Send(

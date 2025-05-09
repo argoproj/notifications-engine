@@ -9,8 +9,6 @@ import (
 	"testing"
 	"text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-
 	"github.com/stretchr/testify/assert"
 )
 
@@ -26,12 +24,10 @@ func TestWebhook_SuccessfullySendsNotification(t *testing.T) {
 	defer server.Close()
 
 	service := NewWebhookService(WebhookOptions{
-		BasicAuth: &BasicAuth{Username: "testUsername", Password: "testPassword"},
-		URL:       server.URL,
-		Headers:   []Header{{Name: "testHeader", Value: "testHeaderValue"}},
-		Transport: httputil.HTTPTransportSettings{
-			InsecureSkipVerify: true,
-		},
+		BasicAuth:          &BasicAuth{Username: "testUsername", Password: "testPassword"},
+		URL:                server.URL,
+		Headers:            []Header{{Name: "testHeader", Value: "testHeaderValue"}},
+		InsecureSkipVerify: true,
 	})
 	err := service.Send(
 		Notification{
@@ -143,12 +139,10 @@ func TestWebhookService_Send_Retry(t *testing.T) {
 	defer server.Close()
 
 	service := NewWebhookService(WebhookOptions{
-		BasicAuth: &BasicAuth{Username: "testUsername", Password: "testPassword"},
-		URL:       server.URL,
-		Headers:   []Header{{Name: "testHeader", Value: "testHeaderValue"}},
-		Transport: httputil.HTTPTransportSettings{
-			InsecureSkipVerify: true,
-		},
+		BasicAuth:          &BasicAuth{Username: "testUsername", Password: "testPassword"},
+		URL:                server.URL,
+		Headers:            []Header{{Name: "testHeader", Value: "testHeaderValue"}},
+		InsecureSkipVerify: true,
 	})
 	err := service.Send(
 		Notification{
