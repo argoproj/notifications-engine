@@ -5,9 +5,7 @@ import (
 	"strings"
 	texttemplate "text/template"
 
-	"gomodules.xyz/notify"
-	"gomodules.xyz/notify/smtp"
-
+	"github.com/argoproj/notifications-engine/pkg/util/email"
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
@@ -62,13 +60,13 @@ type EmailOptions struct {
 }
 
 type emailService struct {
-	client notify.ByEmail
+	client email.ByEmail
 	html   bool
 }
 
 func NewEmailService(opts EmailOptions) *emailService {
 	return &emailService{
-		client: smtp.New(smtp.Options{
+		client: email.New(email.Options{
 			From:               opts.From,
 			Host:               opts.Host,
 			Port:               opts.Port,
