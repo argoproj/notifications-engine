@@ -223,6 +223,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewWebexService(opts), nil
+	case "nats":
+		var opts NatsOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewNatsService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
