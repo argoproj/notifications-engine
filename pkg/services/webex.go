@@ -85,7 +85,7 @@ func (w webexService) Send(notification Notification, dest Destination) error {
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("unable to read response data: %v", err)
+		return fmt.Errorf("unable to read response data: %w", err)
 	}
 
 	if response.StatusCode != http.StatusOK {
