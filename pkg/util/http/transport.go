@@ -18,7 +18,7 @@ func NewTransport(rawURL string, maxIdleConns int, maxIdleConnsPerHost int, maxC
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
 		MaxIdleConns:        maxIdleConns,
-		MaxIdleConnsPerHost: maxConnsPerHost,
+		MaxIdleConnsPerHost: maxIdleConnsPerHost,
 		MaxConnsPerHost:     maxConnsPerHost,
 		IdleConnTimeout:     idleConnTimeout,
 	}
