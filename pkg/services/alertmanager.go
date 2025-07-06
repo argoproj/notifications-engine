@@ -33,17 +33,17 @@ type AlertmanagerNotification struct {
 
 // AlertmanagerOptions cluster configuration
 type AlertmanagerOptions struct {
-	Targets             []string      `json:"targets"`
-	Scheme              string        `json:"scheme"`
-	APIPath             string        `json:"apiPath"`
-	BasicAuth           *BasicAuth    `json:"basicAuth"`
-	BearerToken         string        `json:"bearerToken"`
-	Timeout             int           `json:"timeout"`
-	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
-	MaxIdleConns        int           `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+	Targets             []string   `json:"targets"`
+	Scheme              string     `json:"scheme"`
+	APIPath             string     `json:"apiPath"`
+	BasicAuth           *BasicAuth `json:"basicAuth"`
+	BearerToken         string     `json:"bearerToken"`
+	Timeout             int        `json:"timeout"`
+	InsecureSkipVerify  bool       `json:"insecureSkipVerify"`
+	MaxIdleConns        int        `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int        `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int        `json:"maxConnsPerHost"`
+	IdleConnTimeout     string     `json:"idleConnTimeout"`
 }
 
 // NewAlertmanagerService new service
@@ -211,7 +211,11 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	transport := httputil.NewTransport(rawURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify)
+	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse idle connection timeout")
+	}
+	transport := httputil.NewTransport(rawURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, s.opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, s.entry),
 	}
