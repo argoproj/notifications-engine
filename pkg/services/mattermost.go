@@ -38,13 +38,13 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type MattermostOptions struct {
-	ApiURL              string        `json:"apiURL"`
-	Token               string        `json:"token"`
-	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
-	MaxIdleConns        int           `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+	ApiURL              string `json:"apiURL"`
+	Token               string `json:"token"`
+	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
+	MaxIdleConns        int    `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
+	IdleConnTimeout     string `json:"idleConnTimeout"`
 }
 
 type mattermostService struct {
@@ -56,7 +56,11 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) error {
-	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, m.opts.IdleConnTimeout, m.opts.InsecureSkipVerify)
+	idleConnTimeout, err := time.ParseDuration(m.opts.IdleConnTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse idle connection timeout")
+	}
+	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, idleConnTimeout, m.opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "mattermost")),
 	}

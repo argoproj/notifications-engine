@@ -145,7 +145,7 @@ type TeamsOptions struct {
 	MaxIdleConns        int               `json:"maxIdleConns"`
 	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
 	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration     `json:"idleConnTimeout"`
+	IdleConnTimeout     string            `json:"idleConnTimeout"`
 }
 
 type teamsService struct {
@@ -161,7 +161,11 @@ func (s teamsService) Send(notification Notification, dest Destination) error {
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, false)
+	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse idle connection timeout")
+	}
+	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "teams")),
 	}

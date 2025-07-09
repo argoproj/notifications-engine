@@ -16,13 +16,13 @@ import (
 )
 
 type WebexOptions struct {
-	Token               string        `json:"token"`
-	ApiURL              string        `json:"apiURL"`
-	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
-	MaxIdleConns        int           `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+	Token               string `json:"token"`
+	ApiURL              string `json:"apiURL"`
+	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
+	MaxIdleConns        int    `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
+	IdleConnTimeout     string `json:"idleConnTimeout"`
 }
 
 type webexService struct {
@@ -49,9 +49,13 @@ var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 func (w webexService) Send(notification Notification, dest Destination) error {
 	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
+	idleConnTimeout, err := time.ParseDuration(w.opts.IdleConnTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse idle connection timeout")
+	}
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(requestURL, w.opts.MaxIdleConns, w.opts.MaxIdleConnsPerHost, w.opts.MaxConnsPerHost, w.opts.IdleConnTimeout, false), log.WithField("service", dest.Service)),
+			httputil.NewTransport(requestURL, w.opts.MaxIdleConns, w.opts.MaxIdleConnsPerHost, w.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", dest.Service)),
 	}
 
 	message := webexMessage{

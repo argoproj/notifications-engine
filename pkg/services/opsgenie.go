@@ -22,7 +22,7 @@ type OpsgenieOptions struct {
 	MaxIdleConns        int               `json:"maxIdleConns"`
 	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
 	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration     `json:"idleConnTimeout"`
+	IdleConnTimeout     string            `json:"idleConnTimeout"`
 }
 
 type OpsgenieNotification struct {
@@ -255,12 +255,16 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
+	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse idle connection timeout")
+	}
 	alertClient, _ := alert.NewClient(&client.Config{
 		ApiKey:         apiKey,
 		OpsGenieAPIURL: client.ApiUrl(s.opts.ApiUrl),
 		HttpClient: &http.Client{
 			Transport: httputil.NewLoggingRoundTripper(
-				httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, false), log.WithField("service", "opsgenie")),
+				httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", "opsgenie")),
 		},
 	})
 
@@ -314,7 +318,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 		}
 	}
 
-	_, err := alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
+	_, err = alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
 		Message:     notification.Message,
 		Description: description,
 		Priority:    priority,
