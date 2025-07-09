@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -22,13 +21,9 @@ func TestGrafana_SuccessfullySendsNotification(t *testing.T) {
 	defer server.Close()
 
 	service := NewGrafanaService(GrafanaOptions{
-		ApiUrl:              server.URL,
-		ApiKey:              "something-secret-but-not-relevant-in-this-test",
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 10,
-		MaxConnsPerHost:     20,
-		IdleConnTimeout:     90 * time.Second,
-		InsecureSkipVerify:  true,
+		ApiUrl:             server.URL,
+		ApiKey:             "something-secret-but-not-relevant-in-this-test",
+		InsecureSkipVerify: true,
 	})
 	err := service.Send(
 		Notification{

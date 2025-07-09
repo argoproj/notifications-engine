@@ -90,7 +90,7 @@ type WebhookOptions struct {
 	MaxIdleConns        int           `json:"maxIdleConns"`
 	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
 	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+	IdleConnTimeout     string        `json:"idleConnTimeout"`
 }
 
 func NewWebhookService(opts WebhookOptions) NotificationService {
@@ -177,8 +177,12 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 		return nil, err
 	}
 
+	idleConnTimeout, err := time.ParseDuration(service.opts.IdleConnTimeout)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse idle connection timeout")
+	}
 	transport := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(r.url, service.opts.MaxIdleConns, service.opts.MaxIdleConnsPerHost, service.opts.MaxConnsPerHost, service.opts.IdleConnTimeout, service.opts.InsecureSkipVerify),
+		httputil.NewTransport(r.url, service.opts.MaxIdleConns, service.opts.MaxIdleConnsPerHost, service.opts.MaxConnsPerHost, idleConnTimeout, service.opts.InsecureSkipVerify),
 		log.WithField("service", r.destService))
 
 	client := retryablehttp.NewClient()

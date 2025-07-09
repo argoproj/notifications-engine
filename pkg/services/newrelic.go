@@ -22,7 +22,7 @@ type NewrelicOptions struct {
 	MaxIdleConns        int           `json:"maxIdleConns"`
 	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
 	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     time.Duration `json:"idleConnTimeout"`
+	IdleConnTimeout     string `json:"idleConnTimeout"`
 }
 
 type NewrelicNotification struct {
@@ -138,9 +138,13 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 		},
 	}
 
+	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
+	if err != nil {
+		return fmt.Errorf("failed to parse idle connection timeout")
+	}
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, false), log.WithField("service", dest.Service)),
+			httputil.NewTransport(s.opts.ApiURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", dest.Service)),
 	}
 
 	jsonValue, err := json.Marshal(deploymentMarker)
