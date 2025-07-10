@@ -112,9 +112,13 @@ func (s googleChatService) getClient(recipient string) (*googlechatClient, error
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
-	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse idle connection timeout")
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		var err error
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
 	client := &http.Client{

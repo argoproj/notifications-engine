@@ -400,9 +400,13 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
-	idleConnTimeout, err := time.ParseDuration(opts.IdleConnTimeout)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse idle connection timeout")
+	var idleConnTimeout time.Duration
+	if opts.IdleConnTimeout != "" {
+		var err error
+		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	tr := httputil.NewLoggingRoundTripper(
 		httputil.NewTransport(url, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", "github"))

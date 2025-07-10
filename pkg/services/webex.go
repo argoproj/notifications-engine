@@ -49,9 +49,13 @@ var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 func (w webexService) Send(notification Notification, dest Destination) error {
 	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
-	idleConnTimeout, err := time.ParseDuration(w.opts.IdleConnTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to parse idle connection timeout")
+	var idleConnTimeout time.Duration
+	if w.opts.IdleConnTimeout != "" {
+		var err error
+		idleConnTimeout, err = time.ParseDuration(w.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
