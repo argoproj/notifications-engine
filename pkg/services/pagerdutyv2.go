@@ -140,13 +140,13 @@ func buildEvent(routingKey string, notification Notification) pagerduty.V2Event 
 		Source:   notification.PagerdutyV2.Source,
 	}
 
-	if len(notification.PagerdutyV2.Component) > 0 {
+	if notification.PagerdutyV2.Component != "" {
 		payload.Component = notification.PagerdutyV2.Component
 	}
-	if len(notification.PagerdutyV2.Group) > 0 {
+	if notification.PagerdutyV2.Group != "" {
 		payload.Group = notification.PagerdutyV2.Group
 	}
-	if len(notification.PagerdutyV2.Class) > 0 {
+	if notification.PagerdutyV2.Class != "" {
 		payload.Class = notification.PagerdutyV2.Class
 	}
 
@@ -157,7 +157,7 @@ func buildEvent(routingKey string, notification Notification) pagerduty.V2Event 
 		Client:     "ArgoCD",
 	}
 
-	if len(notification.PagerdutyV2.URL) > 0 {
+	if notification.PagerdutyV2.URL != "" {
 		event.ClientURL = notification.PagerdutyV2.URL
 	}
 

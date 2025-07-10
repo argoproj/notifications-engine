@@ -9,7 +9,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	runtimeutil "k8s.io/apimachinery/pkg/util/runtime"
@@ -39,7 +39,7 @@ type NotificationEventSequence struct {
 	// Key is the resource key. Format is the namespaced name
 	Key string
 	// Resource is the resource that was being processed when the event occurred
-	Resource v1.Object
+	Resource metav1.Object
 	// Delivered is a list of notifications that were delivered
 	Delivered []NotificationDelivery
 	// Errors is a list of errors that occurred during the processing iteration
@@ -66,7 +66,7 @@ type NotificationController interface {
 
 type Opts func(ctrl *notificationController)
 
-func WithToUnstructured(f func(obj v1.Object) (*unstructured.Unstructured, error)) Opts {
+func WithToUnstructured(f func(obj metav1.Object) (*unstructured.Unstructured, error)) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.toUnstructured = f
 	}
@@ -78,13 +78,13 @@ func WithMetricsRegistry(r *MetricsRegistry) Opts {
 	}
 }
 
-func WithAlterDestinations(f func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations) Opts {
+func WithAlterDestinations(f func(obj metav1.Object, destinations services.Destinations, cfg api.Config) services.Destinations) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.alterDestinations = f
 	}
 }
 
-func WithSkipProcessing(f func(obj v1.Object) (bool, string)) Opts {
+func WithSkipProcessing(f func(obj metav1.Object) (bool, string)) Opts {
 	return func(ctrl *notificationController) {
 		ctrl.skipProcessing = f
 	}
@@ -128,10 +128,10 @@ func NewController(
 		queue:           queue,
 		metricsRegistry: NewMetricsRegistry(""),
 		apiFactory:      apiFactory,
-		toUnstructured: func(obj v1.Object) (*unstructured.Unstructured, error) {
+		toUnstructured: func(obj metav1.Object) (*unstructured.Unstructured, error) {
 			res, ok := obj.(*unstructured.Unstructured)
 			if !ok {
-				return nil, fmt.Errorf("Object must be *unstructured.Unstructured but was: %v", res)
+				return nil, fmt.Errorf("object must be *unstructured.Unstructured but was: %v", res)
 			}
 			return res, nil
 		},
@@ -160,9 +160,9 @@ type notificationController struct {
 	queue             workqueue.TypedRateLimitingInterface[string]
 	apiFactory        api.Factory
 	metricsRegistry   *MetricsRegistry
-	skipProcessing    func(obj v1.Object) (bool, string)
-	alterDestinations func(obj v1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
-	toUnstructured    func(obj v1.Object) (*unstructured.Unstructured, error)
+	skipProcessing    func(obj metav1.Object) (bool, string)
+	alterDestinations func(obj metav1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
+	toUnstructured    func(obj metav1.Object) (*unstructured.Unstructured, error)
 	eventCallback     func(eventSequence NotificationEventSequence)
 	namespaceSupport  bool
 }
@@ -187,7 +187,7 @@ func (c *notificationController) isSelfServiceConfigureApi(api api.API) bool {
 	return c.namespaceSupport && api.GetConfig().IsSelfServiceConfig
 }
 
-func (c *notificationController) processResourceWithAPI(api api.API, resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
+func (c *notificationController) processResourceWithAPI(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
 	apiNamespace := api.GetConfig().Namespace
 	notificationsState := NewStateFromRes(resource)
 
@@ -252,7 +252,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 	return notificationsState.Persist(resource)
 }
 
-func (c *notificationController) getDestinations(resource v1.Object, cfg api.Config) services.Destinations {
+func (c *notificationController) getDestinations(resource metav1.Object, cfg api.Config) services.Destinations {
 	res := cfg.GetGlobalDestinations(resource.GetLabels())
 	res.Merge(subscriptions.NewAnnotations(resource.GetAnnotations()).GetDestinations(cfg.DefaultTriggers, cfg.ServiceDefaultTriggers))
 	if c.alterDestinations != nil {
@@ -292,7 +292,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		// This happens after resource was deleted, but the work queue still had an entry for it.
 		return
 	}
-	resource, ok := obj.(v1.Object)
+	resource, ok := obj.(metav1.Object)
 	if !ok {
 		log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
 		eventSequence.addError(err)
@@ -326,7 +326,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 		for _, api := range apisWithNamespace {
 			c.processResource(api, resource, logEntry, &eventSequence)
 
-			//refresh
+			// refresh
 			obj, exists, err := c.informer.GetIndexer().GetByKey(key)
 			if err != nil {
 				log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
@@ -337,7 +337,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 				// This happens after resource was deleted, but the work queue still had an entry for it.
 				return
 			}
-			resource, ok = obj.(v1.Object)
+			resource, ok = obj.(metav1.Object)
 			if !ok {
 				log.Errorf("Failed to get resource '%s' from informer index: %+v", key, err)
 				eventSequence.addError(err)
@@ -350,7 +350,7 @@ func (c *notificationController) processQueueItem() (processNext bool) {
 	return
 }
 
-func (c *notificationController) processResource(api api.API, resource v1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) {
+func (c *notificationController) processResource(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) {
 	annotations, err := c.processResourceWithAPI(api, resource, logEntry, eventSequence)
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
@@ -377,7 +377,7 @@ func (c *notificationController) processResource(api api.API, resource v1.Object
 			eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %w", err))
 			return
 		}
-		resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
+		resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, metav1.PatchOptions{})
 		if err != nil {
 			logEntry.Errorf("Failed to patch resource: %v", err)
 			eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %w", err))

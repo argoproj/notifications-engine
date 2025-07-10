@@ -20,7 +20,7 @@ func CopyServicesDocs(dest string) ([]string, error) {
 		}
 		destName := filepath.Join(dest, entry.Name())
 		destDir := filepath.Dir(entry.Name())
-		if err := os.MkdirAll(destDir, 0755); err != nil {
+		if err := os.MkdirAll(destDir, 0o755); err != nil {
 			return nil, err
 		}
 
@@ -28,7 +28,7 @@ func CopyServicesDocs(dest string) ([]string, error) {
 		if err != nil {
 			return nil, err
 		}
-		err = os.WriteFile(destName, data, 0755)
+		err = os.WriteFile(destName, data, 0o755)
 		if err != nil {
 			return nil, err
 		}
