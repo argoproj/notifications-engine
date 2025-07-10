@@ -161,9 +161,13 @@ func (s teamsService) Send(notification Notification, dest Destination) error {
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to parse idle connection timeout")
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		var err error
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
 	client := &http.Client{

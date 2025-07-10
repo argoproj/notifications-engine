@@ -56,9 +56,13 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) error {
-	idleConnTimeout, err := time.ParseDuration(m.opts.IdleConnTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to parse idle connection timeout")
+	var idleConnTimeout time.Duration
+	if m.opts.IdleConnTimeout != "" {
+		var err error
+		idleConnTimeout, err = time.ParseDuration(m.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, idleConnTimeout, m.opts.InsecureSkipVerify)
 	client := &http.Client{

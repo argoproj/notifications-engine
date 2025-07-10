@@ -138,9 +138,13 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 		},
 	}
 
-	idleConnTimeout, err := time.ParseDuration(s.opts.IdleConnTimeout)
-	if err != nil {
-		return fmt.Errorf("failed to parse idle connection timeout")
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		var err error
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(

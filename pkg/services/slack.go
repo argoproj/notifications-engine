@@ -201,7 +201,10 @@ func newSlackClient(opts SlackOptions) *slack.Client {
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	idleConnTimeout, _ := time.ParseDuration(opts.IdleConnTimeout)
+	var idleConnTimeout time.Duration
+	if opts.IdleConnTimeout != "" {
+		idleConnTimeout, _ = time.ParseDuration(opts.IdleConnTimeout)
+	}
 	transport := httputil.NewTransport(apiURL, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxIdleConns, idleConnTimeout, opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
