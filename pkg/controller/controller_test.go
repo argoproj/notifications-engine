@@ -66,6 +66,7 @@ func newResource(name string, modifiers ...func(app *unstructured.Unstructured))
 }
 
 func newController(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, *mocks.MockAPI, error) {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -98,6 +99,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 }
 
 func newControllerWithNamespaceSupport(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, map[string]notificationApi.API, error) {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -340,7 +342,7 @@ func TestWithEventCallback(t *testing.T) {
 			description: "EventCallback should be invoked with non-nil error on send failure",
 			sendErr:     errors.New("this is a send error"),
 			expectedErrors: []error{
-				errors.New("failed to deliver notification my-trigger to {mock recipient}: this is a send error using the configuration in namespace "),
+				fmt.Errorf("failed to deliver notification my-trigger to {mock recipient}: %w using the configuration in namespace ", errors.New("this is a send error")),
 			},
 		},
 		{
@@ -483,5 +485,4 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 		assert.Equal(t, expectedDeliveries[i].Trigger, event.Trigger)
 		assert.Equal(t, expectedDeliveries[i].Destination, event.Destination)
 	}
-
 }

@@ -99,7 +99,7 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 			name := strings.Join(parts[1:], ".")
 			template := services.Notification{}
 			if err := yaml.Unmarshal([]byte(v), &template); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal template %s: %v", name, err)
+				return nil, fmt.Errorf("failed to unmarshal template %s: %w", name, err)
 			}
 			cfg.Templates[name] = template
 		case strings.HasPrefix(k, "service."):
@@ -116,7 +116,7 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 
 			optsData, err := replaceServiceConfigSecrets(v, secret)
 			if err != nil {
-				return nil, fmt.Errorf("failed to render service configuration %s: %v", serviceType, err)
+				return nil, fmt.Errorf("failed to render service configuration %s: %w", serviceType, err)
 			}
 
 			cfg.Services[name] = func() (services.NotificationService, error) {
@@ -126,14 +126,14 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 			name := strings.Join(parts[1:], ".")
 			var trigger []triggers.Condition
 			if err := yaml.Unmarshal([]byte(v), &trigger); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal trigger %s: %v", name, err)
+				return nil, fmt.Errorf("failed to unmarshal trigger %s: %w", name, err)
 			}
 			cfg.Triggers[name] = trigger
 		case strings.HasPrefix(k, "defaultTriggers."):
 			name := strings.Join(parts[1:], ".")
 			var defaultTriggers []string
 			if err := yaml.Unmarshal([]byte(v), &defaultTriggers); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal default trigger %s: %v", name, err)
+				return nil, fmt.Errorf("failed to unmarshal default trigger %s: %w", name, err)
 			}
 			cfg.ServiceDefaultTriggers[name] = defaultTriggers
 		}
