@@ -178,7 +178,6 @@ func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
 		return nil, err
 	}
 	return f.getApiFromConfigmapAndSecret(cm, secret)
-
 }
 
 func (f *apiFactory) getApiFromConfigmapAndSecret(cm *v1.ConfigMap, secret *v1.Secret) (API, error) {

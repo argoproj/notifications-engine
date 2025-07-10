@@ -97,7 +97,7 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 		attachments := make([]models.Attachment, 0)
 		if notification.RocketChat.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.RocketChat.Attachments), &attachments); err != nil {
-				return fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.RocketChat.Attachments, err)
+				return fmt.Errorf("failed to unmarshal attachments '%s' : %w", notification.RocketChat.Attachments, err)
 			}
 		}
 

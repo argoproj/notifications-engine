@@ -72,7 +72,7 @@ func (m *mattermostService) Send(notification Notification, dest Destination) (e
 	if notification.Mattermost != nil {
 		if notification.Mattermost.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.Mattermost.Attachments), &attachments); err != nil {
-				return fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Mattermost.Attachments, err)
+				return fmt.Errorf("failed to unmarshal attachments '%s' : %w", notification.Mattermost.Attachments, err)
 			}
 		}
 	}
@@ -88,20 +88,20 @@ func (m *mattermostService) Send(notification Notification, dest Destination) (e
 
 	req, err := http.NewRequest(http.MethodPost, m.opts.ApiURL+"/api/v4/posts", bytes.NewReader(b))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.opts.Token))
 
 	res, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to request: %v", err)
+		return fmt.Errorf("failed to request: %w", err)
 	}
 	defer res.Body.Close()
 
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read body: %v", err)
+		return fmt.Errorf("failed to read body: %w", err)
 	}
 
 	if res.StatusCode/100 != 2 {

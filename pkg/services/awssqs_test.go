@@ -48,7 +48,6 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 }
 
 func TestSend_AwsSqs(t *testing.T) {
-
 	// Overriding methods inside, so service.Send could be called.
 	saveGetQueueURL := GetQueueURL
 	saveSendMsg := SendMsg

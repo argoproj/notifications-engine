@@ -72,7 +72,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) (err 
 	}
 	annotationApi := *apiUrl
 	annotationApi.Path = path.Join(apiUrl.Path, "annotations")
-	req, err := http.NewRequest("POST", annotationApi.String(), bytes.NewBuffer(jsonValue))
+	req, err := http.NewRequest(http.MethodPost, annotationApi.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		log.Errorf("Failed to create grafana annotation request: %s", err)
 		return err
@@ -91,7 +91,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) (err 
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("unable to read response data: %v", err)
+		return fmt.Errorf("unable to read response data: %w", err)
 	}
 
 	if response.StatusCode != http.StatusOK {

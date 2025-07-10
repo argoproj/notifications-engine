@@ -205,7 +205,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
 			logEntry.Errorf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
-			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace))
+			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
 		}
 		logEntry.Infof("Trigger %s result: %v", trigger, res)
 
@@ -234,7 +234,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource v1
 							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
 						notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
-						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
+						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s", trigger, to, err, apiNamespace))
 					} else {
 						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
@@ -374,18 +374,18 @@ func (c *notificationController) processResource(api api.API, resource v1.Object
 		})
 		if err != nil {
 			logEntry.Errorf("Failed to marshal resource patch: %v", err)
-			eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %v", err))
+			eventSequence.addWarning(fmt.Errorf("failed to marshal annotations patch %w", err))
 			return
 		}
 		resource, err = c.client.Namespace(resource.GetNamespace()).Patch(context.Background(), resource.GetName(), types.MergePatchType, patchData, v1.PatchOptions{})
 		if err != nil {
 			logEntry.Errorf("Failed to patch resource: %v", err)
-			eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %v", err))
+			eventSequence.addWarning(fmt.Errorf("failed to patch resource annotations %w", err))
 			return
 		}
 		if err := c.informer.GetStore().Update(resource); err != nil {
 			logEntry.Warnf("Failed to store update resource in informer: %v", err)
-			eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %v", err))
+			eventSequence.addWarning(fmt.Errorf("failed to store update resource in informer: %w", err))
 			return
 		}
 	}

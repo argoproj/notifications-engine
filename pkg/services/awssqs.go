@@ -72,7 +72,6 @@ func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *s
 		MessageBody:  aws.String(notif.Message),
 		DelaySeconds: 10,
 	}
-
 }
 func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
 	result := &sqs.GetQueueUrlInput{}
