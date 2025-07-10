@@ -4,8 +4,8 @@ import (
 	"testing"
 	"text/template"
 
+	"github.com/argoproj/notifications-engine/pkg/util/email"
 	"github.com/stretchr/testify/assert"
-	"gomodules.xyz/notify"
 	"k8s.io/utils/strings/slices"
 )
 
@@ -37,7 +37,7 @@ func TestGetTemplater_Email(t *testing.T) {
 }
 
 type mockClient struct {
-	notify.ByEmail
+	email.ByEmail
 }
 
 func (c *mockClient) Send() error {
@@ -48,15 +48,15 @@ func (c *mockClient) SendHtml() error {
 	return nil
 }
 
-func (c *mockClient) WithSubject(string) notify.ByEmail {
+func (c *mockClient) WithSubject(string) email.ByEmail {
 	return c
 }
 
-func (c *mockClient) WithBody(string) notify.ByEmail {
+func (c *mockClient) WithBody(string) email.ByEmail {
 	return c
 }
 
-func (c *mockClient) To(string, ...string) notify.ByEmail {
+func (c *mockClient) To(string, ...string) email.ByEmail {
 	return c
 }
 
