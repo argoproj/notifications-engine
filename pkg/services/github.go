@@ -689,6 +689,8 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				ExternalID:  &externalID,
 				Name:        notification.GitHub.CheckRun.Name,
 				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL,
+				Status: &notification.GitHub.CheckRun.Status,
+				Conclusion: &notification.GitHub.CheckRun.Conclusion,
 				StartedAt:   &github.Timestamp{Time: startedTime},
 				CompletedAt: &github.Timestamp{Time: completedTime},
 				Output:      checkRunOutput,
