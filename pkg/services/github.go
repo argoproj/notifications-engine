@@ -662,11 +662,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	if notification.GitHub.CheckRun != nil {
-		startedTime, err := time.Parse("YYYY-MM-DDTHH:MM:SSZ", notification.GitHub.CheckRun.StartedAt)
+		startedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.StartedAt)
 		if err != nil {
 			return err
 		}
-		completedTime, err := time.Parse("YYYY-MM-DDTHH:MM:SSZ", notification.GitHub.CheckRun.CompletedAt)
+		completedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.CompletedAt)
 		if err != nil {
 			return err
 		}
