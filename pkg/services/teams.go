@@ -156,14 +156,13 @@ func NewTeamsService(opts TeamsOptions) NotificationService {
 	return &teamsService{opts: opts}
 }
 
-func (s teamsService) Send(notification Notification, dest Destination) error {
+func (s teamsService) Send(notification Notification, dest Destination) (err error) {
 	webhookUrl, ok := s.opts.RecipientUrls[dest.Recipient]
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
 	var idleConnTimeout time.Duration
 	if s.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to parse idle connection timeout: %w", err)

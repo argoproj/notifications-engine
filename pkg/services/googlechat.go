@@ -107,14 +107,13 @@ type webhookError struct {
 	Status  string `json:"status"`
 }
 
-func (s googleChatService) getClient(recipient string) (*googlechatClient, error) {
+func (s googleChatService) getClient(recipient string) (googlechatclient *googlechatClient, err error) {
 	webhookUrl, ok := s.opts.WebhookUrls[recipient]
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
 	var idleConnTimeout time.Duration
 	if s.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)

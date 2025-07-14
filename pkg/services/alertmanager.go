@@ -208,12 +208,11 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 	return nil
 }
 
-func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
+func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) (err error) {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
 	var idleConnTimeout time.Duration
 	if s.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to parse idle connection timeout: %w", err)

@@ -250,14 +250,13 @@ func NewOpsgenieService(opts OpsgenieOptions) NotificationService {
 	return &opsgenieService{opts: opts}
 }
 
-func (s *opsgenieService) Send(notification Notification, dest Destination) error {
+func (s *opsgenieService) Send(notification Notification, dest Destination) (err error) {
 	apiKey, ok := s.opts.ApiKeys[dest.Recipient]
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
 	var idleConnTimeout time.Duration
 	if s.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
@@ -322,7 +321,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 		}
 	}
 
-	_, err := alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
+	_, err = alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
 		Message:     notification.Message,
 		Description: description,
 		Priority:    priority,

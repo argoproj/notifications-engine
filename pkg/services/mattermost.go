@@ -55,10 +55,9 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 	return &mattermostService{opts: opts}
 }
 
-func (m *mattermostService) Send(notification Notification, dest Destination) error {
+func (m *mattermostService) Send(notification Notification, dest Destination) (err error) {
 	var idleConnTimeout time.Duration
 	if m.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(m.opts.IdleConnTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to parse idle connection timeout: %w", err)

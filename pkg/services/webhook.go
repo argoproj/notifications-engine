@@ -179,7 +179,6 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 
 	var idleConnTimeout time.Duration
 	if service.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(service.opts.IdleConnTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
