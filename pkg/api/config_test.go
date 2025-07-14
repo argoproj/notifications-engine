@@ -7,16 +7,16 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
 var (
-	emptySecret = &v1.Secret{Data: map[string][]byte{}}
+	emptySecret = &corev1.Secret{Data: map[string][]byte{}}
 )
 
 func TestParseConfig_Services(t *testing.T) {
-	cfg, err := ParseConfig(&v1.ConfigMap{Data: map[string]string{
+	cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
 		"service.slack": `
 token: my-token
 `}}, emptySecret)
@@ -29,7 +29,7 @@ token: my-token
 }
 
 func TestParseConfig_Templates(t *testing.T) {
-	cfg, err := ParseConfig(&v1.ConfigMap{Data: map[string]string{
+	cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
 		"template.my-template": `
 message: hello world
 `}}, emptySecret)
@@ -44,7 +44,7 @@ message: hello world
 }
 
 func TestParseConfig_DefaultServiceTriggers(t *testing.T) {
-	cfg, err := ParseConfig(&v1.ConfigMap{Data: map[string]string{
+	cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
 		"defaultTriggers.slack": `
 - trigger-a
 - trigger-b
@@ -85,7 +85,7 @@ headers:
     value: Bearer $secret-value
 `
 
-	secrets := v1.Secret{
+	secrets := corev1.Secret{
 		Data: map[string][]byte{
 			"endpoint":     []byte("https://example.com"),
 			"secret-value": []byte("token"),
@@ -111,7 +111,7 @@ apiKeys:
   second-team: $second-team-secret
 `
 
-	secrets := v1.Secret{
+	secrets := corev1.Secret{
 		Data: map[string][]byte{
 			"first-team-secret":  []byte("first-token"),
 			"second-team-secret": []byte("second-token"),
@@ -136,7 +136,7 @@ privateKey: $github-privateKey
 installationID: 67890
 `
 
-	secrets := v1.Secret{
+	secrets := corev1.Secret{
 		Data: map[string][]byte{
 			"github-privateKey": []byte("A\nValue\nOn\nMultiple\nLines"),
 		},
@@ -159,7 +159,7 @@ installationID: 67890
 }
 
 func TestParseConfig_DefaultTriggers(t *testing.T) {
-	cfg, err := ParseConfig(&v1.ConfigMap{
+	cfg, err := ParseConfig(&corev1.ConfigMap{
 		Data: map[string]string{
 			"defaultTriggers": `[trigger1, trigger2]`,
 		},
@@ -172,7 +172,7 @@ func TestParseConfig_DefaultTriggers(t *testing.T) {
 }
 
 func TestParseConfig_Subscriptions(t *testing.T) {
-	cfg, err := ParseConfig(&v1.ConfigMap{
+	cfg, err := ParseConfig(&corev1.ConfigMap{
 		Data: map[string]string{
 			"subscriptions": `
 - selector: test=true

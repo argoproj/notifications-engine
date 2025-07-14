@@ -9,7 +9,7 @@ import (
 	"os"
 	"time"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -103,17 +103,18 @@ func (c *commandContext) loadResource(name string) (*unstructured.Unstructured, 
 	return res, nil
 }
 
-func (c *commandContext) getSecret() (*v1.Secret, error) {
-	var secret v1.Secret
-	if c.secretPath == ":empty" {
-		secret = v1.Secret{}
-	} else if c.secretPath == "" {
+func (c *commandContext) getSecret() (*corev1.Secret, error) {
+	var secret corev1.Secret
+	switch c.secretPath {
+	case ":empty":
+		secret = corev1.Secret{}
+	case "":
 		s, err := c.k8sClient.CoreV1().Secrets(c.namespace).Get(context.Background(), c.SecretName, metav1.GetOptions{})
 		if err != nil {
 			return nil, err
 		}
 		secret = *s
-	} else {
+	default:
 		if err := c.unmarshalFromFile(c.secretPath, c.SecretName, schema.GroupKind{Kind: "Secret"}, &secret); err != nil {
 			return nil, err
 		}
@@ -129,8 +130,8 @@ func (c *commandContext) getSecret() (*v1.Secret, error) {
 	return &secret, nil
 }
 
-func (c *commandContext) getConfigMap() (*v1.ConfigMap, error) {
-	var configMap v1.ConfigMap
+func (c *commandContext) getConfigMap() (*corev1.ConfigMap, error) {
+	var configMap corev1.ConfigMap
 	if c.configMapPath == "" {
 		cm, err := c.k8sClient.CoreV1().ConfigMaps(c.namespace).Get(context.Background(), c.ConfigMapName, metav1.GetOptions{})
 		if err != nil {

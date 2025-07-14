@@ -125,7 +125,7 @@ func (s webhookService) Send(notification Notification, dest Destination) error 
 	}
 	defer resp.Body.Close()
 
-	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			data = []byte(fmt.Sprintf("unable to read response data: %v", err))

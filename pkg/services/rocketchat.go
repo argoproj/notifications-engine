@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -109,7 +110,7 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 		return err
 	}
 	if !postMessage.Success {
-		return fmt.Errorf(postMessage.Error)
+		return errors.New(postMessage.Error)
 	}
 
 	return err
@@ -122,7 +123,7 @@ func isValidAvatarURL(iconURL string) bool {
 	}
 
 	u, err := url.Parse(iconURL)
-	if err != nil || (u.Scheme == "" || !(u.Scheme == "http" || u.Scheme == "https")) || u.Host == "" {
+	if err != nil || (u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https")) || u.Host == "" {
 		return false
 	}
 
