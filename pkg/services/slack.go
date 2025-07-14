@@ -179,7 +179,7 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		return err
 	}
 	return slackutil.NewThreadedClient(
-		newSlackClient(s.opts),
+		newSlackClient(s.opts, err),
 		slackState,
 	).SendMessage(
 		context.TODO(),
@@ -196,14 +196,14 @@ func (s *slackService) GetSigningSecret() string {
 	return s.opts.SigningSecret
 }
 
-func newSlackClient(opts SlackOptions) *slack.Client {
+func newSlackClient(opts SlackOptions, err error) *slack.Client {
 	apiURL := slack.APIURL
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
 	var idleConnTimeout time.Duration
 	if opts.IdleConnTimeout != "" {
-		idleConnTimeout, _ = time.ParseDuration(opts.IdleConnTimeout)
+		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
 	}
 	transport := httputil.NewTransport(apiURL, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxIdleConns, idleConnTimeout, opts.InsecureSkipVerify)
 	client := &http.Client{

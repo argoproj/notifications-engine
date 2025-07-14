@@ -402,7 +402,6 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 
 	var idleConnTimeout time.Duration
 	if opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
 		if err != nil {
 			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)

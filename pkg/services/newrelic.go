@@ -116,7 +116,7 @@ type newrelicDeploymentMarkerRequest struct {
 	Deployment NewrelicNotification `json:"deployment"`
 }
 
-func (s newrelicService) Send(notification Notification, dest Destination) error {
+func (s newrelicService) Send(notification Notification, dest Destination) (err error) {
 	if s.opts.ApiKey == "" {
 		return ErrMissingApiKey
 	}
@@ -140,7 +140,6 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 
 	var idleConnTimeout time.Duration
 	if s.opts.IdleConnTimeout != "" {
-		var err error
 		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
 		if err != nil {
 			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
