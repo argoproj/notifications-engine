@@ -99,20 +99,21 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 			for _, v := range subscriptions {
 				triggers := v.Trigger
 				destinations := v.Destinations
-				if len(triggers) == 0 && len(destinations) == 0 {
+				switch {
+				case len(triggers) == 0 && len(destinations) == 0:
 					trigger := ""
 					destination := ""
 					recipients = []string{}
 					log.Printf("Notification triggers and destinations are not configured")
 					callback(trigger, destination, recipients, k)
-				} else if len(triggers) == 0 && len(destinations) != 0 {
+				case len(triggers) == 0 && len(destinations) != 0:
 					trigger := ""
 					log.Printf("Notification triggers are not configured")
 					for _, destination := range destinations {
 						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
 						callback(trigger, destination.Service, destination.Recipients, k)
 					}
-				} else if len(triggers) != 0 && len(destinations) == 0 {
+				case len(triggers) != 0 && len(destinations) == 0:
 					service := ""
 					recipients = []string{}
 					log.Printf("Notification destinations are not configured")
@@ -120,7 +121,7 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, service, recipients)
 						callback(trigger, service, recipients, k)
 					}
-				} else {
+				default:
 					for _, trigger := range triggers {
 						for _, destination := range destinations {
 							log.Printf("Notification trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)

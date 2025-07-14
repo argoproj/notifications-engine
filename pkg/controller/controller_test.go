@@ -12,7 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -76,10 +76,10 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 	resourceClient := client.Resource(testGVR)
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (object runtime.Object, err error) {
+			ListFunc: func(options metav1.ListOptions) (object runtime.Object, err error) {
 				return resourceClient.List(context.Background(), options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return resourceClient.Watch(context.Background(), options)
 			},
 		},
@@ -109,10 +109,10 @@ func newControllerWithNamespaceSupport(t *testing.T, ctx context.Context, client
 	resourceClient := client.Resource(testGVR)
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (object runtime.Object, err error) {
+			ListFunc: func(options metav1.ListOptions) (object runtime.Object, err error) {
 				return resourceClient.List(context.Background(), options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return resourceClient.Watch(context.Background(), options)
 			},
 		},
@@ -412,7 +412,7 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 
 	receivedObj := map[string]interface{}{}
 
-	//SelfService API: config has IsSelfServiceConfig set to true
+	// SelfService API: config has IsSelfServiceConfig set to true
 	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: namespace}).AnyTimes()
 	api.EXPECT().RunTrigger(trigger, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
@@ -452,7 +452,7 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 	assert.NoError(t, err)
 
 	ctrl.namespaceSupport = true
-	//SelfService API: config has IsSelfServiceConfig set to true
+	// SelfService API: config has IsSelfServiceConfig set to true
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).Times(3)
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {

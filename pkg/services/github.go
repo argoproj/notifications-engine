@@ -426,13 +426,11 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	}
 
 	return &gitHubService{
-		opts:   opts,
 		client: &githubClientAdapter{client: client},
 	}, nil
 }
 
 type gitHubService struct {
-	opts   GitHubOptions
 	client githubClient
 }
 

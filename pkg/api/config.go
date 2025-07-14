@@ -11,7 +11,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	yaml3 "gopkg.in/yaml.v3"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"sigs.k8s.io/yaml"
 )
@@ -57,7 +57,7 @@ func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Desti
 	return dests
 }
 
-var keyPattern = regexp.MustCompile(`[$][\w-_]+`)
+var keyPattern = regexp.MustCompile(`[$][\w-]+`)
 
 // replaceStringSecret checks if given string is a secret key reference ( starts with $ ) and returns corresponding value from provided map
 func replaceStringSecret(val string, secretValues map[string][]byte) string {
@@ -72,7 +72,7 @@ func replaceStringSecret(val string, secretValues map[string][]byte) string {
 }
 
 // ParseConfig retrieves Config from given ConfigMap and Secret
-func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
+func ParseConfig(configMap *corev1.ConfigMap, secret *corev1.Secret) (*Config, error) {
 	cfg := Config{
 		Services:               map[string]ServiceFactory{},
 		Triggers:               map[string][]triggers.Condition{},
@@ -106,11 +106,12 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 			name := ""
 			serviceType := ""
 			parts := strings.Split(k, ".")
-			if len(parts) == 3 {
+			switch len(parts) {
+			case 3:
 				serviceType, name = parts[1], parts[2]
-			} else if len(parts) == 2 {
+			case 2:
 				serviceType, name = parts[1], parts[1]
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid service key; expected 'service.<type>(.<name>)' but got '%s'", k)
 			}
 
@@ -141,7 +142,7 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 	return &cfg, nil
 }
 
-func replaceServiceConfigSecrets(inputYaml string, secret *v1.Secret) ([]byte, error) {
+func replaceServiceConfigSecrets(inputYaml string, secret *corev1.Secret) ([]byte, error) {
 	var node yaml3.Node
 	err := yaml3.Unmarshal([]byte(inputYaml), &node)
 	if err != nil {

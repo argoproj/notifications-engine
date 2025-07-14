@@ -14,13 +14,11 @@ import (
 // Mock Opsgenie service for testing purposes
 type mockOpsgenieService struct {
 	options OpsgenieOptions
-	client  *http.Client
 }
 
 func NewOpsgenieServiceWithClient(options OpsgenieOptions, client *http.Client) *mockOpsgenieService {
 	return &mockOpsgenieService{
 		options: options,
-		client:  client,
 	}
 }
 

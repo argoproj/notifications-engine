@@ -121,7 +121,7 @@ func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
 }
 
-func buildMessageOptions(notification Notification, dest Destination, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
+func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
 	slackNotification := &SlackNotification{}
 
@@ -139,11 +139,12 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 			icon = opts.Icon
 		}
 
-		if validIconEmoji.MatchString(icon) {
+		switch {
+		case validIconEmoji.MatchString(icon):
 			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(icon))
-		} else if isValidIconURL(icon) {
+		case isValidIconURL(icon):
 			msgOptions = append(msgOptions, slack.MsgOptionIconURL(icon))
-		} else {
+		default:
 			log.Warnf("Icon reference '%v' is not a valid emoji or url", icon)
 		}
 	}
@@ -174,7 +175,7 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 }
 
 func (s *slackService) Send(notification Notification, dest Destination) error {
-	slackNotification, msgOptions, err := buildMessageOptions(notification, dest, s.opts)
+	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
 	if err != nil {
 		return err
 	}
@@ -226,7 +227,7 @@ func isValidIconURL(iconURL string) bool {
 	}
 
 	u, err := url.Parse(iconURL)
-	if err != nil || (u.Scheme == "" || !(u.Scheme == "http" || u.Scheme == "https")) || u.Host == "" {
+	if err != nil || (u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https")) || u.Host == "" {
 		return false
 	}
 

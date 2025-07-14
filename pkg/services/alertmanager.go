@@ -100,7 +100,7 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 			return err
 		}
 
-		if len(n.Labels) <= 0 {
+		if len(n.Labels) == 0 {
 			return fmt.Errorf("at least one label pair required")
 		}
 
