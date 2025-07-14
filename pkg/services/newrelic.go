@@ -16,12 +16,12 @@ import (
 )
 
 type NewrelicOptions struct {
-	ApiKey              string        `json:"apiKey"`
-	ApiURL              string        `json:"apiURL"`
-	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
-	MaxIdleConns        int           `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	ApiKey              string `json:"apiKey"`
+	ApiURL              string `json:"apiURL"`
+	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
+	MaxIdleConns        int    `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
 	IdleConnTimeout     string `json:"idleConnTimeout"`
 }
 
