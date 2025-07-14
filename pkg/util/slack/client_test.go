@@ -174,6 +174,7 @@ func TestThreadedClient(t *testing.T) {
 
 			client := NewThreadedClient(
 				m,
+				slack.ErrExpiredTimestamp,
 				&state{
 					Limiter:    rate.NewLimiter(rate.Inf, 1),
 					ThreadTSs:  tc.threadTSs,

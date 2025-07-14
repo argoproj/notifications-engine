@@ -178,8 +178,10 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 	if err != nil {
 		return err
 	}
+	client, err := newSlackClient(s.opts)
 	return slackutil.NewThreadedClient(
-		newSlackClient(s.opts, err),
+		client,
+		err,
 		slackState,
 	).SendMessage(
 		context.TODO(),
@@ -196,7 +198,7 @@ func (s *slackService) GetSigningSecret() string {
 	return s.opts.SigningSecret
 }
 
-func newSlackClient(opts SlackOptions, err error) *slack.Client {
+func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	apiURL := slack.APIURL
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
@@ -209,7 +211,7 @@ func newSlackClient(opts SlackOptions, err error) *slack.Client {
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
 	}
-	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
+	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), err
 }
 
 func isValidIconURL(iconURL string) bool {
