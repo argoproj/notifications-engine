@@ -213,6 +213,61 @@ func TestGetClientOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	assert.Equal(t, 2, len(options))
 }
 
+func TestSendMessageInput_WithMessageGroupId_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue.fifo"
+
+	notification := Notification{
+		Message: "Hello",
+		AwsSqs: &AwsSqsNotification{
+			MessageGroupId: "test-group-id",
+		},
+	}
+
+	input := SendMessageInput(s, &queueUrl, notification)
+
+	assert.Equal(t, &queueUrl, input.QueueUrl)
+	assert.Equal(t, "Hello", *input.MessageBody)
+	assert.Equal(t, int32(10), input.DelaySeconds)
+	assert.Equal(t, "test-group-id", *input.MessageGroupId)
+}
+
+func TestSendMessageInput_WithoutMessageGroupId_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+
+	notification := Notification{
+		Message: "Hello",
+		AwsSqs: &AwsSqsNotification{
+			MessageGroupId: "", // Empty string
+		},
+	}
+
+	input := SendMessageInput(s, &queueUrl, notification)
+
+	assert.Equal(t, &queueUrl, input.QueueUrl)
+	assert.Equal(t, "Hello", *input.MessageBody)
+	assert.Equal(t, int32(10), input.DelaySeconds)
+	assert.Nil(t, input.MessageGroupId) // Should not be set
+}
+
+func TestSendMessageInput_WithoutAwsSqsNotification_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+
+	notification := Notification{
+		Message: "Hello",
+		AwsSqs:  nil, // No AWS SQS notification
+	}
+
+	input := SendMessageInput(s, &queueUrl, notification)
+
+	assert.Equal(t, &queueUrl, input.QueueUrl)
+	assert.Equal(t, "Hello", *input.MessageBody)
+	assert.Equal(t, int32(10), input.DelaySeconds)
+	assert.Nil(t, input.MessageGroupId) // Should not be set
+}
+
 // Helpers
 var GetConfigOptions = (*awsSqsService).getConfigOptions
 var GetClientOptions = (*awsSqsService).getClientOptions
