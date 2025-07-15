@@ -208,12 +208,15 @@ func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	var idleConnTimeout time.Duration
 	if opts.IdleConnTimeout != "" {
 		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	transport := httputil.NewTransport(apiURL, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxIdleConns, idleConnTimeout, opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
 	}
-	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), err
+	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), nil
 }
 
 func isValidIconURL(iconURL string) bool {
