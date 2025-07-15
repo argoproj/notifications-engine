@@ -80,12 +80,11 @@ func NewState(limiter *rate.Limiter) *state {
 
 type threadedClient struct {
 	Client SlackClient
-	error
 	*state
 }
 
-func NewThreadedClient(client SlackClient, err error, s *state) *threadedClient {
-	return &threadedClient{client, err, s}
+func NewThreadedClient(client SlackClient, s *state) *threadedClient {
+	return &threadedClient{client, s}
 }
 
 func (c *threadedClient) getChannelID(recipient string) string {

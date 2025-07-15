@@ -178,10 +178,12 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 	if err != nil {
 		return err
 	}
-	client, err := newSlackClient(s.opts)
+	client, err := newSlackClient(s.opts)  
+    if err != nil {  
+        return err  
+    }  
 	return slackutil.NewThreadedClient(
 		client,
-		err,
 		slackState,
 	).SendMessage(
 		context.TODO(),
