@@ -11,7 +11,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +30,7 @@ func newTestResource(name string) *unstructured.Unstructured {
 }
 
 func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, resources ...runtime.Object) (*commandContext, func(), error) {
-	cm := v1.ConfigMap{
+	cm := corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-config-map",
@@ -70,7 +70,7 @@ func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, 
 		Settings: api.Settings{
 			ConfigMapName: "my-config-map",
 			SecretName:    "my-secret",
-			InitGetVars: func(cfg *api.Config, configMap *v1.ConfigMap, secret *v1.Secret) (api.GetVars, error) {
+			InitGetVars: func(cfg *api.Config, configMap *corev1.ConfigMap, secret *corev1.Secret) (api.GetVars, error) {
 				return func(obj map[string]interface{}, _ services.Destination) map[string]interface{} {
 					return map[string]interface{}{"app": obj}
 				}, nil
