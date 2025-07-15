@@ -17,9 +17,13 @@ import (
 )
 
 type GrafanaOptions struct {
-	ApiUrl             string `json:"apiUrl"`
-	ApiKey             string `json:"apiKey"`
-	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	ApiUrl              string `json:"apiUrl"`
+	ApiKey              string `json:"apiKey"`
+	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
+	MaxIdleConns        int    `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
+	IdleConnTimeout     string `json:"idleConnTimeout"`
 }
 
 type grafanaService struct {
@@ -37,7 +41,7 @@ type GrafanaAnnotation struct {
 	Text     string   `json:"text"`
 }
 
-func (s *grafanaService) Send(notification Notification, dest Destination) error {
+func (s *grafanaService) Send(notification Notification, dest Destination) (err error) {
 	ga := GrafanaAnnotation{
 		Time:     time.Now().Unix() * 1000, // unix ts in ms
 		IsRegion: false,
@@ -48,10 +52,16 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 	if notification.Message == "" {
 		log.Warnf("Message is an empty string or not provided in the notifications template")
 	}
-
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiUrl, s.opts.InsecureSkipVerify), log.WithField("service", "grafana")),
+			httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, s.opts.InsecureSkipVerify), log.WithField("service", "grafana")),
 	}
 
 	jsonValue, _ := json.Marshal(ga)

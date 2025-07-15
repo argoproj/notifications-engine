@@ -26,10 +26,15 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID             interface{} `json:"appID"`
-	InstallationID    interface{} `json:"installationID"`
-	PrivateKey        string      `json:"privateKey"`
-	EnterpriseBaseURL string      `json:"enterpriseBaseURL"`
+	AppID               interface{} `json:"appID"`
+	InstallationID      interface{} `json:"installationID"`
+	PrivateKey          string      `json:"privateKey"`
+	EnterpriseBaseURL   string      `json:"enterpriseBaseURL"`
+	InsecureSkipVerify  bool        `json:"insecureSkipVerify"`
+	MaxIdleConns        int         `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int         `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int         `json:"maxConnsPerHost"`
+	IdleConnTimeout     string      `json:"idleConnTimeout"`
 }
 
 type GitHubNotification struct {
@@ -395,8 +400,15 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
+	var idleConnTimeout time.Duration
+	if opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
 	tr := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(url, false), log.WithField("service", "github"))
+		httputil.NewTransport(url, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", "github"))
 	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err

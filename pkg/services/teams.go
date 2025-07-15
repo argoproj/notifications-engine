@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	texttemplate "text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -139,7 +140,12 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type TeamsOptions struct {
-	RecipientUrls map[string]string `json:"recipientUrls"`
+	RecipientUrls       map[string]string `json:"recipientUrls"`
+	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
+	MaxIdleConns        int               `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
+	IdleConnTimeout     string            `json:"idleConnTimeout"`
 }
 
 type teamsService struct {
@@ -150,12 +156,19 @@ func NewTeamsService(opts TeamsOptions) NotificationService {
 	return &teamsService{opts: opts}
 }
 
-func (s teamsService) Send(notification Notification, dest Destination) error {
+func (s teamsService) Send(notification Notification, dest Destination) (err error) {
 	webhookUrl, ok := s.opts.RecipientUrls[dest.Recipient]
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
+	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "teams")),
 	}

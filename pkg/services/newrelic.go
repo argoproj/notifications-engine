@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	texttemplate "text/template"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -15,8 +16,13 @@ import (
 )
 
 type NewrelicOptions struct {
-	ApiKey string `json:"apiKey"`
-	ApiURL string `json:"apiURL"`
+	ApiKey              string `json:"apiKey"`
+	ApiURL              string `json:"apiURL"`
+	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
+	MaxIdleConns        int    `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
+	IdleConnTimeout     string `json:"idleConnTimeout"`
 }
 
 type NewrelicNotification struct {
@@ -110,7 +116,7 @@ type newrelicDeploymentMarkerRequest struct {
 	Deployment NewrelicNotification `json:"deployment"`
 }
 
-func (s newrelicService) Send(notification Notification, dest Destination) error {
+func (s newrelicService) Send(notification Notification, dest Destination) (err error) {
 	if s.opts.ApiKey == "" {
 		return ErrMissingApiKey
 	}
@@ -132,9 +138,16 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 		},
 	}
 
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiURL, false), log.WithField("service", dest.Service)),
+			httputil.NewTransport(s.opts.ApiURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", dest.Service)),
 	}
 
 	jsonValue, err := json.Marshal(deploymentMarker)

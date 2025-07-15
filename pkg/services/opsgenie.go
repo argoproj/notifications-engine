@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	texttemplate "text/template"
+	"time"
 
 	"github.com/opsgenie/opsgenie-go-sdk-v2/alert"
 	"github.com/opsgenie/opsgenie-go-sdk-v2/client"
@@ -15,8 +16,13 @@ import (
 )
 
 type OpsgenieOptions struct {
-	ApiUrl  string            `json:"apiUrl"`
-	ApiKeys map[string]string `json:"apiKeys"`
+	ApiUrl              string            `json:"apiUrl"`
+	ApiKeys             map[string]string `json:"apiKeys"`
+	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
+	MaxIdleConns        int               `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
+	IdleConnTimeout     string            `json:"idleConnTimeout"`
 }
 
 type OpsgenieNotification struct {
@@ -244,17 +250,24 @@ func NewOpsgenieService(opts OpsgenieOptions) NotificationService {
 	return &opsgenieService{opts: opts}
 }
 
-func (s *opsgenieService) Send(notification Notification, dest Destination) error {
+func (s *opsgenieService) Send(notification Notification, dest Destination) (err error) {
 	apiKey, ok := s.opts.ApiKeys[dest.Recipient]
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
+	}
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
 	}
 	alertClient, _ := alert.NewClient(&client.Config{
 		ApiKey:         apiKey,
 		OpsGenieAPIURL: client.ApiUrl(s.opts.ApiUrl),
 		HttpClient: &http.Client{
 			Transport: httputil.NewLoggingRoundTripper(
-				httputil.NewTransport(s.opts.ApiUrl, false), log.WithField("service", "opsgenie")),
+				httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", "opsgenie")),
 		},
 	})
 
@@ -308,7 +321,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) erro
 		}
 	}
 
-	_, err := alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
+	_, err = alertClient.Create(context.TODO(), &alert.CreateAlertRequest{
 		Message:     notification.Message,
 		Description: description,
 		Priority:    priority,

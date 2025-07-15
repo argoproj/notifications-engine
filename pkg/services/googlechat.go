@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	texttemplate "text/template"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -80,7 +81,12 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type GoogleChatOptions struct {
-	WebhookUrls map[string]string `json:"webhooks"`
+	WebhookUrls         map[string]string `json:"webhooks"`
+	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
+	MaxIdleConns        int               `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
+	IdleConnTimeout     string            `json:"idleConnTimeout"`
 }
 
 type googleChatService struct {
@@ -101,12 +107,19 @@ type webhookError struct {
 	Status  string `json:"status"`
 }
 
-func (s googleChatService) getClient(recipient string) (*googlechatClient, error) {
+func (s googleChatService) getClient(recipient string) (googlechatclient *googlechatClient, err error) {
 	webhookUrl, ok := s.opts.WebhookUrls[recipient]
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
+	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "googlechat")),
 	}

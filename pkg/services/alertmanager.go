@@ -33,13 +33,17 @@ type AlertmanagerNotification struct {
 
 // AlertmanagerOptions cluster configuration
 type AlertmanagerOptions struct {
-	Targets            []string   `json:"targets"`
-	Scheme             string     `json:"scheme"`
-	APIPath            string     `json:"apiPath"`
-	BasicAuth          *BasicAuth `json:"basicAuth"`
-	BearerToken        string     `json:"bearerToken"`
-	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
-	Timeout            int        `json:"timeout"`
+	Targets             []string   `json:"targets"`
+	Scheme              string     `json:"scheme"`
+	APIPath             string     `json:"apiPath"`
+	BasicAuth           *BasicAuth `json:"basicAuth"`
+	BearerToken         string     `json:"bearerToken"`
+	Timeout             int        `json:"timeout"`
+	InsecureSkipVerify  bool       `json:"insecureSkipVerify"`
+	MaxIdleConns        int        `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int        `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int        `json:"maxConnsPerHost"`
+	IdleConnTimeout     string     `json:"idleConnTimeout"`
 }
 
 // NewAlertmanagerService new service
@@ -204,10 +208,17 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 	return nil
 }
 
-func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
+func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) (err error) {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	transport := httputil.NewTransport(rawURL, s.opts.InsecureSkipVerify)
+	var idleConnTimeout time.Duration
+	if s.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
+		if err != nil {
+			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
+	transport := httputil.NewTransport(rawURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, s.opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, s.entry),
 	}

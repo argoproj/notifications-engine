@@ -80,13 +80,17 @@ type BasicAuth struct {
 }
 
 type WebhookOptions struct {
-	URL                string        `json:"url"`
-	Headers            []Header      `json:"headers"`
-	BasicAuth          *BasicAuth    `json:"basicAuth"`
-	InsecureSkipVerify bool          `json:"insecureSkipVerify"`
-	RetryWaitMin       time.Duration `json:"retryWaitMin"`
-	RetryWaitMax       time.Duration `json:"retryWaitMax"`
-	RetryMax           int           `json:"retryMax"`
+	URL                 string        `json:"url"`
+	Headers             []Header      `json:"headers"`
+	BasicAuth           *BasicAuth    `json:"basicAuth"`
+	RetryWaitMin        time.Duration `json:"retryWaitMin"`
+	RetryWaitMax        time.Duration `json:"retryWaitMax"`
+	RetryMax            int           `json:"retryMax"`
+	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
+	MaxIdleConns        int           `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
+	IdleConnTimeout     string        `json:"idleConnTimeout"`
 }
 
 func NewWebhookService(opts WebhookOptions) NotificationService {
@@ -173,8 +177,15 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 		return nil, err
 	}
 
+	var idleConnTimeout time.Duration
+	if service.opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(service.opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
 	transport := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(r.url, service.opts.InsecureSkipVerify),
+		httputil.NewTransport(r.url, service.opts.MaxIdleConns, service.opts.MaxIdleConnsPerHost, service.opts.MaxConnsPerHost, idleConnTimeout, service.opts.InsecureSkipVerify),
 		log.WithField("service", r.destService))
 
 	client := retryablehttp.NewClient()

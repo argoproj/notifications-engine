@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"regexp"
 	texttemplate "text/template"
+	"time"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
@@ -96,14 +97,18 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type SlackOptions struct {
-	Username           string   `json:"username"`
-	Icon               string   `json:"icon"`
-	Token              string   `json:"token"`
-	SigningSecret      string   `json:"signingSecret"`
-	Channels           []string `json:"channels"`
-	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
-	ApiURL             string   `json:"apiURL"`
-	DisableUnfurl      bool     `json:"disableUnfurl"`
+	Username            string   `json:"username"`
+	Icon                string   `json:"icon"`
+	Token               string   `json:"token"`
+	SigningSecret       string   `json:"signingSecret"`
+	Channels            []string `json:"channels"`
+	ApiURL              string   `json:"apiURL"`
+	DisableUnfurl       bool     `json:"disableUnfurl"`
+	InsecureSkipVerify  bool     `json:"insecureSkipVerify"`
+	MaxIdleConns        int      `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int      `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int      `json:"maxConnsPerHost"`
+	IdleConnTimeout     string   `json:"idleConnTimeout"`
 }
 
 type slackService struct {
@@ -174,8 +179,12 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 	if err != nil {
 		return err
 	}
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		return err
+	}
 	return slackutil.NewThreadedClient(
-		newSlackClient(s.opts),
+		client,
 		slackState,
 	).SendMessage(
 		context.TODO(),
@@ -192,16 +201,23 @@ func (s *slackService) GetSigningSecret() string {
 	return s.opts.SigningSecret
 }
 
-func newSlackClient(opts SlackOptions) *slack.Client {
+func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	apiURL := slack.APIURL
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	transport := httputil.NewTransport(apiURL, opts.InsecureSkipVerify)
+	var idleConnTimeout time.Duration
+	if opts.IdleConnTimeout != "" {
+		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
+	transport := httputil.NewTransport(apiURL, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxIdleConns, idleConnTimeout, opts.InsecureSkipVerify)
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
 	}
-	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
+	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), nil
 }
 
 func isValidIconURL(iconURL string) bool {

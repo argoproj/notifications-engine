@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"net/http"
 	"net/url"
+	"time"
 )
 
 var certResolver func(serverName string) ([]string, error)
@@ -13,9 +14,13 @@ func SetCertResolver(resolver func(serverName string) ([]string, error)) {
 	certResolver = resolver
 }
 
-func NewTransport(rawURL string, insecureSkipVerify bool) *http.Transport {
+func NewTransport(rawURL string, maxIdleConns int, maxIdleConnsPerHost int, maxConnsPerHost int, idleConnTimeout time.Duration, insecureSkipVerify bool) *http.Transport {
 	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
+		Proxy:               http.ProxyFromEnvironment,
+		MaxIdleConns:        maxIdleConns,
+		MaxIdleConnsPerHost: maxIdleConnsPerHost,
+		MaxConnsPerHost:     maxConnsPerHost,
+		IdleConnTimeout:     idleConnTimeout,
 	}
 	if insecureSkipVerify {
 		transport.TLSClientConfig = &tls.Config{
