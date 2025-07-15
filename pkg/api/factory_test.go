@@ -16,13 +16,11 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
-var (
-	settings = Settings{ConfigMapName: "my-config-map", SecretName: "my-secret", InitGetVars: func(cfg *Config, configMap *corev1.ConfigMap, secret *corev1.Secret) (GetVars, error) {
-		return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-			return map[string]interface{}{"obj": obj}
-		}, nil
-	}}
-)
+var settings = Settings{ConfigMapName: "my-config-map", SecretName: "my-secret", InitGetVars: func(_ *Config, _ *corev1.ConfigMap, _ *corev1.Secret) (GetVars, error) {
+	return func(obj map[string]any, _ services.Destination) map[string]any {
+		return map[string]any{"obj": obj}
+	}, nil
+}}
 
 func TestGetAPI(t *testing.T) {
 	cm := &corev1.ConfigMap{
@@ -60,7 +58,7 @@ func TestGetAPI(t *testing.T) {
 			"service.email": `{"username": "test"}`,
 		},
 	}, metav1.UpdateOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)
 

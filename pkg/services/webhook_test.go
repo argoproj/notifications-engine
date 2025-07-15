@@ -1,7 +1,6 @@
 package services
 
 import (
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -10,15 +9,16 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestWebhook_SuccessfullySendsNotification(t *testing.T) {
 	var receivedHeaders http.Header
 	var receivedBody string
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
 		receivedHeaders = request.Header
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		receivedBody = string(data)
 	}))
 	defer server.Close()
@@ -35,20 +35,20 @@ func TestWebhook_SuccessfullySendsNotification(t *testing.T) {
 				"test": {Body: "hello world", Method: http.MethodPost},
 			},
 		}, Destination{Recipient: "test", Service: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello world", receivedBody)
-	assert.Equal(t, receivedHeaders.Get("testHeader"), "testHeaderValue")
+	assert.Equal(t, "testHeaderValue", receivedHeaders.Get("testHeader"))
 	assert.Contains(t, receivedHeaders.Get("Authorization"), "Basic")
 }
 
 func TestWebhook_WithNoOverrides_SuccessfullySendsNotification(t *testing.T) {
 	var receivedHeaders http.Header
 	var receivedBody string
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
 		receivedHeaders = request.Header
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		receivedBody = string(data)
 	}))
 	defer server.Close()
@@ -59,22 +59,22 @@ func TestWebhook_WithNoOverrides_SuccessfullySendsNotification(t *testing.T) {
 		Headers:   []Header{{Name: "testHeader", Value: "testHeaderValue"}},
 	})
 	err := service.Send(Notification{}, Destination{Recipient: "test", Service: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	assert.Equal(t, "", receivedBody)
-	assert.Equal(t, receivedHeaders.Get("testHeader"), "testHeaderValue")
+	assert.Empty(t, receivedBody)
+	assert.Equal(t, "testHeaderValue", receivedHeaders.Get("testHeader"))
 	assert.Contains(t, receivedHeaders.Get("Authorization"), "Basic")
 }
 
 func TestWebhook_SubPath(t *testing.T) {
 	var receivedPath string
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
 		receivedPath = request.URL.Path
 	}))
 	defer server.Close()
 
 	service := NewWebhookService(WebhookOptions{
-		URL: fmt.Sprintf("%s/subpath1", server.URL),
+		URL: server.URL + "/subpath1",
 	})
 
 	err := service.Send(Notification{
@@ -82,7 +82,7 @@ func TestWebhook_SubPath(t *testing.T) {
 			"test": {Body: "hello world", Method: http.MethodPost},
 		},
 	}, Destination{Recipient: "test", Service: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "/subpath1", receivedPath)
 
 	err = service.Send(Notification{
@@ -90,7 +90,7 @@ func TestWebhook_SubPath(t *testing.T) {
 			"test": {Body: "hello world", Method: http.MethodPost, Path: "/subpath2"},
 		},
 	}, Destination{Recipient: "test", Service: "test"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "/subpath1/subpath2", receivedPath)
 }
 
@@ -106,29 +106,25 @@ func TestGetTemplater_Webhook(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"foo": "hello",
 		"bar": "world",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
-	assert.Equal(t, notification.Webhook["github"].Method, "POST")
-	assert.Equal(t, notification.Webhook["github"].Body, "hello")
-	assert.Equal(t, notification.Webhook["github"].Path, "world")
+	assert.Equal(t, "POST", notification.Webhook["github"].Method)
+	assert.Equal(t, "hello", notification.Webhook["github"].Body)
+	assert.Equal(t, "world", notification.Webhook["github"].Path)
 }
 
 func TestWebhookService_Send_Retry(t *testing.T) {
 	// Set up a mock server to receive requests
 	count := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		count++
 		if count < 5 {
 			w.WriteHeader(http.StatusInternalServerError)

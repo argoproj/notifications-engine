@@ -5,20 +5,21 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidEmoji(t *testing.T) {
-	assert.Equal(t, true, validEmoji.MatchString(":slack:"))
-	assert.Equal(t, true, validEmoji.MatchString(":chart_with_upwards_trend:"))
-	assert.Equal(t, false, validEmoji.MatchString("http://lorempixel.com/48/48"))
+	assert.True(t, validEmoji.MatchString(":slack:"))
+	assert.True(t, validEmoji.MatchString(":chart_with_upwards_trend:"))
+	assert.False(t, validEmoji.MatchString("http://lorempixel.com/48/48"))
 }
 
 func TestValidAvatarURL(t *testing.T) {
-	assert.Equal(t, true, isValidAvatarURL("http://lorempixel.com/48/48"))
-	assert.Equal(t, true, isValidAvatarURL("https://lorempixel.com/48/48"))
-	assert.Equal(t, false, isValidAvatarURL("favicon.ico"))
-	assert.Equal(t, false, isValidAvatarURL("ftp://favicon.ico"))
-	assert.Equal(t, false, isValidAvatarURL("ftp://lorempixel.com/favicon.ico"))
+	assert.True(t, isValidAvatarURL("http://lorempixel.com/48/48"))
+	assert.True(t, isValidAvatarURL("https://lorempixel.com/48/48"))
+	assert.False(t, isValidAvatarURL("favicon.ico"))
+	assert.False(t, isValidAvatarURL("ftp://favicon.ico"))
+	assert.False(t, isValidAvatarURL("ftp://lorempixel.com/favicon.ico"))
 }
 
 func TestGetTemplater_RocketChat(t *testing.T) {
@@ -29,18 +30,14 @@ func TestGetTemplater_RocketChat(t *testing.T) {
 	}
 	templater, err := n.GetTemplater("", template.FuncMap{})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"foo": "hello",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.RocketChat.Attachments)
 }

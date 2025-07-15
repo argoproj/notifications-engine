@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_PagerDutyV2(t *testing.T) {
@@ -23,13 +24,11 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
+		err = templater(&notification, map[string]any{
 			"summary":   "hello",
 			"severity":  "critical",
 			"source":    "my-app",
@@ -39,9 +38,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 			"url":       "http://example.com",
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
@@ -179,28 +176,24 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
+		err = templater(&notification, map[string]any{
 			"summary":  "hello",
 			"severity": "critical",
 			"source":   "my-app",
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
 		assert.Equal(t, "my-app", notification.PagerdutyV2.Source)
-		assert.Equal(t, "", notification.PagerdutyV2.Component)
-		assert.Equal(t, "", notification.PagerdutyV2.Group)
-		assert.Equal(t, "", notification.PagerdutyV2.Class)
+		assert.Empty(t, notification.PagerdutyV2.Component)
+		assert.Empty(t, notification.PagerdutyV2.Group)
+		assert.Empty(t, notification.PagerdutyV2.Class)
 	})
 }
 

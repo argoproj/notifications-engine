@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	texttemplate "text/template"
 
@@ -54,7 +55,7 @@ func (p *PagerDutyV2Notification) GetTemplater(name string, f texttemplate.FuncM
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.PagerdutyV2 == nil {
 			notification.PagerdutyV2 = &PagerDutyV2Notification{}
 		}
@@ -119,7 +120,7 @@ func (p pagerdutyV2Service) Send(notification Notification, dest Destination) er
 	}
 
 	if notification.PagerdutyV2 == nil {
-		return fmt.Errorf("no config found for pagerdutyv2")
+		return errors.New("no config found for pagerdutyv2")
 	}
 
 	event := buildEvent(routingKey, notification)

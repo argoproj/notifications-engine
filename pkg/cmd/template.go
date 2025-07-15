@@ -13,10 +13,10 @@ import (
 )
 
 func newTemplateCommand(cmdContext *commandContext) *cobra.Command {
-	var command = cobra.Command{
+	command := cobra.Command{
 		Use:   "template",
 		Short: "Notification templates related commands",
-		RunE: func(c *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return errors.New("select child command")
 		},
 	}
@@ -27,10 +27,8 @@ func newTemplateCommand(cmdContext *commandContext) *cobra.Command {
 }
 
 func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
-	var (
-		recipients []string
-	)
-	var command = cobra.Command{
+	var recipients []string
+	command := cobra.Command{
 		Use: "notify NAME RESOURCE_NAME",
 		Example: fmt.Sprintf(`
 # Trigger notification using in-cluster config map and secret
@@ -40,7 +38,7 @@ func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
 %s template notify app-sync-succeeded guestbook
 `, cmdContext.cliName, cmdContext.cliName),
 		Short: "Generates notification using the specified template and send it to specified recipients",
-		RunE: func(c *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			cancel := withDebugLogs()
 			defer cancel()
 			if len(args) < 2 {
@@ -83,10 +81,8 @@ func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
 }
 
 func newTemplateGetCommand(cmdContext *commandContext) *cobra.Command {
-	var (
-		output string
-	)
-	var command = cobra.Command{
+	var output string
+	command := cobra.Command{
 		Use: "get",
 		Example: fmt.Sprintf(`
 # prints all templates
@@ -95,7 +91,7 @@ func newTemplateGetCommand(cmdContext *commandContext) *cobra.Command {
 %s template get app-sync-succeeded -o=yaml
 `, cmdContext.cliName, cmdContext.cliName),
 		Short: "Prints information about configured templates",
-		RunE: func(c *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			var name string
 			if len(args) == 1 {
 				name = args[0]

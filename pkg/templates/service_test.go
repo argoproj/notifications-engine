@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
@@ -15,17 +16,13 @@ func TestFormat_Message(t *testing.T) {
 		},
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
-	notification, err := svc.FormatNotification(map[string]interface{}{
+	notification, err := svc.FormatNotification(map[string]any{
 		"foo": "hello",
 	}, "test")
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.Message)
 }

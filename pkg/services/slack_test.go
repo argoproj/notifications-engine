@@ -12,20 +12,21 @@ import (
 	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidIconEmoji(t *testing.T) {
-	assert.Equal(t, true, validIconEmoji.MatchString(":slack:"))
-	assert.Equal(t, true, validIconEmoji.MatchString(":chart_with_upwards_trend:"))
-	assert.Equal(t, false, validIconEmoji.MatchString("http://lorempixel.com/48/48"))
+	assert.True(t, validIconEmoji.MatchString(":slack:"))
+	assert.True(t, validIconEmoji.MatchString(":chart_with_upwards_trend:"))
+	assert.False(t, validIconEmoji.MatchString("http://lorempixel.com/48/48"))
 }
 
 func TestValidIconURL(t *testing.T) {
-	assert.Equal(t, true, isValidIconURL("http://lorempixel.com/48/48"))
-	assert.Equal(t, true, isValidIconURL("https://lorempixel.com/48/48"))
-	assert.Equal(t, false, isValidIconURL("favicon.ico"))
-	assert.Equal(t, false, isValidIconURL("ftp://favicon.ico"))
-	assert.Equal(t, false, isValidIconURL("ftp://lorempixel.com/favicon.ico"))
+	assert.True(t, isValidIconURL("http://lorempixel.com/48/48"))
+	assert.True(t, isValidIconURL("https://lorempixel.com/48/48"))
+	assert.False(t, isValidIconURL("favicon.ico"))
+	assert.False(t, isValidIconURL("ftp://favicon.ico"))
+	assert.False(t, isValidIconURL("ftp://lorempixel.com/favicon.ico"))
 }
 
 func TestGetTemplater_Slack(t *testing.T) {
@@ -41,33 +42,29 @@ func TestGetTemplater_Slack(t *testing.T) {
 	}
 	templater, err := n.GetTemplater("", template.FuncMap{})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"foo": "hello",
 		"bar": "world",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "world-hello", notification.Slack.Username)
 	assert.Equal(t, ":hello:", notification.Slack.Icon)
 	assert.Equal(t, "hello", notification.Slack.Attachments)
 	assert.Equal(t, "world", notification.Slack.Blocks)
 	assert.Equal(t, "hello-world", notification.Slack.GroupingKey)
-	assert.Equal(t, true, notification.Slack.NotifyBroadcast)
+	assert.True(t, notification.Slack.NotifyBroadcast)
 }
 
 func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
 	n := Notification{}
 
 	sn, opts, err := buildMessageOptions(n, SlackOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, opts, 1)
 	assert.Empty(t, sn.GroupingKey)
 	assert.Equal(t, slackutil.Post, sn.DeliveryPolicy)
@@ -87,12 +84,12 @@ func TestSlack_SendNotification(t *testing.T) {
 		MessageTimeStamp: "1503435956.000247",
 		Text:             "text",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Run("only message", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			data, err := io.ReadAll(request.Body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			v := url.Values{}
 			v.Add("channel", "test-channel")
 			v.Add("text", "Annotation description")
@@ -101,7 +98,7 @@ func TestSlack_SendNotification(t *testing.T) {
 
 			writer.WriteHeader(http.StatusOK)
 			_, err = writer.Write(dummyResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -115,15 +112,13 @@ func TestSlack_SendNotification(t *testing.T) {
 			Notification{Message: "Annotation description"},
 			Destination{Recipient: "test-channel", Service: "slack"},
 		)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("attachments", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			data, err := io.ReadAll(request.Body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			v := url.Values{}
 			v.Add("attachments", `[{"pretext":"pre-hello","text":"text-world","blocks":null}]`)
 			v.Add("channel", "test")
@@ -133,7 +128,7 @@ func TestSlack_SendNotification(t *testing.T) {
 
 			writer.WriteHeader(http.StatusOK)
 			_, err = writer.Write(dummyResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -152,15 +147,13 @@ func TestSlack_SendNotification(t *testing.T) {
 			},
 			Destination{Recipient: "test", Service: "slack"},
 		)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("blocks", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			data, err := io.ReadAll(request.Body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			v := url.Values{}
 			v.Add("attachments", "[]")
 			v.Add("blocks", `[{"type":"section","text":{"type":"plain_text","text":"Hello world"}}]`)
@@ -171,7 +164,7 @@ func TestSlack_SendNotification(t *testing.T) {
 
 			writer.WriteHeader(http.StatusOK)
 			_, err = writer.Write(dummyResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -190,9 +183,7 @@ func TestSlack_SendNotification(t *testing.T) {
 			},
 			Destination{Recipient: "test", Service: "slack"},
 		)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 }
 
@@ -203,12 +194,12 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 		MessageTimeStamp: "1503435956.000247",
 		Text:             "text",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	t.Run("no set", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			data, err := io.ReadAll(request.Body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			v := url.Values{}
 			v.Add("channel", "test")
 			v.Add("text", "test")
@@ -217,7 +208,7 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 
 			writer.WriteHeader(http.StatusOK)
 			_, err = writer.Write(dummyResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -233,15 +224,13 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 			},
 			Destination{Recipient: "test", Service: "slack"},
 		)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("set service config", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			data, err := io.ReadAll(request.Body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			v := url.Values{}
 			v.Add("channel", "test")
 			v.Add("icon_emoji", ":smile:")
@@ -253,7 +242,7 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 
 			writer.WriteHeader(http.StatusOK)
 			_, err = writer.Write(dummyResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -271,15 +260,13 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 			},
 			Destination{Recipient: "test", Service: "slack"},
 		)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("set service config and template", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 			data, err := io.ReadAll(request.Body)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			v := url.Values{}
 			v.Add("attachments", "[]")
 			v.Add("channel", "test")
@@ -292,7 +279,7 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 
 			writer.WriteHeader(http.StatusOK)
 			_, err = writer.Write(dummyResponse)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 		}))
 		defer server.Close()
 
@@ -314,8 +301,6 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 			},
 			Destination{Recipient: "test", Service: "slack"},
 		)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 }

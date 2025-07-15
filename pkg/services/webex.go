@@ -41,7 +41,7 @@ func NewWebexService(opts WebexOptions) NotificationService {
 var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 
 func (w webexService) Send(notification Notification, dest Destination) error {
-	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
+	requestURL := w.opts.ApiURL + "/v1/messages"
 
 	client := &http.Client{
 		Transport: httputil.NewLoggingRoundTripper(
@@ -69,7 +69,7 @@ func (w webexService) Send(notification Notification, dest Destination) error {
 		return err
 	}
 
-	apiToken := fmt.Sprintf("Bearer %s", w.opts.Token)
+	apiToken := "Bearer " + w.opts.Token
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", apiToken)

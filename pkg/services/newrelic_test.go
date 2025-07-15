@@ -8,6 +8,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_Newrelic(t *testing.T) {
@@ -20,24 +21,22 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("newrelic", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
 
-	err = templater(&notification, map[string]interface{}{
-		"context": map[string]interface{}{
+	err = templater(&notification, map[string]any{
+		"context": map[string]any{
 			"argocdUrl": "https://example.com",
 			"user":      "somebot",
 		},
-		"app": map[string]interface{}{
-			"metadata": map[string]interface{}{
+		"app": map[string]any{
+			"metadata": map[string]any{
 				"name": "argocd-notifications",
 			},
-			"status": map[string]interface{}{
-				"operationState": map[string]interface{}{
-					"syncResult": map[string]interface{}{
+			"status": map[string]any{
+				"operationState": map[string]any{
+					"syncResult": map[string]any{
 						"revision": "0123456789",
 					},
 				},
@@ -45,9 +44,7 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 		},
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "0123456789", notification.Newrelic.Revision)
 	assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
@@ -57,15 +54,13 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 
 func TestSend_Newrelic(t *testing.T) {
 	t.Run("revision deployment marker", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			b, err := io.ReadAll(r.Body)
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
+			require.NoError(t, err)
 
-			assert.Equal(t, r.URL.Path, "/v2/applications/123456789/deployments.json")
-			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["X-Api-Key"], []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, "/v2/applications/123456789/deployments.json", r.URL.Path)
+			assert.Equal(t, []string{"application/json"}, r.Header["Content-Type"])
+			assert.Equal(t, []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"}, r.Header["X-Api-Key"])
 
 			assert.JSONEq(t, `{
 				"deployment": {
@@ -92,21 +87,17 @@ func TestSend_Newrelic(t *testing.T) {
 			Recipient: "123456789",
 		})
 
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("complete deployment marker", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			b, err := io.ReadAll(r.Body)
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
+			require.NoError(t, err)
 
-			assert.Equal(t, r.URL.Path, "/v2/applications/123456789/deployments.json")
-			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["X-Api-Key"], []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, "/v2/applications/123456789/deployments.json", r.URL.Path)
+			assert.Equal(t, []string{"application/json"}, r.Header["Content-Type"])
+			assert.Equal(t, []string{"NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"}, r.Header["X-Api-Key"])
 
 			assert.JSONEq(t, `{
 				"deployment": {
@@ -136,9 +127,7 @@ func TestSend_Newrelic(t *testing.T) {
 			Recipient: "123456789",
 		})
 
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("missing config", func(t *testing.T) {

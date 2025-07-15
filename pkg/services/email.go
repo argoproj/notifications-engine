@@ -26,7 +26,7 @@ func (n *EmailNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Email == nil {
 			notification.Email = &EmailNotification{}
 		}

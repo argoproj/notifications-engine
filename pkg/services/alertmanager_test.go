@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_Alertmanager(t *testing.T) {
@@ -19,13 +20,13 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 		},
 	}
 
-	vars := map[string]interface{}{
-		"app": map[string]interface{}{
-			"metadata": map[string]interface{}{
+	vars := map[string]any{
+		"app": map[string]any{
+			"metadata": map[string]any{
 				"name": "argocd-notifications",
 			},
-			"spec": map[string]interface{}{
-				"source": map[string]interface{}{
+			"spec": map[string]any{
+				"source": map[string]any{
 					"repoURL": "https://github.com/argoproj-labs/argocd-notifications.git",
 				},
 			},
@@ -34,15 +35,11 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 
 	t.Run("test_Labels_Annotations", func(t *testing.T) {
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 		err = templater(&notification, vars)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "App_Deployed", notification.Alertmanager.Labels["alertname"])
 		assert.Equal(t, "argocd-notifications", notification.Alertmanager.Annotations["appname"])
@@ -50,15 +47,11 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 
 	t.Run("test_default_GeneratorURL", func(t *testing.T) {
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 		err = templater(&notification, vars)
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.Alertmanager.GeneratorURL)
 	})
@@ -67,18 +60,16 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 		n.Alertmanager.GeneratorURL = "{{.app.metadata.name}}"
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
-		_ = templater(&notification, map[string]interface{}{
-			"app": map[string]interface{}{
-				"metadata": map[string]interface{}{
+		_ = templater(&notification, map[string]any{
+			"app": map[string]any{
+				"metadata": map[string]any{
 					"name": "argocd-notifications",
 				},
-				"spec": map[string]interface{}{
-					"source": map[string]interface{}{
+				"spec": map[string]any{
+					"source": map[string]any{
 						"repoURL": "https://github.com/argoproj-labs/argocd-notifications.git",
 					},
 				},
@@ -92,18 +83,16 @@ func TestGetTemplater_Alertmanager(t *testing.T) {
 		n.Alertmanager.GeneratorURL = "{{.app.spec.source.repoURL}}"
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
-		_ = templater(&notification, map[string]interface{}{
-			"app": map[string]interface{}{
-				"metadata": map[string]interface{}{
+		_ = templater(&notification, map[string]any{
+			"app": map[string]any{
+				"metadata": map[string]any{
 					"name": "argocd-notifications",
 				},
-				"spec": map[string]interface{}{
-					"source": map[string]interface{}{
+				"spec": map[string]any{
+					"source": map[string]any{
 						"repoURL": "git@github.com:argoproj-labs/argocd-notifications.git",
 					},
 				},
