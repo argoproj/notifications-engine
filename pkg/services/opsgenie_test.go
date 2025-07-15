@@ -9,6 +9,7 @@ import (
 
 	"github.com/opsgenie/opsgenie-go-sdk-v2/alert"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // Mock Opsgenie service for testing purposes
@@ -16,7 +17,7 @@ type mockOpsgenieService struct {
 	options OpsgenieOptions
 }
 
-func NewOpsgenieServiceWithClient(options OpsgenieOptions, client *http.Client) *mockOpsgenieService {
+func NewOpsgenieServiceWithClient(options OpsgenieOptions, _ *http.Client) *mockOpsgenieService {
 	return &mockOpsgenieService{
 		options: options,
 	}
@@ -33,6 +34,7 @@ func (s *mockOpsgenieService) Send(notification Notification, destination Destin
 	// Return nil to simulate successful sending of notification
 	return nil
 }
+
 func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 	// Prepare test data
 	name := "testTemplate"
@@ -73,11 +75,11 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		templater, err := notification.GetTemplater(name, f)
 
 		// Assert that no error occurred during the call
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Prepare mock data for the Templater function
 		mockNotification := &Notification{}
-		vars := map[string]interface{}{
+		vars := map[string]any{
 			"foo":            "bar",
 			"entity":         "entity1",
 			"user":           "user1",
@@ -93,7 +95,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		err = templater(mockNotification, vars)
 
 		// Assert that no error occurred during the execution of the Templater function
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Assert that the OpsgenieNotification's fields were correctly updated
 		assert.Equal(t, "Test Opsgenie alert: bar", mockNotification.Opsgenie.Description)
@@ -127,11 +129,11 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		templater, err := notification.GetTemplater(name, f)
 
 		// Assert that no error occurred during the call
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Prepare mock data for the Templater function
 		mockNotification := &Notification{}
-		vars := map[string]interface{}{
+		vars := map[string]any{
 			"foo": "bar",
 		}
 
@@ -139,7 +141,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		err = templater(mockNotification, vars)
 
 		// Assert that no error occurred during the execution of the Templater function
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Assert that the OpsgenieNotification's Details field was correctly updated
 		assert.Equal(t, map[string]string{
@@ -161,11 +163,11 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		templater, err := notification.GetTemplater(name, f)
 
 		// Assert that no error occurred during the call
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Prepare mock data for the Templater function
 		mockNotification := &Notification{}
-		vars := map[string]interface{}{
+		vars := map[string]any{
 			"responderType1": "user",
 			"responder1":     "responder1_id",
 			"responderName1": "Responder One",
@@ -180,7 +182,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		err = templater(mockNotification, vars)
 
 		// Assert that no error occurred during the execution of the Templater function
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Assert that the OpsgenieNotification's VisibleTo field was correctly updated
 		assert.Equal(t, []alert.Responder{
@@ -234,11 +236,11 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		templater, err := notification.GetTemplater(name, f)
 
 		// Assert that no error occurred during the call
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Prepare mock data for the Templater function
 		mockNotification := &Notification{}
-		vars := map[string]interface{}{
+		vars := map[string]any{
 			"foo": "bar",
 		}
 
@@ -246,7 +248,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		err = templater(mockNotification, vars)
 
 		// Assert that no error occurred during the execution of the Templater function
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Assert that the OpsgenieNotification's actions field was correctly updated
 		assert.Equal(t, []string{"action1: bar", "action2: bar"}, mockNotification.Opsgenie.Actions)
@@ -258,14 +260,15 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 
 func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	// Create a mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
 
 	service := NewOpsgenieService(OpsgenieOptions{
 		ApiUrl:  server.URL,
-		ApiKeys: map[string]string{}})
+		ApiKeys: map[string]string{},
+	})
 
 	// Prepare test data
 	recipient := "testRecipient"
@@ -290,12 +293,13 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
 	// Assert the result for missing API Key
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no API key configured for recipient testRecipient")
 }
+
 func TestOpsgenie_SendNotification_WithMessageOnly(t *testing.T) {
 	// Create a mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -308,7 +312,8 @@ func TestOpsgenie_SendNotification_WithMessageOnly(t *testing.T) {
 		ApiUrl: server.URL,
 		ApiKeys: map[string]string{
 			"testRecipient": "testApiKey",
-		}}, mockClient)
+		},
+	}, mockClient)
 
 	// Prepare test data
 	recipient := "testRecipient"
@@ -323,13 +328,13 @@ func TestOpsgenie_SendNotification_WithMessageOnly(t *testing.T) {
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
 	// Assert the result for missing description and priority
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Description is missing")
 }
 
 func TestOpsgenie_SendNotification_WithDescriptionOnly(t *testing.T) {
 	// Create a mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -367,7 +372,7 @@ func TestOpsgenie_SendNotification_WithDescriptionOnly(t *testing.T) {
 
 func TestOpsgenie_SendNotification_WithDescriptionAndPriority(t *testing.T) {
 	// Create a mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -380,7 +385,8 @@ func TestOpsgenie_SendNotification_WithDescriptionAndPriority(t *testing.T) {
 		ApiUrl: server.URL,
 		ApiKeys: map[string]string{
 			"testRecipient": "testApiKey",
-		}}, mockClient)
+		},
+	}, mockClient)
 
 	// Prepare test data
 	recipient := "testRecipient"
@@ -406,7 +412,7 @@ func TestOpsgenie_SendNotification_WithDescriptionAndPriority(t *testing.T) {
 
 func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
 	// Create a mock HTTP server
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -419,7 +425,8 @@ func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
 		ApiUrl: server.URL,
 		ApiKeys: map[string]string{
 			"testRecipient": "testApiKey",
-		}}, mockClient)
+		},
+	}, mockClient)
 
 	// Prepare test data
 	recipient := "testRecipient"

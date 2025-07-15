@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -20,13 +21,11 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
-var (
-	gitSuffix = regexp.MustCompile(`\.git$`)
-)
+var gitSuffix = regexp.MustCompile(`\.git$`)
 
 type GitHubOptions struct {
-	AppID              interface{} `json:"appID"`
-	InstallationID     interface{} `json:"installationID"`
+	AppID              any `json:"appID"`
+	InstallationID     any `json:"installationID"`
 	PrivateKey         string      `json:"privateKey"`
 	EnterpriseBaseURL  string      `json:"enterpriseBaseURL"`
 	InsecureSkipVerify bool        `json:"insecureSkipVerify"`
@@ -205,7 +204,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.GitHub == nil {
 			notification.GitHub = &GitHubNotification{
 				RepoURLPath:  g.RepoURLPath,
@@ -498,7 +497,7 @@ func fullNameByRepoURL(rawURL string) string {
 
 func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub == nil {
-		return fmt.Errorf("config is empty")
+		return errors.New("config is empty")
 	}
 
 	u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
@@ -695,7 +694,6 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				Output:      checkRunOutput,
 			},
 		)
-
 		if err != nil {
 			return err
 		}
