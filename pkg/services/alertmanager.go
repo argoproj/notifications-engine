@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"net/url"
 	"strings"
@@ -100,12 +101,12 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 			return fmt.Errorf("at least one label pair required")
 		}
 
-		notification.Alertmanager.Labels = n.Labels
+		notification.Alertmanager.Labels = maps.Clone(n.Labels)
 		if err := notification.Alertmanager.parseLabels(name, f, vars); err != nil {
 			return err
 		}
 		if len(n.Annotations) > 0 {
-			notification.Alertmanager.Annotations = n.Annotations
+			notification.Alertmanager.Annotations = maps.Clone(n.Annotations)
 			if err := notification.Alertmanager.parseAnnotations(name, f, vars); err != nil {
 				return err
 			}
