@@ -97,7 +97,7 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 			return err
 		}
 
-		if len(n.Labels) <= 0 {
+		if len(n.Labels) == 0 {
 			return fmt.Errorf("at least one label pair required")
 		}
 
@@ -235,7 +235,7 @@ func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, r
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("unable to read response data: %v", err)
+		return fmt.Errorf("unable to read response data: %w", err)
 	}
 
 	if response.StatusCode != http.StatusOK {

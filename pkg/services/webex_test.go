@@ -87,7 +87,7 @@ func TestSend_Webex(t *testing.T) {
 
 	t.Run("auth error", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(401)
+			w.WriteHeader(http.StatusUnauthorized)
 			b, err := io.ReadAll(r.Body)
 			if !assert.NoError(t, err) {
 				t.FailNow()
@@ -119,5 +119,4 @@ func TestSend_Webex(t *testing.T) {
 			t.FailNow()
 		}
 	})
-
 }

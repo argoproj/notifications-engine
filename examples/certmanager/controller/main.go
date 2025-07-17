@@ -12,7 +12,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/spf13/cobra"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -59,7 +59,7 @@ func main() {
 			notificationsFactory := api.NewFactory(api.Settings{
 				ConfigMapName: "cert-manager-notifications-cm",
 				SecretName:    "cert-manager-notifications-secret",
-				InitGetVars: func(cfg *api.Config, configMap *v1.ConfigMap, secret *v1.Secret) (api.GetVars, error) {
+				InitGetVars: func(cfg *api.Config, configMap *corev1.ConfigMap, secret *corev1.Secret) (api.GetVars, error) {
 					return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
 						return map[string]interface{}{"cert": obj}
 					}, nil
