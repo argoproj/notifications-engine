@@ -13,28 +13,54 @@ func SetCertResolver(resolver func(serverName string) ([]string, error)) {
 	certResolver = resolver
 }
 
+func GetTLSConfig(rawURL string, insecureSkipVerify bool) (*tls.Config, error) {
+	if insecureSkipVerify {
+		return &tls.Config{
+			InsecureSkipVerify: true,
+		}, nil
+	}
+	if certResolver != nil {
+		parsedURL, err := url.Parse(rawURL)
+		if err != nil {
+			return nil, err
+		}
+		return GetTLSConfigFromHost(parsedURL.Host, insecureSkipVerify)
+	}
+
+	return nil, nil
+}
+
+func GetTLSConfigFromHost(host string, insecureSkipVerify bool) (*tls.Config, error) {
+	if insecureSkipVerify {
+		return &tls.Config{
+			InsecureSkipVerify: true,
+		}, nil
+	}
+	if certResolver != nil {
+		serverCertificatePem, err := certResolver(host)
+		if err != nil {
+			return nil, err
+		} else if len(serverCertificatePem) > 0 {
+			return &tls.Config{
+				RootCAs: getCertPoolFromPEMData(serverCertificatePem),
+			}, nil
+		}
+	}
+
+	return nil, nil
+}
+
 func NewTransport(rawURL string, insecureSkipVerify bool) *http.Transport {
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 	}
-	if insecureSkipVerify {
-		transport.TLSClientConfig = &tls.Config{
-			InsecureSkipVerify: true,
-		}
-	} else if certResolver != nil {
-		parsedURL, err := url.Parse(rawURL)
-		if err != nil {
-			return transport
-		}
-		serverCertificatePem, err := certResolver(parsedURL.Host)
-		if err != nil {
-			return transport
-		} else if len(serverCertificatePem) > 0 {
-			transport.TLSClientConfig = &tls.Config{
-				RootCAs: getCertPoolFromPEMData(serverCertificatePem),
-			}
-		}
+
+	config, err := GetTLSConfig(rawURL, insecureSkipVerify)
+	if err != nil {
+		return transport
 	}
+
+	transport.TLSClientConfig = config
 	return transport
 }
 
