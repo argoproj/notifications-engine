@@ -8,32 +8,55 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestSend_GcpPubsub tests sending a message to Google Cloud Pub/Sub
-// you can start the PubSub emulator locally with:
-// `gcloud beta emulators pubsub start --project=test-project`
+// --- Mocks ---
+type mockTopic struct {
+	publishedMsg  string
+	publishedAttr map[string]string
+	publishErr    error
+}
+
+func (m *mockTopic) Publish(ctx context.Context, msg *pubsub.Message) pubsubPublishResult {
+	m.publishedMsg = string(msg.Data)
+	m.publishedAttr = msg.Attributes
+	return &mockPublishResult{err: m.publishErr}
+}
+func (m *mockTopic) Stop() {}
+
+type mockPublishResult struct {
+	err error
+}
+
+func (m *mockPublishResult) Get(ctx context.Context) (string, error) {
+	if m.err != nil {
+		return "", m.err
+	}
+	return "mock-id", nil
+}
+
+type pubSubMockClient struct {
+	topics map[string]*mockTopic
+}
+
+func (m *pubSubMockClient) Topic(name string) pubsubTopic {
+	if t, ok := m.topics[name]; ok {
+		return t
+	}
+	return nil
+}
+func (m *pubSubMockClient) Close() error { return nil }
+
+// --- Test ---
 func TestSend_GcpPubsub(t *testing.T) {
+	topic := &mockTopic{}
+	client := &pubSubMockClient{topics: map[string]*mockTopic{"test-topic": topic}}
 
-	ctx := context.Background()
-	projectID := "test-project"
-	topicID := "test-topic"
-
-	client, err := pubsub.NewClient(ctx, projectID)
-	if err != nil {
-		t.Fatalf("failed to create pubsub client: %v", err)
+	service := &gcpPubsubService{
+		opts: GcpPubsubOptions{
+			Project: "test-project",
+			Topic:   "test-topic",
+		},
+		client: client,
 	}
-	defer client.Close()
-
-	// Create topic
-	topic, err := client.CreateTopic(ctx, topicID)
-	if err != nil {
-		t.Fatalf("failed to create topic: %v", err)
-	}
-	defer topic.Stop()
-
-	service := NewGcpPubsubService(GcpPubsubOptions{
-		Project: projectID,
-		Topic:   topicID,
-	})
 
 	notification := Notification{
 		Message:   "hello world",
@@ -41,6 +64,8 @@ func TestSend_GcpPubsub(t *testing.T) {
 	}
 	dest := Destination{Recipient: ""}
 
-	err = service.Send(notification, dest)
+	err := service.Send(notification, dest)
 	assert.NoError(t, err)
+	assert.Equal(t, "hello world", topic.publishedMsg)
+	assert.Equal(t, map[string]string{"foo": "bar"}, topic.publishedAttr)
 }
