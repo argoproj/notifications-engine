@@ -9,6 +9,38 @@ import (
 	"google.golang.org/api/option"
 )
 
+// Interfaces for testability
+type pubsubClient interface {
+	Topic(name string) pubsubTopic
+	Close() error
+}
+type pubsubTopic interface {
+	Publish(ctx context.Context, msg *pubsub.Message) pubsubPublishResult
+	Stop()
+}
+type pubsubPublishResult interface {
+	Get(ctx context.Context) (string, error)
+}
+
+// Real implementations
+type realPubsubClient struct{ c *pubsub.Client }
+
+func (r *realPubsubClient) Topic(name string) pubsubTopic {
+	return &realPubsubTopic{t: r.c.Topic(name)}
+}
+func (r *realPubsubClient) Close() error { return r.c.Close() }
+
+type realPubsubTopic struct{ t *pubsub.Topic }
+
+func (r *realPubsubTopic) Publish(ctx context.Context, msg *pubsub.Message) pubsubPublishResult {
+	return &realPubsubPublishResult{r.t.Publish(ctx, msg)}
+}
+func (r *realPubsubTopic) Stop() { r.t.Stop() }
+
+type realPubsubPublishResult struct{ r *pubsub.PublishResult }
+
+func (r *realPubsubPublishResult) Get(ctx context.Context) (string, error) { return r.r.Get(ctx) }
+
 type GcpPubsubOptions struct {
 	Topic   string `json:"topic"`
 	Project string `json:"project"`
@@ -24,25 +56,33 @@ func NewGcpPubsubService(opts GcpPubsubOptions) NotificationService {
 }
 
 type gcpPubsubService struct {
-	opts GcpPubsubOptions
+	opts   GcpPubsubOptions
+	client pubsubClient // interface for testability
 }
 
 func (s *gcpPubsubService) Send(notif Notification, dest Destination) error {
 	ctx := context.Background()
-	var client *pubsub.Client
+	var client pubsubClient
 	var err error
 
-	// Use key file if provided, else default creds (enables GKE Workload Identity)
-	if s.opts.KeyFile != "" {
-		client, err = pubsub.NewClient(ctx, s.opts.Project, option.WithCredentialsFile(s.opts.KeyFile))
+	// Use injected client if present (for testing)
+	if s.client != nil {
+		client = s.client
 	} else {
-		client, err = pubsub.NewClient(ctx, s.opts.Project)
+		// Use key file if provided, else default creds (enables GKE Workload Identity)
+		var realClient *pubsub.Client
+		if s.opts.KeyFile != "" {
+			realClient, err = pubsub.NewClient(ctx, s.opts.Project, option.WithCredentialsFile(s.opts.KeyFile))
+		} else {
+			realClient, err = pubsub.NewClient(ctx, s.opts.Project)
+		}
+		if err != nil {
+			log.Errorf("failed to create pubsub client: %v", err)
+			return err
+		}
+		defer realClient.Close()
+		client = &realPubsubClient{c: realClient}
 	}
-	if err != nil {
-		log.Errorf("failed to create pubsub client: %v", err)
-		return err
-	}
-	defer client.Close()
 
 	// Determine topic name, annotations takes precedence over the default topic
 	topicName := s.opts.Topic
