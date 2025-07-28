@@ -99,7 +99,6 @@ func TestRun_OncePerSet(t *testing.T) {
 			OncePer:   "",
 		}}, res)
 	})
-
 }
 
 func TestRun_OncePer_Evaluate(t *testing.T) {

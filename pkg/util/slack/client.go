@@ -3,6 +3,7 @@ package slack
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 
 	sl "github.com/slack-go/slack"
@@ -187,7 +188,8 @@ func SendMessageRateLimited(client SlackClient, ctx context.Context, limiter *ra
 		)
 
 		if err != nil {
-			if rateLimitedError, ok := err.(*sl.RateLimitedError); ok {
+			var rateLimitedError *sl.RateLimitedError
+			if errors.As(err, &rateLimitedError) {
 				limiter.SetLimit(rate.Every(rateLimitedError.RetryAfter))
 			} else {
 				break
