@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"text/template"
 
@@ -48,7 +47,6 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 }
 
 func TestSend_AwsSqs(t *testing.T) {
-
 	// Overriding methods inside, so service.Send could be called.
 	saveGetQueueURL := GetQueueURL
 	saveSendMsg := SendMsg
@@ -118,17 +116,17 @@ func TestGetConfigOptions_AwsSqs(t *testing.T) {
 	assert.Equal(t, "us-east-1", options.Region)
 	// Get and Verify credentials from Provider
 	creds, _ := options.Credentials.Retrieve(context.TODO())
-	assert.Equal(t, s.opts.AwsAccess.Key, creds.AccessKeyID)
-	assert.Equal(t, s.opts.AwsAccess.Secret, creds.SecretAccessKey)
+	assert.Equal(t, s.opts.Key, creds.AccessKeyID)
+	assert.Equal(t, s.opts.Secret, creds.SecretAccessKey)
 }
 
 func TestGetConfigOptionsFromEnv_AwsSqs(t *testing.T) {
 	// Applying override via parameters instead of the ENV Variables
 	finalKey, finalSecret, finalRegion := "key", "secret", "us-east-1"
 
-	os.Setenv("AWS_ACCESS_KEY_ID", finalKey)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", finalSecret)
-	os.Setenv("AWS_DEFAULT_REGION", finalRegion)
+	t.Setenv("AWS_ACCESS_KEY_ID", finalKey)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", finalSecret)
+	t.Setenv("AWS_DEFAULT_REGION", finalRegion)
 
 	s := NewTypedAwsSqsService(AwsSqsOptions{})
 
@@ -144,9 +142,9 @@ func TestGetConfigOptionsFromEnv_AwsSqs(t *testing.T) {
 }
 
 func TestGetConfigOptionsOverrideCredentials_AwsSqs(t *testing.T) {
-	os.Setenv("AWS_ACCESS_KEY_ID", "env_key")
-	os.Setenv("AWS_SECRET_ACCESS_KEY", "env_secret")
-	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
+	t.Setenv("AWS_ACCESS_KEY_ID", "env_key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "env_secret")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	// Applying override via parameters instead of the ENV Variables
 	finalKey, finalSecret, finalRegion := "key", "secret", "us-east-1"
@@ -172,7 +170,7 @@ func TestGetConfigOptionsOverrideCredentials_AwsSqs(t *testing.T) {
 
 func TestGetConfigOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	// Will be overridden
-	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
 
@@ -198,7 +196,7 @@ func TestGetConfigOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 
 func TestGetClientOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	// Will be overridden
-	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
 

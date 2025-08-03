@@ -8,7 +8,7 @@ import (
 
 	"k8s.io/utils/strings/slices"
 
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	v1listers "k8s.io/client-go/listers/core/v1"
@@ -22,7 +22,7 @@ type Settings struct {
 	// SecretName holds Kubernetes Secret name that contains sensitive information
 	SecretName string
 	// InitGetVars returns a function that produces notifications context variables
-	InitGetVars func(cfg *Config, configMap *v1.ConfigMap, secret *v1.Secret) (GetVars, error)
+	InitGetVars func(cfg *Config, configMap *corev1.ConfigMap, secret *corev1.Secret) (GetVars, error)
 	// DefaultNamespace default namespace for ConfigMap and Secret.
 	// For self-service notification, we get notification configurations from rollout resource namespace
 	// and also the default namespace
@@ -95,11 +95,11 @@ func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
 	}
 }
 
-func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigMapNamespaceLister, secretLister v1listers.SecretNamespaceLister) (*v1.ConfigMap, *v1.Secret, error) {
+func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigMapNamespaceLister, secretLister v1listers.SecretNamespaceLister) (*corev1.ConfigMap, *corev1.Secret, error) {
 	cm, err := cmLister.Get(f.ConfigMapName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			cm = &v1.ConfigMap{}
+			cm = &corev1.ConfigMap{}
 		} else {
 			return nil, nil, err
 		}
@@ -108,7 +108,7 @@ func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigM
 	secret, err := secretLister.Get(f.SecretName)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			secret = &v1.Secret{}
+			secret = &corev1.Secret{}
 		} else {
 			return nil, nil, err
 		}
@@ -120,7 +120,7 @@ func (f *apiFactory) getConfigMapAndSecretWithListers(cmLister v1listers.ConfigM
 	return cm, secret, err
 }
 
-func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1.Secret, error) {
+func (f *apiFactory) getConfigMapAndSecret(namespace string) (*corev1.ConfigMap, *corev1.Secret, error) {
 	cmLister := f.cmLister.ConfigMaps(namespace)
 	secretLister := f.secretLister.Secrets(namespace)
 
@@ -128,11 +128,11 @@ func (f *apiFactory) getConfigMapAndSecret(namespace string) (*v1.ConfigMap, *v1
 }
 
 func (f *apiFactory) GetAPI() (API, error) {
-	apis, err := f.GetAPIsFromNamespace(f.Settings.DefaultNamespace)
+	apis, err := f.GetAPIsFromNamespace(f.DefaultNamespace)
 	if err != nil {
 		return nil, err
 	}
-	return apis[f.Settings.DefaultNamespace], nil
+	return apis[f.DefaultNamespace], nil
 }
 
 // GetAPIsFromNamespace returns a map of API instances for a given namespace, if there is an error in populating the API for a namespace, it will be skipped
@@ -146,8 +146,8 @@ func (f *apiFactory) GetAPIsFromNamespace(namespace string) (map[string]API, err
 
 	// namespaces to look for notification configurations
 	namespaces := []string{namespace}
-	if !slices.Contains(namespaces, f.Settings.DefaultNamespace) {
-		namespaces = append(namespaces, f.Settings.DefaultNamespace)
+	if !slices.Contains(namespaces, f.DefaultNamespace) {
+		namespaces = append(namespaces, f.DefaultNamespace)
 	}
 
 	errors := []error{}
@@ -178,16 +178,15 @@ func (f *apiFactory) getApiFromNamespace(namespace string) (API, error) {
 		return nil, err
 	}
 	return f.getApiFromConfigmapAndSecret(cm, secret)
-
 }
 
-func (f *apiFactory) getApiFromConfigmapAndSecret(cm *v1.ConfigMap, secret *v1.Secret) (API, error) {
+func (f *apiFactory) getApiFromConfigmapAndSecret(cm *corev1.ConfigMap, secret *corev1.Secret) (API, error) {
 	cfg, err := ParseConfig(cm, secret)
 	if err != nil {
 		return nil, err
 	}
 
-	if cm.Namespace != f.Settings.DefaultNamespace {
+	if cm.Namespace != f.DefaultNamespace {
 		cfg.IsSelfServiceConfig = true
 	}
 	getVars, err := f.InitGetVars(cfg, cm, secret)

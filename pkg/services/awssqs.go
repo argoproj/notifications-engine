@@ -72,7 +72,6 @@ func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *s
 		MessageBody:  aws.String(notif.Message),
 		DelaySeconds: 10,
 	}
-
 }
 func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
 	result := &sqs.GetQueueUrlInput{}
@@ -95,8 +94,8 @@ func (s awsSqsService) getConfigOptions() []func(*config.LoadOptions) error {
 	var options []func(*config.LoadOptions) error
 
 	// When Credentials Are provided in service configuration - use them.
-	if (s.opts != AwsSqsOptions{} && s.opts.AwsAccess.Key != "" && s.opts.AwsAccess.Secret != "") {
-		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.opts.AwsAccess.Key, s.opts.AwsAccess.Secret, "default")))
+	if (s.opts != AwsSqsOptions{} && s.opts.Key != "" && s.opts.Secret != "") {
+		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.opts.Key, s.opts.Secret, "default")))
 	}
 
 	// Fill Region from configuration

@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -97,7 +98,7 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 		attachments := make([]models.Attachment, 0)
 		if notification.RocketChat.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.RocketChat.Attachments), &attachments); err != nil {
-				return fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.RocketChat.Attachments, err)
+				return fmt.Errorf("failed to unmarshal attachments '%s' : %w", notification.RocketChat.Attachments, err)
 			}
 		}
 
@@ -109,7 +110,7 @@ func (r *rocketChatService) Send(notification Notification, dest Destination) er
 		return err
 	}
 	if !postMessage.Success {
-		return fmt.Errorf(postMessage.Error)
+		return errors.New(postMessage.Error)
 	}
 
 	return err
@@ -122,7 +123,7 @@ func isValidAvatarURL(iconURL string) bool {
 	}
 
 	u, err := url.Parse(iconURL)
-	if err != nil || (u.Scheme == "" || !(u.Scheme == "http" || u.Scheme == "https")) || u.Host == "" {
+	if err != nil || (u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https")) || u.Host == "" {
 		return false
 	}
 
