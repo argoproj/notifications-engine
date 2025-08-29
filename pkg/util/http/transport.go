@@ -3,9 +3,12 @@ package http
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 )
 
 var certResolver func(serverName string) ([]string, error)
@@ -41,6 +44,20 @@ func NewTransport(rawURL string, maxIdleConns int, maxIdleConnsPerHost int, maxC
 		}
 	}
 	return transport
+}
+
+func NewServiceHTTPClient(maxIdleConns, maxIdleConnsPerHost, maxConnsPerHost int, idleConnTimeout string, insecureSkipVerify bool, apiURL string, serviceName string) (client *http.Client, err error) {
+	var timeout time.Duration
+	if idleConnTimeout != "" {
+		timeout, err = time.ParseDuration(idleConnTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
+		}
+	}
+	transport := NewTransport(apiURL, maxIdleConns, maxIdleConnsPerHost, maxConnsPerHost, timeout, insecureSkipVerify)
+	return &http.Client{
+		Transport: NewLoggingRoundTripper(transport, log.WithField("service", serviceName)),
+	}, nil
 }
 
 func getCertPoolFromPEMData(pemData []string) *x509.CertPool {
