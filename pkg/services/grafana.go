@@ -26,7 +26,7 @@ func (n *GrafanaNotification) GetTemplater(name string, f texttemplate.FuncMap) 
 	if err != nil {
 		return nil, err
 	}
-	
+
 	return func(notification *Notification, vars map[string]interface{}) error {
 		if notification.Grafana == nil {
 			notification.Grafana = &GrafanaNotification{}
