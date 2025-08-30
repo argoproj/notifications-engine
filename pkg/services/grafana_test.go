@@ -30,7 +30,7 @@ func TestGrafana_SuccessfullySendsNotification(t *testing.T) {
 	err := service.Send(
 		Notification{
 			Message: "Annotation description",
-			Grafana: &GrafanaNotification{Tags: "tagFoo|tagBar"}},
+			Grafana: &GrafanaNotification{Tags: "tagFoo|tagBar"},
 		}, Destination{Recipient: "tag1|tag2", Service: "test-service"})
 	assert.NoError(t, err)
 
