@@ -76,8 +76,8 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
     }
 
 	// append global tags from opts
-	 if opts.Tags != nil && len(opts.Tags) > 0 {
-		optsTags := strings.Split(opts.Tags, "|")
+	 if s.opts.Tags != nil && len(s.opts.Tags) > 0 {
+		optsTags := strings.Split(s.opts.Tags, "|")
         tags = append(tags, optsTags...)
     }
 
