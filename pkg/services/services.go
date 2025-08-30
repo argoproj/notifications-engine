@@ -27,6 +27,7 @@ type Notification struct {
 	Pagerduty    *PagerDutyNotification    `json:"pagerduty,omitempty"`
 	PagerdutyV2  *PagerDutyV2Notification  `json:"pagerdutyv2,omitempty"`
 	Newrelic     *NewrelicNotification     `json:"newrelic,omitempty"`
+	Grafana      *GrafanaNotification      `json:"grafana,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -102,6 +103,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.Newrelic != nil {
 		sources = append(sources, n.Newrelic)
+	}
+	if n.Grafana != nil {
+		sources = append(sources, n.Grafana)
 	}
 	return n.getTemplater(name, f, sources)
 }

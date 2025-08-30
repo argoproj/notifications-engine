@@ -16,10 +16,37 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type GrafanaNotification struct {
+	Tags               string `json:"tags,omitempty"`
+}
+
+func (n *GrafanaNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	
+	grafanaTags, err := texttemplate.New(name).Funcs(f).Parse(n.Tags)
+	if err != nil {
+		return nil, err
+	}
+	
+	return func(notification *Notification, vars map[string]interface{}) error {
+		if notification.Grafana == nil {
+			notification.Grafana = &GrafanaNotification{}
+		}
+		var grafanaTagsData bytes.Buffer
+		if err := grafanaTags.Execute(&grafanaTagsData, vars); err != nil {
+			return err
+		}
+		notification.Grafana.Tags = grafanaTagsData.String()
+
+	
+		return nil
+	}, nil
+}
+
 type GrafanaOptions struct {
 	ApiUrl             string `json:"apiUrl"`
 	ApiKey             string `json:"apiKey"`
 	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	Tags               string `json:"tags"`
 }
 
 type grafanaService struct {
@@ -38,10 +65,25 @@ type GrafanaAnnotation struct {
 }
 
 func (s *grafanaService) Send(notification Notification, dest Destination) error {
+
+    tags := strings.Split(dest.Recipient, "|")
+
+	// append tags from notification grafana.tags field .. 
+    if notification.Grafana != nil && len(notification.Grafana.Tags) > 0 {
+		notificationTags = strings.Split(notification.Grafana.Tags, "|")
+        tags = append(tags, notificationTags...)
+    }
+
+	// append global tags from opts
+	 if opts.Tags != nil && len(opts.Tags) > 0 {
+		globalTags = strings.Split(opts.Tags, "|")
+        tags = append(tags, globalTags...)
+    }
+
 	ga := GrafanaAnnotation{
 		Time:     time.Now().Unix() * 1000, // unix ts in ms
 		IsRegion: false,
-		Tags:     strings.Split(dest.Recipient, "|"),
+		Tags:     tags,
 		Text:     notification.Message,
 	}
 
