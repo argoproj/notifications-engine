@@ -10,6 +10,7 @@ import (
 	"path"
 	"strings"
 	"time"
+	texttemplate "text/template"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 
@@ -70,14 +71,14 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 
 	// append tags from notification grafana.tags field .. 
     if notification.Grafana != nil && len(notification.Grafana.Tags) > 0 {
-		notificationTags = strings.Split(notification.Grafana.Tags, "|")
+		notificationTags := strings.Split(notification.Grafana.Tags, "|")
         tags = append(tags, notificationTags...)
     }
 
 	// append global tags from opts
 	 if opts.Tags != nil && len(opts.Tags) > 0 {
-		globalTags = strings.Split(opts.Tags, "|")
-        tags = append(tags, globalTags...)
+		optsTags := strings.Split(opts.Tags, "|")
+        tags = append(tags, optsTags...)
     }
 
 	ga := GrafanaAnnotation{
