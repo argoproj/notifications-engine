@@ -71,7 +71,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 		tags = append(tags, notificationTags...)
 	}
 
-	 if s.opts.Tags != "" {
+	if s.opts.Tags != "" {
 		optsTags := strings.Split(s.opts.Tags, "|")
 		tags = append(tags, optsTags...)
 	}
