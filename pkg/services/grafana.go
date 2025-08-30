@@ -64,7 +64,7 @@ type GrafanaAnnotation struct {
 }
 
 func (s *grafanaService) Send(notification Notification, dest Destination) error {
-    tags := strings.Split(dest.Recipient, "|")
+	tags := strings.Split(dest.Recipient, "|")
 
 	// append tags from notification grafana.tags field .. 
 	if notification.Grafana != nil && notification.Grafana.Tags != "" {
