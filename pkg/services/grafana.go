@@ -18,7 +18,7 @@ import (
 )
 
 type GrafanaNotification struct {
-	Tags               string `json:"tags,omitempty"`
+	Tags string `json:"tags,omitempty"`
 }
 
 func (n *GrafanaNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -76,7 +76,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
     }
 
 	// append global tags from opts
-	 if s.opts.Tags != nil && len(s.opts.Tags) > 0 {
+	 if len(s.opts.Tags) > 0 {
 		optsTags := strings.Split(s.opts.Tags, "|")
         tags = append(tags, optsTags...)
     }

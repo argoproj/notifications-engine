@@ -25,12 +25,12 @@ func TestGrafana_SuccessfullySendsNotification(t *testing.T) {
 		ApiUrl:             server.URL,
 		ApiKey:             "something-secret-but-not-relevant-in-this-test",
 		InsecureSkipVerify: true,
-		Tags:               []string{"tagA", "tagB"},
+		Tags:               "tagA|tagB",
 	})
 	err := service.Send(
 		Notification{
 			Message: "Annotation description",
-			Grafana: &GrafanaNotification{Tags: []string{"tagFoo", "tagBar"}},
+			Grafana: &GrafanaNotification{Tags: "tagFoo|tagBar"}},
 		}, Destination{Recipient: "tag1|tag2", Service: "test-service"})
 	assert.NoError(t, err)
 
