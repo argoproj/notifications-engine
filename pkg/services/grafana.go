@@ -36,7 +36,6 @@ func (n *GrafanaNotification) GetTemplater(name string, f texttemplate.FuncMap) 
 			return err
 		}
 		notification.Grafana.Tags = grafanaTagsData.String()
-
 	
 		return nil
 	}, nil
