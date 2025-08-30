@@ -9,8 +9,8 @@ import (
 	"net/url"
 	"path"
 	"strings"
-	"time"
 	texttemplate "text/template"
+	"time"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 
@@ -22,7 +22,6 @@ type GrafanaNotification struct {
 }
 
 func (n *GrafanaNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
-	
 	grafanaTags, err := texttemplate.New(name).Funcs(f).Parse(n.Tags)
 	if err != nil {
 		return nil, err
@@ -66,17 +65,16 @@ type GrafanaAnnotation struct {
 }
 
 func (s *grafanaService) Send(notification Notification, dest Destination) error {
-
     tags := strings.Split(dest.Recipient, "|")
 
 	// append tags from notification grafana.tags field .. 
-    if notification.Grafana != nil && len(notification.Grafana.Tags) > 0 {
+    if notification.Grafana != nil && notification.Grafana.Tags != "" {
 		notificationTags := strings.Split(notification.Grafana.Tags, "|")
         tags = append(tags, notificationTags...)
     }
 
 	// append global tags from opts
-	 if len(s.opts.Tags) > 0 {
+	 if s.opts.Tags != "" {
 		optsTags := strings.Split(s.opts.Tags, "|")
         tags = append(tags, optsTags...)
     }

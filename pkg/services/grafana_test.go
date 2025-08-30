@@ -62,7 +62,6 @@ func TestGrafana_UnSuccessfullySendsNotification(t *testing.T) {
 	assert.Error(t, err)
 }
 
-
 func TestGetTemplater_Grafana(t *testing.T) {
 	n := Notification{
 		Grafana: &GrafanaNotification{
