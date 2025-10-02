@@ -29,8 +29,10 @@ type Config struct {
 	DefaultTriggers []string
 	// ServiceDefaultTriggers holds list of default triggers per service
 	ServiceDefaultTriggers map[string][]string
-	Namespace              string
-	IsSelfServiceConfig    bool
+	// MaxConcurrentNotifications is the maximum number of notifications to send concurrently (default: 10)
+	MaxConcurrentNotifications int
+	Namespace                  string
+	IsSelfServiceConfig        bool
 }
 
 // Returns list of destinations for the specified trigger
@@ -71,14 +73,20 @@ func replaceStringSecret(val string, secretValues map[string][]byte) string {
 	})
 }
 
+const (
+	// DefaultMaxConcurrentNotifications is the default maximum number of concurrent notification deliveries
+	DefaultMaxConcurrentNotifications = 10
+)
+
 // ParseConfig retrieves Config from given ConfigMap and Secret
 func ParseConfig(configMap *corev1.ConfigMap, secret *corev1.Secret) (*Config, error) {
 	cfg := Config{
-		Services:               map[string]ServiceFactory{},
-		Triggers:               map[string][]triggers.Condition{},
-		ServiceDefaultTriggers: map[string][]string{},
-		Templates:              map[string]services.Notification{},
-		Namespace:              configMap.Namespace,
+		Services:                   map[string]ServiceFactory{},
+		Triggers:                   map[string][]triggers.Condition{},
+		ServiceDefaultTriggers:     map[string][]string{},
+		Templates:                  map[string]services.Notification{},
+		Namespace:                  configMap.Namespace,
+		MaxConcurrentNotifications: DefaultMaxConcurrentNotifications,
 	}
 	if subscriptionYaml, ok := configMap.Data["subscriptions"]; ok {
 		if err := yaml.Unmarshal([]byte(subscriptionYaml), &cfg.Subscriptions); err != nil {
@@ -89,6 +97,23 @@ func ParseConfig(configMap *corev1.ConfigMap, secret *corev1.Secret) (*Config, e
 	if defaultTriggersYaml, ok := configMap.Data["defaultTriggers"]; ok {
 		if err := yaml.Unmarshal([]byte(defaultTriggersYaml), &cfg.DefaultTriggers); err != nil {
 			return nil, err
+		}
+	}
+
+	if maxConcurrentYaml, ok := configMap.Data["maxConcurrentNotifications"]; ok {
+		var maxConcurrent int
+		if err := yaml.Unmarshal([]byte(maxConcurrentYaml), &maxConcurrent); err != nil {
+			log.Warnf("Invalid maxConcurrentNotifications value '%s' (must be a positive integer), using default: %d", maxConcurrentYaml, DefaultMaxConcurrentNotifications)
+		} else {
+			switch {
+			case maxConcurrent <= 0:
+				log.Warnf("maxConcurrentNotifications must be positive, got %d, using default: %d", maxConcurrent, DefaultMaxConcurrentNotifications)
+			case maxConcurrent > 1000:
+				log.Warnf("maxConcurrentNotifications value %d is very high (>1000), consider using a lower value", maxConcurrent)
+				cfg.MaxConcurrentNotifications = maxConcurrent
+			default:
+				cfg.MaxConcurrentNotifications = maxConcurrent
+			}
 		}
 	}
 

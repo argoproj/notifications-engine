@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"reflect"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -21,6 +22,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/api"
 	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
+	"github.com/argoproj/notifications-engine/pkg/triggers"
 )
 
 // NotificationDelivery represents a notification that was delivered
@@ -98,6 +100,17 @@ func WithEventCallback(f func(eventSequence NotificationEventSequence)) Opts {
 	}
 }
 
+// WithMaxConcurrentNotifications sets the maximum number of concurrent notification
+// deliveries per resource. This helps prevent resource exhaustion when sending
+// notifications to many destinations. Default is 10 if not specified.
+func WithMaxConcurrentNotifications(maxConcurrent int) Opts {
+	return func(ctrl *notificationController) {
+		if maxConcurrent > 0 {
+			ctrl.maxConcurrentNotifications = maxConcurrent
+		}
+	}
+}
+
 func NewController(
 	client dynamic.NamespaceableResourceInterface,
 	informer cache.SharedIndexInformer,
@@ -123,11 +136,12 @@ func NewController(
 	)
 
 	ctrl := &notificationController{
-		client:          client,
-		informer:        informer,
-		queue:           queue,
-		metricsRegistry: NewMetricsRegistry(""),
-		apiFactory:      apiFactory,
+		client:                     client,
+		informer:                   informer,
+		queue:                      queue,
+		metricsRegistry:            NewMetricsRegistry(""),
+		apiFactory:                 apiFactory,
+		maxConcurrentNotifications: api.DefaultMaxConcurrentNotifications,
 		toUnstructured: func(obj metav1.Object) (*unstructured.Unstructured, error) {
 			res, ok := obj.(*unstructured.Unstructured)
 			if !ok {
@@ -155,16 +169,17 @@ func NewControllerWithNamespaceSupport(
 }
 
 type notificationController struct {
-	client            dynamic.NamespaceableResourceInterface
-	informer          cache.SharedIndexInformer
-	queue             workqueue.TypedRateLimitingInterface[string]
-	apiFactory        api.Factory
-	metricsRegistry   *MetricsRegistry
-	skipProcessing    func(obj metav1.Object) (bool, string)
-	alterDestinations func(obj metav1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
-	toUnstructured    func(obj metav1.Object) (*unstructured.Unstructured, error)
-	eventCallback     func(eventSequence NotificationEventSequence)
-	namespaceSupport  bool
+	client                     dynamic.NamespaceableResourceInterface
+	informer                   cache.SharedIndexInformer
+	queue                      workqueue.TypedRateLimitingInterface[string]
+	apiFactory                 api.Factory
+	metricsRegistry            *MetricsRegistry
+	skipProcessing             func(obj metav1.Object) (bool, string)
+	alterDestinations          func(obj metav1.Object, destinations services.Destinations, cfg api.Config) services.Destinations
+	toUnstructured             func(obj metav1.Object) (*unstructured.Unstructured, error)
+	eventCallback              func(eventSequence NotificationEventSequence)
+	namespaceSupport           bool
+	maxConcurrentNotifications int
 }
 
 func (c *notificationController) Run(threadiness int, stopCh <-chan struct{}) {
@@ -187,13 +202,72 @@ func (c *notificationController) isSelfServiceConfigureApi(api api.API) bool {
 	return c.namespaceSupport && api.GetConfig().IsSelfServiceConfig
 }
 
-func (c *notificationController) processResourceWithAPI(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
-	apiNamespace := api.GetConfig().Namespace
+// notificationResult encapsulates the result of sending a single notification.
+// It is used to communicate results from parallel notification goroutines back to the main processing loop.
+type notificationResult struct {
+	success  bool                 // success indicates whether the notification was sent successfully
+	err      error                // err contains the error if the send failed
+	delivery NotificationDelivery // delivery contains the notification delivery information
+}
+
+// sendSingleNotification sends a notification to a single destination and returns the result.
+// Thread-safe: designed for concurrent execution. All parameters are either read-only or thread-safe.
+// The api.Send call is performed without locks to enable parallel execution.
+func (c *notificationController) sendSingleNotification(
+	api api.API,
+	un *unstructured.Unstructured,
+	resource metav1.Object,
+	trigger string,
+	cr triggers.ConditionResult,
+	destination services.Destination,
+	templates []string,
+	apiNamespace string,
+	logEntry *log.Entry,
+) notificationResult {
+	logEntry.Infof("Sending notification about condition '%s.%s' to '%v' using the configuration in namespace %s",
+		trigger, cr.Key, destination, apiNamespace)
+
+	err := api.Send(un.Object, templates, destination)
+
+	result := notificationResult{
+		success: err == nil,
+		err:     err,
+		delivery: NotificationDelivery{
+			Trigger:         trigger,
+			Destination:     destination,
+			AlreadyNotified: false,
+		},
+	}
+
+	if err != nil {
+		logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
+			destination, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
+		result.err = fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s",
+			trigger, destination, err, apiNamespace)
+	} else {
+		logEntry.Debugf("Notification %s was sent using the configuration in namespace %s",
+			destination.Recipient, apiNamespace)
+	}
+
+	return result
+}
+
+func (c *notificationController) processResourceWithAPI(apiObj api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
+	cfg := apiObj.GetConfig()
+	apiNamespace := cfg.Namespace
 	notificationsState := NewStateFromRes(resource)
 
-	destinations := c.getDestinations(resource, api.GetConfig())
+	destinations := c.getDestinations(resource, cfg)
 	if len(destinations) == 0 {
 		return resource.GetAnnotations(), nil
+	}
+
+	// Determine max concurrent notifications
+	// Priority: 1) Programmatic config override 2) ConfigMap value 3) api.DefaultMaxConcurrentNotifications
+	maxConcurrent := c.maxConcurrentNotifications
+	if maxConcurrent == api.DefaultMaxConcurrentNotifications && cfg.MaxConcurrentNotifications > 0 {
+		maxConcurrent = cfg.MaxConcurrentNotifications
+		logEntry.Debugf("Using maxConcurrentNotifications from ConfigMap: %d", maxConcurrent)
 	}
 
 	un, err := c.toUnstructured(resource)
@@ -202,7 +276,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 	}
 
 	for trigger, destinations := range destinations {
-		res, err := api.RunTrigger(trigger, un.Object)
+		res, err := apiObj.RunTrigger(trigger, un.Object)
 		if err != nil {
 			logEntry.Errorf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
 			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
@@ -214,13 +288,18 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 
 			if !cr.Triggered {
 				for _, to := range destinations {
-					notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
+					notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(apiObj), apiNamespace, trigger, cr, to, false)
 				}
 				continue
 			}
 
+			// send notifications in parallel using goroutines with a worker pool
+			var wg sync.WaitGroup
+			var notificationsMutex sync.Mutex
+			semaphore := make(chan struct{}, maxConcurrent)
+
 			for _, to := range destinations {
-				if changed := notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, true); !changed {
+				if changed := notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(apiObj), apiNamespace, trigger, cr, to, true); !changed {
 					logEntry.Infof("Notification about condition '%s.%s' already sent to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
 					eventSequence.addDelivered(NotificationDelivery{
 						Trigger:         trigger,
@@ -228,24 +307,32 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 						AlreadyNotified: true,
 					})
 				} else {
-					logEntry.Infof("Sending notification about condition '%s.%s' to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
-					if err := api.Send(un.Object, cr.Templates, to); err != nil {
-						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
-							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
-						notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
-						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
-						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s", trigger, to, err, apiNamespace))
-					} else {
-						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
-						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
-						eventSequence.addDelivered(NotificationDelivery{
-							Trigger:         trigger,
-							Destination:     to,
-							AlreadyNotified: false,
-						})
-					}
+					wg.Add(1)
+					go func(destination services.Destination, templates []string) {
+						semaphore <- struct{}{}
+						defer func() {
+							<-semaphore
+							wg.Done()
+						}()
+
+						result := c.sendSingleNotification(apiObj, un, resource, trigger, cr, destination, templates, apiNamespace, logEntry)
+
+						notificationsMutex.Lock()
+						defer notificationsMutex.Unlock()
+
+						if !result.success {
+							notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(apiObj), apiNamespace, trigger, cr, destination, false)
+							c.metricsRegistry.IncDeliveriesCounter(trigger, destination.Service, false)
+							eventSequence.addError(result.err)
+						} else {
+							c.metricsRegistry.IncDeliveriesCounter(trigger, destination.Service, true)
+							eventSequence.addDelivered(result.delivery)
+						}
+					}(to, cr.Templates)
 				}
 			}
+
+			wg.Wait()
 		}
 	}
 

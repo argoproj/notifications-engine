@@ -42,6 +42,13 @@ data:
 
   service.slack: |
     token: $slack-token
+  
+  # Optional: Maximum concurrent notification deliveries (default: 10)
+  # Controls parallel processing of notifications to multiple destinations.
+  # Higher values speed up delivery when destinations are slow/timing out but increase resource usage.
+  # Recommended: 10-25 (small/medium clusters), 50-100 (large clusters)
+  # Note: Some services have rate limits; start low and increase if needed.
+  maxConcurrentNotifications: "25"
 ---
 apiVersion: v1
 kind: Secret
@@ -76,6 +83,7 @@ notifications.argoproj.io/subscriptions: |
       - service: slack
         recipients: [my-channel-21, my-channel-22]
 ```
+
 ## Getting Started
 
 Ready to add notifications to your project? Check out sample notifications for [cert-manager](./examples/certmanager/README.md)

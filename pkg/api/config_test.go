@@ -62,6 +62,80 @@ func TestParseConfig_DefaultServiceTriggers(t *testing.T) {
 	}, cfg.ServiceDefaultTriggers)
 }
 
+func TestParseConfig_MaxConcurrentNotifications(t *testing.T) {
+	tests := []struct {
+		name     string
+		data     map[string]string
+		expected int
+	}{
+		{
+			name: "valid positive value",
+			data: map[string]string{
+				"maxConcurrentNotifications": "25",
+			},
+			expected: 25,
+		},
+		{
+			name: "valid value 100",
+			data: map[string]string{
+				"maxConcurrentNotifications": "100",
+			},
+			expected: 100,
+		},
+		{
+			name:     "not set uses default",
+			data:     map[string]string{},
+			expected: DefaultMaxConcurrentNotifications,
+		},
+		{
+			name: "zero uses default",
+			data: map[string]string{
+				"maxConcurrentNotifications": "0",
+			},
+			expected: DefaultMaxConcurrentNotifications,
+		},
+		{
+			name: "negative uses default",
+			data: map[string]string{
+				"maxConcurrentNotifications": "-10",
+			},
+			expected: DefaultMaxConcurrentNotifications,
+		},
+		{
+			name: "invalid non-numeric uses default",
+			data: map[string]string{
+				"maxConcurrentNotifications": "invalid",
+			},
+			expected: DefaultMaxConcurrentNotifications,
+		},
+		{
+			name: "empty string uses default",
+			data: map[string]string{
+				"maxConcurrentNotifications": "",
+			},
+			expected: DefaultMaxConcurrentNotifications,
+		},
+		{
+			name: "very high value is accepted with warning",
+			data: map[string]string{
+				"maxConcurrentNotifications": "1500",
+			},
+			expected: 1500,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := ParseConfig(&corev1.ConfigMap{Data: tt.data}, emptySecret)
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.Equal(t, tt.expected, cfg.MaxConcurrentNotifications,
+				"MaxConcurrentNotifications should match expected value")
+		})
+	}
+}
+
 func TestReplaceStringSecret_KeyPresent(t *testing.T) {
 	val := replaceStringSecret("hello $secret-value", map[string][]byte{
 		"secret-value": []byte("world"),

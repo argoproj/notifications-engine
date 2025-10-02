@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -453,13 +455,13 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 
 	ctrl.namespaceSupport = true
 	// SelfService API: config has IsSelfServiceConfig set to true
-	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).Times(3)
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).AnyTimes()
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
 		return true
 	}), []string{"test"}, destination).Return(nil).AnyTimes()
 
-	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default"}).Times(3)
+	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default"}).AnyTimes()
 	apiMap["default"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	apiMap["default"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
 		return true
@@ -484,5 +486,493 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 	for i, event := range actualSequence.Delivered {
 		assert.Equal(t, expectedDeliveries[i].Trigger, event.Trigger)
 		assert.Equal(t, expectedDeliveries[i].Destination, event.Destination)
+	}
+}
+
+func TestNotificationsShouldNotBeBlockedBySlowDestinations(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Setup: 3 destinations - 1 slow (500ms) and 2 fast (50ms)
+	// We verify that fast notifications complete without waiting for the slow one
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook-slow"):  "slow-recipient",
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook-fast1"): "fast-recipient-1",
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook-fast2"): "fast-recipient-2",
+	}))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+
+	// Track when each notification starts to verify parallel execution
+	sendTimes := make([]time.Time, 0)
+	var timesLock sync.Mutex
+
+	const slowWebhookDelay = 500 * time.Millisecond
+	const fastWebhookDelay = 50 * time.Millisecond
+	const parallelStartThreshold = 50 * time.Millisecond
+
+	// Mock slow webhook that times out after 500ms
+	api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{Service: "webhook-slow", Recipient: "slow-recipient"}).
+		DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			timesLock.Lock()
+			sendTimes = append(sendTimes, time.Now())
+			timesLock.Unlock()
+			time.Sleep(slowWebhookDelay)
+			return fmt.Errorf("webhook timeout")
+		})
+
+	// Mock fast webhooks that complete quickly
+	api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{Service: "webhook-fast1", Recipient: "fast-recipient-1"}).
+		DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			timesLock.Lock()
+			sendTimes = append(sendTimes, time.Now())
+			timesLock.Unlock()
+			time.Sleep(fastWebhookDelay)
+			return nil
+		})
+
+	api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{Service: "webhook-fast2", Recipient: "fast-recipient-2"}).
+		DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			timesLock.Lock()
+			sendTimes = append(sendTimes, time.Now())
+			timesLock.Unlock()
+			time.Sleep(fastWebhookDelay)
+			return nil
+		})
+
+	// Execute and measure total time
+	eventSequence := &NotificationEventSequence{}
+	start := time.Now()
+	_, err = ctrl.processResourceWithAPI(api, app, logEntry, eventSequence)
+	elapsed := time.Since(start)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(sendTimes), "All 3 notifications should have been sent")
+
+	// Verify all notifications started in parallel (within threshold)
+	if len(sendTimes) >= 2 {
+		timeBetweenFirstAndSecond := sendTimes[1].Sub(sendTimes[0])
+		assert.Less(t, timeBetweenFirstAndSecond.Milliseconds(), parallelStartThreshold.Milliseconds(),
+			"Fast notifications should start in parallel, not wait for slow ones")
+	}
+
+	if len(sendTimes) >= 3 {
+		timeBetweenFirstAndThird := sendTimes[2].Sub(sendTimes[0])
+		assert.Less(t, timeBetweenFirstAndThird.Milliseconds(), parallelStartThreshold.Milliseconds(),
+			"All notifications should start in parallel")
+	}
+
+	// Total time should be ~500ms (longest webhook), not 600ms (sum of all)
+	assert.Less(t, elapsed.Seconds(), 0.7,
+		"Total time should be ~0.5s (parallel), not sum of all notifications")
+
+	// Verify error was recorded for slow webhook
+	assert.Greater(t, len(eventSequence.Errors), 0, "Slow webhook error should be recorded")
+
+	// Verify 2 fast webhooks succeeded
+	successfulDeliveries := 0
+	for _, delivery := range eventSequence.Delivered {
+		if !delivery.AlreadyNotified {
+			successfulDeliveries++
+		}
+	}
+	assert.Equal(t, 2, successfulDeliveries, "Two fast webhooks should have succeeded")
+}
+
+func TestConcurrentNotificationsLimited(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Setup: 10 destinations with a concurrency limit of 3
+	// Verify that at most 3 notifications are sent concurrently
+	const numNotifications = 10
+	const maxConcurrency = 3
+
+	annotations := make(map[string]string)
+	for i := 1; i <= numNotifications; i++ {
+		annotations[subscriptions.SubscribeAnnotationKey("my-trigger", fmt.Sprintf("webhook-%d", i))] = fmt.Sprintf("recipient-%d", i)
+	}
+	app := newResource("test", withAnnotations(annotations))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app), WithMaxConcurrentNotifications(maxConcurrency))
+	assert.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+
+	// Track concurrent execution to verify worker pool limits
+	var concurrentCount int32
+	var maxConcurrent int32
+	var countLock sync.Mutex
+
+	for i := 1; i <= numNotifications; i++ {
+		api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{
+			Service:   fmt.Sprintf("webhook-%d", i),
+			Recipient: fmt.Sprintf("recipient-%d", i),
+		}).DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			// Increment concurrent count and track maximum
+			countLock.Lock()
+			concurrentCount++
+			if concurrentCount > maxConcurrent {
+				maxConcurrent = concurrentCount
+			}
+			currentCount := concurrentCount
+			countLock.Unlock()
+
+			// Verify we never exceed the limit
+			assert.LessOrEqual(t, currentCount, int32(maxConcurrency),
+				"Concurrent notifications should not exceed configured limit")
+
+			// Simulate work
+			time.Sleep(50 * time.Millisecond)
+
+			// Decrement concurrent count
+			countLock.Lock()
+			concurrentCount--
+			countLock.Unlock()
+
+			return nil
+		})
+	}
+
+	eventSequence := &NotificationEventSequence{}
+	_, err = ctrl.processResourceWithAPI(api, app, logEntry, eventSequence)
+	assert.NoError(t, err)
+
+	// Verify the worker pool reached the configured limit
+	assert.Equal(t, int32(maxConcurrency), maxConcurrent,
+		"Worker pool should reach the maximum concurrency limit")
+	assert.Equal(t, numNotifications, len(eventSequence.Delivered),
+		"All notifications should be delivered")
+}
+
+func TestSendNotificationsInParallel(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Setup: 3 destinations to verify they execute in parallel
+	// We use concurrent call counting instead of timing to avoid flaky tests
+	const numNotifications = 3
+
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook-1"): "recipient-1",
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook-2"): "recipient-2",
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook-3"): "recipient-3",
+	}))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+
+	// Track active concurrent calls and maximum reached
+	var activeCalls int32
+	var maxConcurrent int32
+	var countLock sync.Mutex
+
+	// Channel signals when all notifications have started
+	allStarted := make(chan struct{})
+
+	for i := 1; i <= numNotifications; i++ {
+		api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{
+			Service:   fmt.Sprintf("webhook-%d", i),
+			Recipient: fmt.Sprintf("recipient-%d", i),
+		}).DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			// Track concurrent execution
+			countLock.Lock()
+			activeCalls++
+			if activeCalls > maxConcurrent {
+				maxConcurrent = activeCalls
+			}
+			currentActive := activeCalls
+
+			// Signal when all notifications are active concurrently
+			if currentActive == numNotifications {
+				close(allStarted)
+			}
+			countLock.Unlock()
+
+			// Simulate work
+			time.Sleep(100 * time.Millisecond)
+
+			countLock.Lock()
+			activeCalls--
+			countLock.Unlock()
+
+			return nil
+		})
+	}
+
+	// Execute in background to verify parallel start
+	eventSequence := &NotificationEventSequence{}
+	done := make(chan struct{})
+	go func() {
+		_, err = ctrl.processResourceWithAPI(api, app, logEntry, eventSequence)
+		close(done)
+	}()
+
+	// Wait for all notifications to start concurrently
+	select {
+	case <-allStarted:
+		// Success - all notifications started in parallel
+	case <-time.After(time.Second):
+		t.Fatal("notifications did not start in parallel within timeout")
+	}
+
+	// Wait for completion
+	<-done
+	assert.NoError(t, err)
+
+	// Verify all notifications ran concurrently
+	assert.Equal(t, int32(numNotifications), maxConcurrent,
+		"All notifications should have been active concurrently")
+	assert.Equal(t, numNotifications, len(eventSequence.Delivered),
+		"All notifications should be delivered")
+}
+
+func TestSendSingleNotification(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Setup common test data
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "webhook"): "recipient",
+	}))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+
+	un, err := ctrl.toUnstructured(app)
+	assert.NoError(t, err)
+
+	destination := services.Destination{Service: "webhook", Recipient: "recipient"}
+	templates := []string{"template1"}
+	trigger := "my-trigger"
+	cr := triggers.ConditionResult{Key: "test-condition"}
+	apiNamespace := "default"
+
+	t.Run("success case", func(t *testing.T) {
+		// Mock successful send
+		api.EXPECT().Send(un.Object, templates, destination).Return(nil)
+
+		// Execute
+		result := ctrl.sendSingleNotification(api, un, app, trigger, cr, destination, templates, apiNamespace, logEntry)
+
+		// Verify success result
+		assert.True(t, result.success, "Notification should succeed")
+		assert.Nil(t, result.err, "No error should be returned")
+		assert.Equal(t, trigger, result.delivery.Trigger, "Trigger name should match")
+		assert.Equal(t, destination, result.delivery.Destination, "Destination should match")
+		assert.False(t, result.delivery.AlreadyNotified, "Should not be marked as already notified")
+	})
+
+	t.Run("error case", func(t *testing.T) {
+		// Mock failed send
+		sendErr := fmt.Errorf("network timeout")
+		api.EXPECT().Send(un.Object, templates, destination).Return(sendErr)
+
+		// Execute
+		result := ctrl.sendSingleNotification(api, un, app, trigger, cr, destination, templates, apiNamespace, logEntry)
+
+		// Verify error result
+		assert.False(t, result.success, "Notification should fail")
+		assert.NotNil(t, result.err, "Error should be returned")
+		assert.Contains(t, result.err.Error(), "network timeout", "Error should contain original error message")
+		assert.Contains(t, result.err.Error(), "failed to deliver notification", "Error should be wrapped with context")
+	})
+}
+
+func TestDefaultConcurrencyLimit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Verify default concurrency limit when not explicitly configured
+	ctrl, _, err := newController(t, ctx, newFakeClient())
+	assert.NoError(t, err)
+
+	assert.Equal(t, notificationApi.DefaultMaxConcurrentNotifications, ctrl.maxConcurrentNotifications,
+		"Default concurrency limit should match constant")
+}
+
+func TestCustomConcurrencyLimit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Verify custom concurrency limit is applied
+	ctrl, _, err := newController(t, ctx, newFakeClient(), WithMaxConcurrentNotifications(25))
+	assert.NoError(t, err)
+
+	assert.Equal(t, 25, ctrl.maxConcurrentNotifications,
+		"Custom concurrency limit should be applied")
+}
+
+func TestInvalidConcurrencyLimit(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Verify negative values fall back to default
+	ctrl, _, err := newController(t, ctx, newFakeClient(), WithMaxConcurrentNotifications(-5))
+	assert.NoError(t, err)
+
+	assert.Equal(t, notificationApi.DefaultMaxConcurrentNotifications, ctrl.maxConcurrentNotifications,
+		"Negative concurrency limit should fall back to default")
+
+	// Verify zero values fall back to default
+	ctrl2, _, err := newController(t, ctx, newFakeClient(), WithMaxConcurrentNotifications(0))
+	assert.NoError(t, err)
+
+	assert.Equal(t, notificationApi.DefaultMaxConcurrentNotifications, ctrl2.maxConcurrentNotifications,
+		"Zero concurrency limit should fall back to default")
+}
+
+func TestConcurrencyLimitFromConfig(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// Setup: app with 5 destinations
+	// Controller has default limit of 50, but Config sets it to 2
+	const numNotifications = 5
+	const configMaxConcurrency = 2
+
+	annotations := make(map[string]string)
+	for i := 1; i <= numNotifications; i++ {
+		annotations[subscriptions.SubscribeAnnotationKey("my-trigger", fmt.Sprintf("webhook-%d", i))] = fmt.Sprintf("recipient-%d", i)
+	}
+	app := newResource("test", withAnnotations(annotations))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	assert.NoError(t, err)
+
+	// Config specifies MaxConcurrentNotifications
+	api.EXPECT().GetConfig().Return(notificationApi.Config{
+		MaxConcurrentNotifications: configMaxConcurrency,
+	}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+
+	// Track concurrent execution to verify config value is used
+	var concurrentCount int32
+	var maxConcurrent int32
+	var countLock sync.Mutex
+
+	for i := 1; i <= numNotifications; i++ {
+		api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{
+			Service:   fmt.Sprintf("webhook-%d", i),
+			Recipient: fmt.Sprintf("recipient-%d", i),
+		}).DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			// Increment and track concurrent count
+			countLock.Lock()
+			concurrentCount++
+			if concurrentCount > maxConcurrent {
+				maxConcurrent = concurrentCount
+			}
+			currentCount := concurrentCount
+			countLock.Unlock()
+
+			// Verify we never exceed the config limit
+			assert.LessOrEqual(t, currentCount, int32(configMaxConcurrency),
+				"Concurrent notifications should not exceed config limit")
+
+			time.Sleep(50 * time.Millisecond)
+
+			countLock.Lock()
+			concurrentCount--
+			countLock.Unlock()
+
+			return nil
+		})
+	}
+
+	eventSequence := &NotificationEventSequence{}
+	_, err = ctrl.processResourceWithAPI(api, app, logEntry, eventSequence)
+	assert.NoError(t, err)
+
+	// Verify the config value was used (not the controller default of 50)
+	assert.Equal(t, int32(configMaxConcurrency), maxConcurrent,
+		"Should use config's MaxConcurrentNotifications value")
+	assert.Equal(t, numNotifications, len(eventSequence.Delivered),
+		"All notifications should be delivered")
+}
+
+func TestSequentialNotificationsWhenConcurrencyIsOne(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	// --- Arrange ------------------------------------------------------------------
+	const (
+		triggerName      = "my-trigger"
+		numNotifications = 5
+		servicePrefix    = "webhook"
+		recipientPrefix  = "recipient"
+	)
+
+	annotations := make(map[string]string, numNotifications)
+	for i := 1; i <= numNotifications; i++ {
+		annotations[subscriptions.SubscribeAnnotationKey(triggerName, fmt.Sprintf("%s-%d", servicePrefix, i))] = fmt.Sprintf("%s-%d", recipientPrefix, i)
+	}
+	app := newResource("test", withAnnotations(annotations))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app), WithMaxConcurrentNotifications(1))
+	assert.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
+
+	// Concurrency tracking state
+	var active int32         // current in-flight sends
+	var peakActive int32     // maximum observed simultaneous sends
+	var executionOrder []int // order in which destinations began sending (for permutation validation)
+	var orderLock sync.Mutex
+
+	for i := 1; i <= numNotifications; i++ {
+		idx := i
+		api.EXPECT().Send(gomock.Any(), []string{"test"}, services.Destination{
+			Service:   fmt.Sprintf("%s-%d", servicePrefix, i),
+			Recipient: fmt.Sprintf("%s-%d", recipientPrefix, i),
+		}).DoAndReturn(func(_ map[string]interface{}, _ []string, _ services.Destination) error {
+			// Track entry
+			current := atomic.AddInt32(&active, 1)
+			if current > peakActive {
+				peakActive = current
+			}
+			orderLock.Lock()
+			executionOrder = append(executionOrder, idx)
+			orderLock.Unlock()
+
+			// Simulate delivery time (small to keep test fast)
+			time.Sleep(20 * time.Millisecond)
+
+			// Track exit
+			atomic.AddInt32(&active, -1)
+			return nil
+		})
+	}
+
+	// --- Act ----------------------------------------------------------------------
+	eventSeq := &NotificationEventSequence{}
+	_, err = ctrl.processResourceWithAPI(api, app, logEntry, eventSeq)
+	assert.NoError(t, err)
+
+	// --- Assert -------------------------------------------------------------------
+	assert.Equal(t, int32(1), peakActive, "Concurrency=1 must enforce strictly sequential sends")
+	assert.Equal(t, numNotifications, len(eventSeq.Delivered), "All notifications should be delivered")
+	assert.Empty(t, eventSeq.Errors, "No delivery errors expected")
+
+	// Validate executionOrder is a permutation of 1..numNotifications
+	if len(executionOrder) != numNotifications {
+		t.Fatalf("expected %d executions recorded, got %d", numNotifications, len(executionOrder))
+	}
+	seen := make(map[int]bool, numNotifications)
+	for _, v := range executionOrder {
+		seen[v] = true
+	}
+	for i := 1; i <= numNotifications; i++ {
+		if !seen[i] {
+			t.Fatalf("missing expected index %d in execution order (concurrency=1)", i)
+		}
 	}
 }
