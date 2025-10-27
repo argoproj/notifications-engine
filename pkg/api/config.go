@@ -12,7 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	yaml3 "gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/yaml"
 )
 
@@ -34,7 +34,7 @@ type Config struct {
 }
 
 // Returns list of destinations for the specified trigger
-func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Destinations {
+func (cfg Config) GetGlobalDestinations(resourceLabels map[string]string) services.Destinations {
 	dests := services.Destinations{}
 	for _, s := range cfg.Subscriptions {
 		triggers := s.Triggers
@@ -42,7 +42,7 @@ func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Desti
 			triggers = cfg.DefaultTriggers
 		}
 		for _, trigger := range triggers {
-			if s.MatchesTrigger(trigger) && s.Selector.Matches(fields.Set(labels)) {
+			if s.MatchesTrigger(trigger) && s.Selector.Matches(labels.Set(resourceLabels)) {
 				for _, recipient := range s.Recipients {
 					parts := strings.Split(recipient, ":")
 					dest := services.Destination{Service: parts[0]}
