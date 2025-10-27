@@ -14,7 +14,6 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/google/go-github/v69/github"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
@@ -400,33 +399,28 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
-	var idleConnTimeout time.Duration
-	if opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
+	client, err := httputil.NewServiceHTTPClient(opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, opts.IdleConnTimeout, opts.InsecureSkipVerify, url, "github")
+	if err != nil {
+		return nil, err
 	}
-	tr := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(url, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", "github"))
-	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
+	itr, err := ghinstallation.New(client.Transport, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err
 	}
 
-	var client *github.Client
+	var ghclient *github.Client
 	if opts.EnterpriseBaseURL == "" {
-		client = github.NewClient(&http.Client{Transport: itr})
+		ghclient = github.NewClient(&http.Client{Transport: itr})
 	} else {
 		itr.BaseURL = opts.EnterpriseBaseURL
-		client, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
+		ghclient, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &gitHubService{
-		client: &githubClientAdapter{client: client},
+		client: &githubClientAdapter{client: ghclient},
 	}, nil
 }
 

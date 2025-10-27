@@ -52,16 +52,10 @@ func (s *grafanaService) Send(notification Notification, dest Destination) (err 
 	if notification.Message == "" {
 		log.Warnf("Message is an empty string or not provided in the notifications template")
 	}
-	var idleConnTimeout time.Duration
-	if s.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, s.opts.InsecureSkipVerify), log.WithField("service", "grafana")),
+
+	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "grafana")
+	if err != nil {
+		return err
 	}
 
 	jsonValue, _ := json.Marshal(ga)

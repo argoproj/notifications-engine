@@ -8,9 +8,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
@@ -49,16 +46,9 @@ var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 func (w webexService) Send(notification Notification, dest Destination) (err error) {
 	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
-	var idleConnTimeout time.Duration
-	if w.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(w.opts.IdleConnTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(requestURL, w.opts.MaxIdleConns, w.opts.MaxIdleConnsPerHost, w.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", dest.Service)),
+	client, err := httputil.NewServiceHTTPClient(w.opts.MaxIdleConns, w.opts.MaxIdleConnsPerHost, w.opts.MaxConnsPerHost, w.opts.IdleConnTimeout, w.opts.InsecureSkipVerify, requestURL, "webex")
+	if err != nil {
+		return err
 	}
 
 	message := webexMessage{

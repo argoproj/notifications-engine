@@ -4,13 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"net/http"
 	texttemplate "text/template"
-	"time"
 
 	"github.com/opsgenie/opsgenie-go-sdk-v2/alert"
 	"github.com/opsgenie/opsgenie-go-sdk-v2/client"
-	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
@@ -255,20 +252,14 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) (err
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
-	var idleConnTimeout time.Duration
-	if s.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
+	opsclient, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "opsgenie")
+	if err != nil {
+		return err
 	}
 	alertClient, _ := alert.NewClient(&client.Config{
 		ApiKey:         apiKey,
 		OpsGenieAPIURL: client.ApiUrl(s.opts.ApiUrl),
-		HttpClient: &http.Client{
-			Transport: httputil.NewLoggingRoundTripper(
-				httputil.NewTransport(s.opts.ApiUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", "opsgenie")),
-		},
+		HttpClient:     opsclient,
 	})
 
 	var description, alias, note, entity, user string

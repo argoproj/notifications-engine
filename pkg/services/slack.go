@@ -5,11 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"regexp"
 	texttemplate "text/template"
-	"time"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
@@ -206,16 +204,9 @@ func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	var idleConnTimeout time.Duration
-	if opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(opts.IdleConnTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	transport := httputil.NewTransport(apiURL, opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxIdleConns, idleConnTimeout, opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
+	client, err := httputil.NewServiceHTTPClient(opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, opts.IdleConnTimeout, opts.InsecureSkipVerify, apiURL, "slack")
+	if err != nil {
+		return nil, err
 	}
 	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), nil
 }

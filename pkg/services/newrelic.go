@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 	texttemplate "text/template"
-	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -138,16 +137,9 @@ func (s newrelicService) Send(notification Notification, dest Destination) (err 
 		},
 	}
 
-	var idleConnTimeout time.Duration
-	if s.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiURL, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false), log.WithField("service", dest.Service)),
+	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, s.opts.ApiURL, "newrelic")
+	if err != nil {
+		return err
 	}
 
 	jsonValue, err := json.Marshal(deploymentMarker)

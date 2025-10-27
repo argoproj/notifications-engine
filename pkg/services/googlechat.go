@@ -8,11 +8,9 @@ import (
 	"net/http"
 	"net/url"
 	texttemplate "text/template"
-	"time"
 
 	"github.com/google/uuid"
 
-	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 
 	"google.golang.org/api/chat/v1"
@@ -112,16 +110,10 @@ func (s googleChatService) getClient(recipient string) (googlechatclient *google
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
-	var idleConnTimeout time.Duration
-	if s.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "googlechat")),
+
+	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, webhookUrl, "googlechat")
+	if err != nil {
+		return nil, err
 	}
 	return &googlechatClient{httpClient: client, url: webhookUrl}, nil
 }

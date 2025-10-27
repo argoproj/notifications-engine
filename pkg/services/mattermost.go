@@ -7,9 +7,6 @@ import (
 	"io"
 	"net/http"
 	texttemplate "text/template"
-	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
@@ -56,16 +53,9 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) (err error) {
-	var idleConnTimeout time.Duration
-	if m.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(m.opts.IdleConnTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, idleConnTimeout, m.opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "mattermost")),
+	client, err := httputil.NewServiceHTTPClient(m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, m.opts.IdleConnTimeout, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
+	if err != nil {
+		return err
 	}
 
 	attachments := []interface{}{}

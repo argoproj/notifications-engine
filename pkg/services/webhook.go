@@ -11,8 +11,6 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 
-	log "github.com/sirupsen/logrus"
-
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
@@ -177,21 +175,13 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 		return nil, err
 	}
 
-	var idleConnTimeout time.Duration
-	if service.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(service.opts.IdleConnTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
+	whclient, err := httputil.NewServiceHTTPClient(service.opts.MaxIdleConns, service.opts.MaxIdleConnsPerHost, service.opts.MaxConnsPerHost, service.opts.IdleConnTimeout, service.opts.InsecureSkipVerify, service.opts.URL, r.destService)
+	if err != nil {
+		return nil, err
 	}
-	transport := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(r.url, service.opts.MaxIdleConns, service.opts.MaxIdleConnsPerHost, service.opts.MaxConnsPerHost, idleConnTimeout, service.opts.InsecureSkipVerify),
-		log.WithField("service", r.destService))
 
 	client := retryablehttp.NewClient()
-	client.HTTPClient = &http.Client{
-		Transport: transport,
-	}
+	client.HTTPClient = whclient
 	client.RetryWaitMin = service.opts.RetryWaitMin
 	client.RetryWaitMax = service.opts.RetryWaitMax
 	client.RetryMax = service.opts.RetryMax

@@ -5,11 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	texttemplate "text/template"
-	"time"
-
-	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
@@ -161,16 +157,9 @@ func (s teamsService) Send(notification Notification, dest Destination) (err err
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	var idleConnTimeout time.Duration
-	if s.opts.IdleConnTimeout != "" {
-		idleConnTimeout, err = time.ParseDuration(s.opts.IdleConnTimeout)
-		if err != nil {
-			return fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	transport := httputil.NewTransport(webhookUrl, s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, idleConnTimeout, false)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "teams")),
+	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, webhookUrl, "teams")
+	if err != nil {
+		return err
 	}
 
 	message, err := teamsNotificationToReader(notification)

@@ -211,7 +211,7 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) (err error) {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, rawURL, "alertmeanger")
+	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, rawURL, "alertmanager")
 	if err != nil {
 		return err
 	}
