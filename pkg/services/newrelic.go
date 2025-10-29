@@ -15,13 +15,10 @@ import (
 )
 
 type NewrelicOptions struct {
-	ApiKey              string `json:"apiKey"`
-	ApiURL              string `json:"apiURL"`
-	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
-	MaxIdleConns        int    `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
-	IdleConnTimeout     string `json:"idleConnTimeout"`
+	ApiKey             string `json:"apiKey"`
+	ApiURL             string `json:"apiURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type NewrelicNotification struct {
@@ -137,7 +134,13 @@ func (s newrelicService) Send(notification Notification, dest Destination) (err 
 		},
 	}
 
-	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, s.opts.ApiURL, "newrelic")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        s.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
+		IdleConnTimeout:     s.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, s.opts.ApiURL, "newrelic")
 	if err != nil {
 		return err
 	}

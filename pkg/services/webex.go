@@ -13,13 +13,10 @@ import (
 )
 
 type WebexOptions struct {
-	Token               string `json:"token"`
-	ApiURL              string `json:"apiURL"`
-	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
-	MaxIdleConns        int    `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
-	IdleConnTimeout     string `json:"idleConnTimeout"`
+	Token              string `json:"token"`
+	ApiURL             string `json:"apiURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type webexService struct {
@@ -46,7 +43,13 @@ var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 func (w webexService) Send(notification Notification, dest Destination) (err error) {
 	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
-	client, err := httputil.NewServiceHTTPClient(w.opts.MaxIdleConns, w.opts.MaxIdleConnsPerHost, w.opts.MaxConnsPerHost, w.opts.IdleConnTimeout, w.opts.InsecureSkipVerify, requestURL, "webex")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        w.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: w.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     w.opts.MaxConnsPerHost,
+		IdleConnTimeout:     w.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, w.opts.InsecureSkipVerify, requestURL, "webex")
 	if err != nil {
 		return err
 	}

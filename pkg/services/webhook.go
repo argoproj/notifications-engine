@@ -78,17 +78,14 @@ type BasicAuth struct {
 }
 
 type WebhookOptions struct {
-	URL                 string        `json:"url"`
-	Headers             []Header      `json:"headers"`
-	BasicAuth           *BasicAuth    `json:"basicAuth"`
-	RetryWaitMin        time.Duration `json:"retryWaitMin"`
-	RetryWaitMax        time.Duration `json:"retryWaitMax"`
-	RetryMax            int           `json:"retryMax"`
-	InsecureSkipVerify  bool          `json:"insecureSkipVerify"`
-	MaxIdleConns        int           `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int           `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int           `json:"maxConnsPerHost"`
-	IdleConnTimeout     string        `json:"idleConnTimeout"`
+	URL                string        `json:"url"`
+	Headers            []Header      `json:"headers"`
+	BasicAuth          *BasicAuth    `json:"basicAuth"`
+	RetryWaitMin       time.Duration `json:"retryWaitMin"`
+	RetryWaitMax       time.Duration `json:"retryWaitMax"`
+	RetryMax           int           `json:"retryMax"`
+	InsecureSkipVerify bool          `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 func NewWebhookService(opts WebhookOptions) NotificationService {
@@ -175,7 +172,13 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 		return nil, err
 	}
 
-	whclient, err := httputil.NewServiceHTTPClient(service.opts.MaxIdleConns, service.opts.MaxIdleConnsPerHost, service.opts.MaxConnsPerHost, service.opts.IdleConnTimeout, service.opts.InsecureSkipVerify, service.opts.URL, r.destService)
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        service.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: service.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     service.opts.MaxConnsPerHost,
+		IdleConnTimeout:     service.opts.IdleConnTimeout,
+	}
+	whclient, err := httputil.NewServiceHTTPClient(tp, service.opts.InsecureSkipVerify, service.opts.URL, r.destService)
 	if err != nil {
 		return nil, err
 	}

@@ -3,7 +3,6 @@ package http
 import (
 	"crypto/tls"
 	"crypto/x509"
-	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -11,20 +10,37 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type TransportOptions struct {
+	MaxIdleConns        int    `json:"maxIdleConns"`
+	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
+	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
+	IdleConnTimeout     string `json:"idleConnTimeout"`
+}
+
 var certResolver func(serverName string) ([]string, error)
 
 func SetCertResolver(resolver func(serverName string) ([]string, error)) {
 	certResolver = resolver
 }
 
-func NewTransport(rawURL string, maxIdleConns int, maxIdleConnsPerHost int, maxConnsPerHost int, idleConnTimeout time.Duration, insecureSkipVerify bool) *http.Transport {
+func NewTransport(tp TransportOptions, rawURL string, insecureSkipVerify bool) *http.Transport {
+	// Parse IdleConnTimeout from string if provided
+	var idleConnTimeout time.Duration
+	if tp.IdleConnTimeout != "" {
+		dur, err := time.ParseDuration(tp.IdleConnTimeout)
+		if err == nil {
+			idleConnTimeout = dur
+		}
+	}
+
 	transport := &http.Transport{
 		Proxy:               http.ProxyFromEnvironment,
-		MaxIdleConns:        maxIdleConns,
-		MaxIdleConnsPerHost: maxIdleConnsPerHost,
-		MaxConnsPerHost:     maxConnsPerHost,
+		MaxIdleConns:        tp.MaxIdleConns,
+		MaxIdleConnsPerHost: tp.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     tp.MaxConnsPerHost,
 		IdleConnTimeout:     idleConnTimeout,
 	}
+
 	if insecureSkipVerify {
 		transport.TLSClientConfig = &tls.Config{
 			InsecureSkipVerify: true,
@@ -43,18 +59,12 @@ func NewTransport(rawURL string, maxIdleConns int, maxIdleConnsPerHost int, maxC
 			}
 		}
 	}
+
 	return transport
 }
 
-func NewServiceHTTPClient(maxIdleConns, maxIdleConnsPerHost, maxConnsPerHost int, idleConnTimeout string, insecureSkipVerify bool, apiURL string, serviceName string) (client *http.Client, err error) {
-	var timeout time.Duration
-	if idleConnTimeout != "" {
-		timeout, err = time.ParseDuration(idleConnTimeout)
-		if err != nil {
-			return nil, fmt.Errorf("failed to parse idle connection timeout: %w", err)
-		}
-	}
-	transport := NewTransport(apiURL, maxIdleConns, maxIdleConnsPerHost, maxConnsPerHost, timeout, insecureSkipVerify)
+func NewServiceHTTPClient(tp TransportOptions, insecureSkipVerify bool, apiURL string, serviceName string) (*http.Client, error) {
+	transport := NewTransport(tp, apiURL, insecureSkipVerify)
 	return &http.Client{
 		Transport: NewLoggingRoundTripper(transport, log.WithField("service", serviceName)),
 	}, nil

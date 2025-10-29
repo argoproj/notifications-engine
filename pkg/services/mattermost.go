@@ -35,13 +35,10 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type MattermostOptions struct {
-	ApiURL              string `json:"apiURL"`
-	Token               string `json:"token"`
-	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
-	MaxIdleConns        int    `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
-	IdleConnTimeout     string `json:"idleConnTimeout"`
+	ApiURL             string `json:"apiURL"`
+	Token              string `json:"token"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type mattermostService struct {
@@ -53,7 +50,13 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) (err error) {
-	client, err := httputil.NewServiceHTTPClient(m.opts.MaxIdleConns, m.opts.MaxIdleConnsPerHost, m.opts.MaxConnsPerHost, m.opts.IdleConnTimeout, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        m.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: m.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     m.opts.MaxConnsPerHost,
+		IdleConnTimeout:     m.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
 	if err != nil {
 		return err
 	}

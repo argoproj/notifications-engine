@@ -79,12 +79,9 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type GoogleChatOptions struct {
-	WebhookUrls         map[string]string `json:"webhooks"`
-	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
-	MaxIdleConns        int               `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
-	IdleConnTimeout     string            `json:"idleConnTimeout"`
+	WebhookUrls        map[string]string `json:"webhooks"`
+	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type googleChatService struct {
@@ -111,7 +108,13 @@ func (s googleChatService) getClient(recipient string) (googlechatclient *google
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
 
-	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, webhookUrl, "googlechat")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        s.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
+		IdleConnTimeout:     s.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, webhookUrl, "googlechat")
 	if err != nil {
 		return nil, err
 	}

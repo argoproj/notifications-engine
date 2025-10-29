@@ -95,18 +95,15 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type SlackOptions struct {
-	Username            string   `json:"username"`
-	Icon                string   `json:"icon"`
-	Token               string   `json:"token"`
-	SigningSecret       string   `json:"signingSecret"`
-	Channels            []string `json:"channels"`
-	ApiURL              string   `json:"apiURL"`
-	DisableUnfurl       bool     `json:"disableUnfurl"`
-	InsecureSkipVerify  bool     `json:"insecureSkipVerify"`
-	MaxIdleConns        int      `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int      `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int      `json:"maxConnsPerHost"`
-	IdleConnTimeout     string   `json:"idleConnTimeout"`
+	Username           string   `json:"username"`
+	Icon               string   `json:"icon"`
+	Token              string   `json:"token"`
+	SigningSecret      string   `json:"signingSecret"`
+	Channels           []string `json:"channels"`
+	ApiURL             string   `json:"apiURL"`
+	DisableUnfurl      bool     `json:"disableUnfurl"`
+	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type slackService struct {
@@ -204,7 +201,14 @@ func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	client, err := httputil.NewServiceHTTPClient(opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, opts.IdleConnTimeout, opts.InsecureSkipVerify, apiURL, "slack")
+
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        opts.MaxIdleConns,
+		MaxIdleConnsPerHost: opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     opts.MaxConnsPerHost,
+		IdleConnTimeout:     opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, opts.InsecureSkipVerify, apiURL, "slack")
 	if err != nil {
 		return nil, err
 	}

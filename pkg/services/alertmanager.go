@@ -33,17 +33,14 @@ type AlertmanagerNotification struct {
 
 // AlertmanagerOptions cluster configuration
 type AlertmanagerOptions struct {
-	Targets             []string   `json:"targets"`
-	Scheme              string     `json:"scheme"`
-	APIPath             string     `json:"apiPath"`
-	BasicAuth           *BasicAuth `json:"basicAuth"`
-	BearerToken         string     `json:"bearerToken"`
-	Timeout             int        `json:"timeout"`
-	InsecureSkipVerify  bool       `json:"insecureSkipVerify"`
-	MaxIdleConns        int        `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int        `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int        `json:"maxConnsPerHost"`
-	IdleConnTimeout     string     `json:"idleConnTimeout"`
+	Targets            []string   `json:"targets"`
+	Scheme             string     `json:"scheme"`
+	APIPath            string     `json:"apiPath"`
+	BasicAuth          *BasicAuth `json:"basicAuth"`
+	BearerToken        string     `json:"bearerToken"`
+	Timeout            int        `json:"timeout"`
+	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 // NewAlertmanagerService new service
@@ -211,7 +208,13 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) (err error) {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, rawURL, "alertmanager")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        s.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
+		IdleConnTimeout:     s.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, rawURL, "alertmanager")
 	if err != nil {
 		return err
 	}

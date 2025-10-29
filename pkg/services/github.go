@@ -25,15 +25,12 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID               interface{} `json:"appID"`
-	InstallationID      interface{} `json:"installationID"`
-	PrivateKey          string      `json:"privateKey"`
-	EnterpriseBaseURL   string      `json:"enterpriseBaseURL"`
-	InsecureSkipVerify  bool        `json:"insecureSkipVerify"`
-	MaxIdleConns        int         `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int         `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int         `json:"maxConnsPerHost"`
-	IdleConnTimeout     string      `json:"idleConnTimeout"`
+	AppID              interface{} `json:"appID"`
+	InstallationID     interface{} `json:"installationID"`
+	PrivateKey         string      `json:"privateKey"`
+	EnterpriseBaseURL  string      `json:"enterpriseBaseURL"`
+	InsecureSkipVerify bool        `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type GitHubNotification struct {
@@ -399,7 +396,14 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
-	client, err := httputil.NewServiceHTTPClient(opts.MaxIdleConns, opts.MaxIdleConnsPerHost, opts.MaxConnsPerHost, opts.IdleConnTimeout, opts.InsecureSkipVerify, url, "github")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        opts.MaxIdleConns,
+		MaxIdleConnsPerHost: opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     opts.MaxConnsPerHost,
+		IdleConnTimeout:     opts.IdleConnTimeout,
+	}
+
+	client, err := httputil.NewServiceHTTPClient(tp, opts.InsecureSkipVerify, url, "github")
 	if err != nil {
 		return nil, err
 	}

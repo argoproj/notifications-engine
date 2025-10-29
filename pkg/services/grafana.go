@@ -17,13 +17,10 @@ import (
 )
 
 type GrafanaOptions struct {
-	ApiUrl              string `json:"apiUrl"`
-	ApiKey              string `json:"apiKey"`
-	InsecureSkipVerify  bool   `json:"insecureSkipVerify"`
-	MaxIdleConns        int    `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
-	IdleConnTimeout     string `json:"idleConnTimeout"`
+	ApiUrl             string `json:"apiUrl"`
+	ApiKey             string `json:"apiKey"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type grafanaService struct {
@@ -53,7 +50,13 @@ func (s *grafanaService) Send(notification Notification, dest Destination) (err 
 		log.Warnf("Message is an empty string or not provided in the notifications template")
 	}
 
-	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "grafana")
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        s.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
+		IdleConnTimeout:     s.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "grafana")
 	if err != nil {
 		return err
 	}

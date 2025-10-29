@@ -136,12 +136,9 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type TeamsOptions struct {
-	RecipientUrls       map[string]string `json:"recipientUrls"`
-	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
-	MaxIdleConns        int               `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
-	IdleConnTimeout     string            `json:"idleConnTimeout"`
+	RecipientUrls      map[string]string `json:"recipientUrls"`
+	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type teamsService struct {
@@ -157,7 +154,14 @@ func (s teamsService) Send(notification Notification, dest Destination) (err err
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	client, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, webhookUrl, "teams")
+
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        s.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
+		IdleConnTimeout:     s.opts.IdleConnTimeout,
+	}
+	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, webhookUrl, "teams")
 	if err != nil {
 		return err
 	}

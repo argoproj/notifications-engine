@@ -13,13 +13,10 @@ import (
 )
 
 type OpsgenieOptions struct {
-	ApiUrl              string            `json:"apiUrl"`
-	ApiKeys             map[string]string `json:"apiKeys"`
-	InsecureSkipVerify  bool              `json:"insecureSkipVerify"`
-	MaxIdleConns        int               `json:"maxIdleConns"`
-	MaxIdleConnsPerHost int               `json:"maxIdleConnsPerHost"`
-	MaxConnsPerHost     int               `json:"maxConnsPerHost"`
-	IdleConnTimeout     string            `json:"idleConnTimeout"`
+	ApiUrl             string            `json:"apiUrl"`
+	ApiKeys            map[string]string `json:"apiKeys"`
+	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type OpsgenieNotification struct {
@@ -252,7 +249,14 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) (err
 	if !ok {
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
-	opsclient, err := httputil.NewServiceHTTPClient(s.opts.MaxIdleConns, s.opts.MaxIdleConnsPerHost, s.opts.MaxConnsPerHost, s.opts.IdleConnTimeout, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "opsgenie")
+
+	tp := httputil.TransportOptions{
+		MaxIdleConns:        s.opts.MaxIdleConns,
+		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
+		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
+		IdleConnTimeout:     s.opts.IdleConnTimeout,
+	}
+	opsclient, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "opsgenie")
 	if err != nil {
 		return err
 	}
