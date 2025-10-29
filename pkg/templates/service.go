@@ -9,7 +9,7 @@ import (
 )
 
 type Service interface {
-	FormatNotification(vars map[string]interface{}, templates ...string) (*services.Notification, error)
+	FormatNotification(vars map[string]any, templates ...string) (*services.Notification, error)
 }
 
 type service struct {
@@ -32,7 +32,7 @@ func NewService(templates map[string]services.Notification) (*service, error) {
 	return svc, nil
 }
 
-func (s *service) FormatNotification(vars map[string]interface{}, templates ...string) (*services.Notification, error) {
+func (s *service) FormatNotification(vars map[string]any, templates ...string) (*services.Notification, error) {
 	var notification services.Notification
 	for _, templateName := range templates {
 		templater, ok := s.templaters[templateName]

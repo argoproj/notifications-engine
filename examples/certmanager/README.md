@@ -27,8 +27,8 @@ notificationsFactory := api.NewFactory(api.Settings{
 	ConfigMapName: "cert-manager-notifications-cm",
 	SecretName:    "cert-manager-notifications-secret",
 	InitGetVars: func(cfg *api.Config, configMap *v1.ConfigMap, secret *v1.Secret) (api.GetVars, error) {
-		return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-			return map[string]interface{}{"cert": obj}
+		return func(obj map[string]any, dest services.Destination) map[string]any {
+			return map[string]any{"cert": obj}
 		}, nil
 	},
 }, namespace, secrets, configMaps)
@@ -128,8 +128,8 @@ func main() {
 		ConfigMapName: "cert-manager-notifications-cm",
 		SecretName:    "cert-manager-notifications-secret",
 		InitGetVars: func(cfg *api.Config, configMap *v1.ConfigMap, secret *v1.Secret) (api.GetVars, error) {
-			return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-				return map[string]interface{}{"cert": obj}
+			return func(obj map[string]any, dest services.Destination) map[string]any {
+				return map[string]any{"cert": obj}
 			}, nil
 		},
 	})

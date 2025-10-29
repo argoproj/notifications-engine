@@ -20,9 +20,9 @@ func main() {
 	}, api.Settings{
 		ConfigMapName: "cert-manager-notifications-cm",
 		SecretName:    "cert-manager-notifications-secret",
-		InitGetVars: func(cfg *api.Config, configMap *corev1.ConfigMap, secret *corev1.Secret) (api.GetVars, error) {
-			return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-				return map[string]interface{}{"cert": obj}
+		InitGetVars: func(_ *api.Config, _ *corev1.ConfigMap, _ *corev1.Secret) (api.GetVars, error) {
+			return func(obj map[string]any, _ services.Destination) map[string]any {
+				return map[string]any{"cert": obj}
 			}, nil
 		},
 	})

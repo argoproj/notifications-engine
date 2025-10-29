@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/argoproj/notifications-engine/pkg/api"
@@ -27,17 +26,15 @@ func addOutputFlags(cmd *cobra.Command, output *string) {
 }
 
 func NewToolsCommand(name string, cliName string, resource schema.GroupVersionResource, settings api.Settings, opts ...func(cfg clientcmd.ClientConfig)) *cobra.Command {
-	var (
-		cmdContext = commandContext{
-			Settings: settings,
-			resource: resource,
-			stdout:   os.Stdout,
-			stderr:   os.Stderr,
-			stdin:    os.Stdin,
-			cliName:  cliName,
-		}
-	)
-	var command = cobra.Command{
+	cmdContext := commandContext{
+		Settings: settings,
+		resource: resource,
+		stdout:   os.Stdout,
+		stderr:   os.Stderr,
+		stdin:    os.Stdin,
+		cliName:  cliName,
+	}
+	command := cobra.Command{
 		Use:   name,
 		Short: "Set of CLI commands that helps manage notifications settings",
 		Run: func(c *cobra.Command, args []string) {
@@ -49,11 +46,11 @@ func NewToolsCommand(name string, cliName string, resource schema.GroupVersionRe
 	command.AddCommand(newTemplateCommand(&cmdContext))
 
 	command.PersistentFlags().StringVar(&cmdContext.configMapPath,
-		"config-map", "", fmt.Sprintf("%s.yaml file path", settings.ConfigMapName))
+		"config-map", "", settings.ConfigMapName+".yaml file path")
 	command.PersistentFlags().StringVar(&cmdContext.secretPath,
-		"secret", "", fmt.Sprintf("%s.yaml file path. Use empty secret if provided value is ':empty'", settings.SecretName))
+		"secret", "", settings.SecretName+".yaml file path. Use empty secret if provided value is ':empty'")
 	clientConfig := addK8SFlagsToCmd(&command)
-	command.PersistentPreRun = func(cmd *cobra.Command, args []string) {
+	command.PersistentPreRun = func(_ *cobra.Command, _ []string) {
 		for i := range opts {
 			opts[i](clientConfig)
 		}

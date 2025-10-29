@@ -10,7 +10,7 @@ import (
 	"sigs.k8s.io/yaml"
 )
 
-func PrintFormatted(input interface{}, output string, out io.Writer) error {
+func PrintFormatted(input any, output string, out io.Writer) error {
 	switch output {
 	case "json":
 		data, err := json.MarshalIndent(input, "", "  ")
@@ -31,7 +31,7 @@ func PrintFormatted(input interface{}, output string, out io.Writer) error {
 	}
 }
 
-func IterateStringKeyMap(val interface{}, callback func(key string)) {
+func IterateStringKeyMap(val any, callback func(key string)) {
 	keys := reflect.ValueOf(val).MapKeys()
 	var sortedKeys []string
 	for _, k := range keys {

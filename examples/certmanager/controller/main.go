@@ -28,12 +28,10 @@ import (
 )
 
 func main() {
-	var (
-		clientConfig clientcmd.ClientConfig
-	)
-	var command = cobra.Command{
+	var clientConfig clientcmd.ClientConfig
+	command := cobra.Command{
 		Use: "controller",
-		Run: func(c *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 			// Optionally set the annotations prefix
 			// subscriptions.SetAnnotationPrefix("example.prefix.io")
 
@@ -59,9 +57,9 @@ func main() {
 			notificationsFactory := api.NewFactory(api.Settings{
 				ConfigMapName: "cert-manager-notifications-cm",
 				SecretName:    "cert-manager-notifications-secret",
-				InitGetVars: func(cfg *api.Config, configMap *corev1.ConfigMap, secret *corev1.Secret) (api.GetVars, error) {
-					return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-						return map[string]interface{}{"cert": obj}
+				InitGetVars: func(_ *api.Config, _ *corev1.ConfigMap, _ *corev1.Secret) (api.GetVars, error) {
+					return func(obj map[string]any, _ services.Destination) map[string]any {
+						return map[string]any{"cert": obj}
 					}, nil
 				},
 			}, namespace, secrets, configMaps)
@@ -74,7 +72,7 @@ func main() {
 				ListFunc: func(options metav1.ListOptions) (runtime.Object, error) {
 					return certClient.List(context.Background(), options)
 				},
-				WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
+				WatchFunc: func(_ metav1.ListOptions) (watch.Interface, error) {
 					return certClient.Watch(context.Background(), metav1.ListOptions{})
 				},
 			}, &unstructured.Unstructured{}, time.Minute, cache.Indexers{})

@@ -5,25 +5,22 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater(t *testing.T) {
 	n := Notification{Message: "{{.foo}}"}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"foo": "hello",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.Message)
 }

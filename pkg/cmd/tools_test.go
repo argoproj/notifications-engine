@@ -7,6 +7,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/util/misc"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPrintFormatterJson(t *testing.T) {
@@ -15,7 +16,7 @@ func TestPrintFormatterJson(t *testing.T) {
 		"foo": "bar",
 	}, "json", &out)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, out.String(), `{
   "foo": "bar"
 }`)
@@ -27,6 +28,6 @@ func TestPrintFormatterYaml(t *testing.T) {
 		"foo": "bar",
 	}, "yaml", &out)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Contains(t, out.String(), `foo: bar`)
 }

@@ -58,31 +58,33 @@ func NewFactory(settings Settings, defaultNamespace string, secretsInformer cach
 	}
 
 	_, _ = secretsInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			factory.invalidateIfHasName(settings.SecretName, obj)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			factory.invalidateIfHasName(settings.SecretName, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(_, newObj any) {
 			factory.invalidateIfHasName(settings.SecretName, newObj)
-		}})
+		},
+	})
 
 	_, _ = cmInformer.AddEventHandler(cache.ResourceEventHandlerFuncs{
-		AddFunc: func(obj interface{}) {
+		AddFunc: func(obj any) {
 			factory.invalidateIfHasName(settings.ConfigMapName, obj)
 		},
-		DeleteFunc: func(obj interface{}) {
+		DeleteFunc: func(obj any) {
 			factory.invalidateIfHasName(settings.ConfigMapName, obj)
 		},
-		UpdateFunc: func(oldObj, newObj interface{}) {
+		UpdateFunc: func(_, newObj any) {
 			factory.invalidateIfHasName(settings.ConfigMapName, newObj)
-		}})
+		},
+	})
 
 	return factory
 }
 
-func (f *apiFactory) invalidateIfHasName(name string, obj interface{}) {
+func (f *apiFactory) invalidateIfHasName(name string, obj any) {
 	metaObj, ok := obj.(metav1.Object)
 	if !ok {
 		return

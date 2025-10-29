@@ -24,7 +24,7 @@ func (n *RocketChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 	if err != nil {
 		return nil, err
 	}
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.RocketChat == nil {
 			notification.RocketChat = &RocketChatNotification{}
 		}
