@@ -14,7 +14,6 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/google/go-github/v69/github"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
@@ -26,10 +25,12 @@ var (
 )
 
 type GitHubOptions struct {
-	AppID             interface{} `json:"appID"`
-	InstallationID    interface{} `json:"installationID"`
-	PrivateKey        string      `json:"privateKey"`
-	EnterpriseBaseURL string      `json:"enterpriseBaseURL"`
+	AppID              interface{} `json:"appID"`
+	InstallationID     interface{} `json:"installationID"`
+	PrivateKey         string      `json:"privateKey"`
+	EnterpriseBaseURL  string      `json:"enterpriseBaseURL"`
+	InsecureSkipVerify bool        `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type GitHubNotification struct {
@@ -395,26 +396,28 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
-	tr := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(url, false), log.WithField("service", "github"))
-	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
+	client, err := httputil.NewServiceHTTPClient(opts.TransportOptions, opts.InsecureSkipVerify, url, "github")
+	if err != nil {
+		return nil, err
+	}
+	itr, err := ghinstallation.New(client.Transport, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err
 	}
 
-	var client *github.Client
+	var ghclient *github.Client
 	if opts.EnterpriseBaseURL == "" {
-		client = github.NewClient(&http.Client{Transport: itr})
+		ghclient = github.NewClient(&http.Client{Transport: itr})
 	} else {
 		itr.BaseURL = opts.EnterpriseBaseURL
-		client, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
+		ghclient, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &gitHubService{
-		client: &githubClientAdapter{client: client},
+		client: &githubClientAdapter{client: ghclient},
 	}, nil
 }
 

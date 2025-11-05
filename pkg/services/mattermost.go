@@ -8,8 +8,6 @@ import (
 	"net/http"
 	texttemplate "text/template"
 
-	log "github.com/sirupsen/logrus"
-
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
@@ -40,6 +38,7 @@ type MattermostOptions struct {
 	ApiURL             string `json:"apiURL"`
 	Token              string `json:"token"`
 	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type mattermostService struct {
@@ -50,10 +49,10 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 	return &mattermostService{opts: opts}
 }
 
-func (m *mattermostService) Send(notification Notification, dest Destination) error {
-	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "mattermost")),
+func (m *mattermostService) Send(notification Notification, dest Destination) (err error) {
+	client, err := httputil.NewServiceHTTPClient(m.opts.TransportOptions, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
+	if err != nil {
+		return err
 	}
 
 	attachments := []interface{}{}

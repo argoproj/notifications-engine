@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 
 	"google.golang.org/api/chat/v1"
@@ -80,7 +79,9 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 }
 
 type GoogleChatOptions struct {
-	WebhookUrls map[string]string `json:"webhooks"`
+	WebhookUrls        map[string]string `json:"webhooks"`
+	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type googleChatService struct {
@@ -101,14 +102,15 @@ type webhookError struct {
 	Status  string `json:"status"`
 }
 
-func (s googleChatService) getClient(recipient string) (*googlechatClient, error) {
+func (s googleChatService) getClient(recipient string) (googlechatclient *googlechatClient, err error) {
 	webhookUrl, ok := s.opts.WebhookUrls[recipient]
 	if !ok {
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "googlechat")),
+
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, webhookUrl, "googlechat")
+	if err != nil {
+		return nil, err
 	}
 	return &googlechatClient{httpClient: client, url: webhookUrl}, nil
 }
