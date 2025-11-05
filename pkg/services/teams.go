@@ -155,13 +155,7 @@ func (s teamsService) Send(notification Notification, dest Destination) (err err
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        s.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
-		IdleConnTimeout:     s.opts.IdleConnTimeout,
-	}
-	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, webhookUrl, "teams")
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, webhookUrl, "teams")
 	if err != nil {
 		return err
 	}

@@ -50,13 +50,7 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 }
 
 func (m *mattermostService) Send(notification Notification, dest Destination) (err error) {
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        m.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: m.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     m.opts.MaxConnsPerHost,
-		IdleConnTimeout:     m.opts.IdleConnTimeout,
-	}
-	client, err := httputil.NewServiceHTTPClient(tp, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
+	client, err := httputil.NewServiceHTTPClient(m.opts.TransportOptions, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
 	if err != nil {
 		return err
 	}

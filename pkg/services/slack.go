@@ -202,13 +202,7 @@ func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 		apiURL = opts.ApiURL
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        opts.MaxIdleConns,
-		MaxIdleConnsPerHost: opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     opts.MaxConnsPerHost,
-		IdleConnTimeout:     opts.IdleConnTimeout,
-	}
-	client, err := httputil.NewServiceHTTPClient(tp, opts.InsecureSkipVerify, apiURL, "slack")
+	client, err := httputil.NewServiceHTTPClient(opts.TransportOptions, opts.InsecureSkipVerify, apiURL, "slack")
 	if err != nil {
 		return nil, err
 	}

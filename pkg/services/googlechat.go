@@ -108,13 +108,7 @@ func (s googleChatService) getClient(recipient string) (googlechatclient *google
 		return nil, fmt.Errorf("no Google chat webhook configured for recipient %s", recipient)
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        s.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
-		IdleConnTimeout:     s.opts.IdleConnTimeout,
-	}
-	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, webhookUrl, "googlechat")
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, webhookUrl, "googlechat")
 	if err != nil {
 		return nil, err
 	}

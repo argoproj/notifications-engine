@@ -250,13 +250,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) (err
 		return fmt.Errorf("no API key configured for recipient %s", dest.Recipient)
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        s.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
-		IdleConnTimeout:     s.opts.IdleConnTimeout,
-	}
-	opsclient, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "opsgenie")
+	opsclient, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "opsgenie")
 	if err != nil {
 		return err
 	}

@@ -134,13 +134,7 @@ func (s newrelicService) Send(notification Notification, dest Destination) (err 
 		},
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        s.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: s.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     s.opts.MaxConnsPerHost,
-		IdleConnTimeout:     s.opts.IdleConnTimeout,
-	}
-	client, err := httputil.NewServiceHTTPClient(tp, s.opts.InsecureSkipVerify, s.opts.ApiURL, "newrelic")
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, s.opts.ApiURL, "newrelic")
 	if err != nil {
 		return err
 	}

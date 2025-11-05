@@ -396,14 +396,7 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        opts.MaxIdleConns,
-		MaxIdleConnsPerHost: opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     opts.MaxConnsPerHost,
-		IdleConnTimeout:     opts.IdleConnTimeout,
-	}
-
-	client, err := httputil.NewServiceHTTPClient(tp, opts.InsecureSkipVerify, url, "github")
+	client, err := httputil.NewServiceHTTPClient(opts.TransportOptions, opts.InsecureSkipVerify, url, "github")
 	if err != nil {
 		return nil, err
 	}

@@ -172,13 +172,7 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 		return nil, err
 	}
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        service.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: service.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     service.opts.MaxConnsPerHost,
-		IdleConnTimeout:     service.opts.IdleConnTimeout,
-	}
-	whclient, err := httputil.NewServiceHTTPClient(tp, service.opts.InsecureSkipVerify, service.opts.URL, r.destService)
+	whclient, err := httputil.NewServiceHTTPClient(service.opts.TransportOptions, service.opts.InsecureSkipVerify, service.opts.URL, r.destService)
 	if err != nil {
 		return nil, err
 	}

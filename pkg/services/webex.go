@@ -43,13 +43,7 @@ var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 func (w webexService) Send(notification Notification, dest Destination) (err error) {
 	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
 
-	tp := httputil.TransportOptions{
-		MaxIdleConns:        w.opts.MaxIdleConns,
-		MaxIdleConnsPerHost: w.opts.MaxIdleConnsPerHost,
-		MaxConnsPerHost:     w.opts.MaxConnsPerHost,
-		IdleConnTimeout:     w.opts.IdleConnTimeout,
-	}
-	client, err := httputil.NewServiceHTTPClient(tp, w.opts.InsecureSkipVerify, requestURL, "webex")
+	client, err := httputil.NewServiceHTTPClient(w.opts.TransportOptions, w.opts.InsecureSkipVerify, requestURL, "webex")
 	if err != nil {
 		return err
 	}
