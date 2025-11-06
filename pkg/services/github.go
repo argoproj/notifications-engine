@@ -440,7 +440,7 @@ type issuesService interface {
 }
 
 type pullRequestsService interface {
-	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.ListOptions) ([]*github.PullRequest, *github.Response, error)
 }
 
 type repositoriesService interface {
@@ -464,7 +464,7 @@ func (g *githubClientAdapter) GetIssues() issuesService {
 }
 
 func (g *githubClientAdapter) GetPullRequests() pullRequestsService {
-	return &pullRequestsServiceAdapter{service: g.client.PullRequests}
+	return g.client.PullRequests
 }
 
 func (g *githubClientAdapter) GetRepositories() repositoriesService {
@@ -702,18 +702,4 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	return nil
-}
-
-// PullRequestsServiceAdapter adapts GitHub's PullRequestsService to our interface
-type pullRequestsServiceAdapter struct {
-	service *github.PullRequestsService
-}
-
-func (a *pullRequestsServiceAdapter) ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
-	// Convert PullRequestListOptions to ListOptions
-	listOpts := &github.ListOptions{
-		Page:    opts.Page,
-		PerPage: opts.PerPage,
-	}
-	return a.service.ListPullRequestsWithCommit(ctx, owner, repo, sha, listOpts)
 }
