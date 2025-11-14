@@ -206,3 +206,42 @@ template.app-sync-failed: |
 ```
 
 The message is sent according to the `deliveryPolicy` string field under the `slack` field. The available modes are `Post` (default), `PostAndUpdate`, and `Update`. The `PostAndUpdate` and `Update` settings require `groupingKey` to be set.
+
+### Thread Replies and Message Updates
+
+You can explicitly control thread replies and message updates using the `threadTs` and `updateTs` fields:
+
+#### Reply to a Specific Thread
+
+Use `threadTs` to post a message as a reply in a specific Slack thread. This is useful when you want to reply to a particular message thread based on a timestamp you already know (e.g., from a previous notification or external system).
+
+```yaml
+template.app-deploy-status: |
+  message: |
+    Deployment completed for {{.app.metadata.name}}.
+  slack:
+    threadTs: "1234567890.123456"  # Reply to this specific thread
+```
+
+The `threadTs` value should be the timestamp of the parent message in the thread. When set, the message will be posted as a reply in that thread, regardless of the `groupingKey` or `deliveryPolicy` settings.
+
+#### Update a Specific Message
+
+Use `updateTs` to update a specific existing message. This is useful when you want to update a particular message based on its timestamp (e.g., to update a deployment status message).
+
+```yaml
+template.app-deploy-update: |
+  message: |
+    Deployment status: {{.app.status.operationState.phase}}
+  slack:
+    updateTs: "1234567890.123456"  # Update this specific message
+```
+
+The `updateTs` value should be the timestamp of the message you want to update. When set, the existing message will be updated with the new content, regardless of the `groupingKey` or `deliveryPolicy` settings.
+
+**Important Notes:**
+- `threadTs` and `updateTs` are mutually exclusive - only use one at a time
+- Both fields support template expressions, allowing dynamic values from your notification context
+- When either field is set, it overrides the normal `groupingKey` and `deliveryPolicy` behavior
+- Only messages posted by the authenticated bot user can be updated
+- To update a message, you need the original message's timestamp (which can be obtained from the Slack API response or stored externally)
