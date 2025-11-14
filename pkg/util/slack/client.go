@@ -122,6 +122,10 @@ func (c *threadedClient) setThreadTimestamp(recipient string, groupingKey string
 }
 
 func (c *threadedClient) SendMessage(ctx context.Context, recipient string, groupingKey string, broadcast bool, policy DeliveryPolicy, threadTS string, updateTS string, options []sl.MsgOption) error {
+	// Validate that threadTS and updateTS are mutually exclusive
+	if threadTS != "" && updateTS != "" {
+		return errors.New("threadTS and updateTS are mutually exclusive; only one may be set")
+	}
 	// If explicit updateTS is provided, update that specific message and return
 	if updateTS != "" {
 		_, _, err := SendMessageRateLimited(

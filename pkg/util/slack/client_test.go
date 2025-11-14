@@ -104,35 +104,35 @@ func TestThreadedClient(t *testing.T) {
 		policy        DeliveryPolicy
 		wantPostType1 gomock.Matcher
 		wantPostType2 gomock.Matcher
-		wantthreadTSs timestampMap
+		wantThreadTSs timestampMap
 	}{
 		"Post, basic": {
 			threadTSs:     timestampMap{},
 			groupingKey:   "",
 			policy:        Post,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{},
+			wantThreadTSs: timestampMap{},
 		},
 		"Post, no parent, with grouping": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        Post,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"Post, with parent, with grouping": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        Post,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 		"PostAndUpdate, no parent. First post should not be updated": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        PostAndUpdate,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"PostAndUpdate, with parent. First post should be updated": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
@@ -140,21 +140,21 @@ func TestThreadedClient(t *testing.T) {
 			policy:        PostAndUpdate,
 			wantPostType1: EqChatPost(),
 			wantPostType2: EqChatUpdate(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 		"Update, no parent. Only call should be post": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        Update,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"Update, with parent. Only call should be update": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        Update,
 			wantPostType1: EqChatUpdate(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 	}
 
@@ -184,7 +184,7 @@ func TestThreadedClient(t *testing.T) {
 			)
 			err := client.SendMessage(context.TODO(), channel, tc.groupingKey, false, tc.policy, "", "", []slack.MsgOption{})
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantthreadTSs, client.ThreadTSs)
+			assert.Equal(t, tc.wantThreadTSs, client.ThreadTSs)
 		})
 	}
 }
@@ -269,35 +269,35 @@ func TestThreadedClient_Backward_Compatibility(t *testing.T) {
 		policy        DeliveryPolicy
 		wantPostType1 gomock.Matcher
 		wantPostType2 gomock.Matcher
-		wantthreadTSs timestampMap
+		wantThreadTSs timestampMap
 	}{
 		"Post, basic": {
 			threadTSs:     timestampMap{},
 			groupingKey:   "",
 			policy:        Post,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{},
+			wantThreadTSs: timestampMap{},
 		},
 		"Post, no parent, with grouping": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        Post,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"Post, with parent, with grouping": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        Post,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 		"PostAndUpdate, no parent. First post should not be updated": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        PostAndUpdate,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"PostAndUpdate, with parent. First post should be updated": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
@@ -305,21 +305,21 @@ func TestThreadedClient_Backward_Compatibility(t *testing.T) {
 			policy:        PostAndUpdate,
 			wantPostType1: EqChatPost(),
 			wantPostType2: EqChatUpdate(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 		"Update, no parent. Only call should be post": {
 			threadTSs:     timestampMap{},
 			groupingKey:   groupingKey,
 			policy:        Update,
 			wantPostType1: EqChatPost(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts1}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts1}},
 		},
 		"Update, with parent. Only call should be update": {
 			threadTSs:     timestampMap{channel: {groupingKey: ts2}},
 			groupingKey:   groupingKey,
 			policy:        Update,
 			wantPostType1: EqChatUpdate(),
-			wantthreadTSs: timestampMap{channel: {groupingKey: ts2}},
+			wantThreadTSs: timestampMap{channel: {groupingKey: ts2}},
 		},
 	}
 	for name, tc := range tests {
@@ -347,7 +347,7 @@ func TestThreadedClient_Backward_Compatibility(t *testing.T) {
 			)
 			err := client.SendMessage(context.TODO(), channel, tc.groupingKey, false, tc.policy, "", "", []slack.MsgOption{})
 			assert.NoError(t, err)
-			assert.Equal(t, tc.wantthreadTSs, client.ThreadTSs)
+			assert.Equal(t, tc.wantThreadTSs, client.ThreadTSs)
 		})
 	}
 }
