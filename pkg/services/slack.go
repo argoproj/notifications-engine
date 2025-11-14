@@ -28,6 +28,8 @@ type SlackNotification struct {
 	GroupingKey     string                   `json:"groupingKey"`
 	NotifyBroadcast bool                     `json:"notifyBroadcast"`
 	DeliveryPolicy  slackutil.DeliveryPolicy `json:"deliveryPolicy"`
+	ThreadTS        string                   `json:"threadTs,omitempty"`
+	UpdateTS        string                   `json:"updateTs,omitempty"`
 }
 
 func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -50,6 +52,16 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, err
 	}
 	groupingKey, err := texttemplate.New(name).Funcs(f).Parse(n.GroupingKey)
+	if err != nil {
+		return nil, err
+	}
+
+	threadTS, err := texttemplate.New(name).Funcs(f).Parse(n.ThreadTS)
+	if err != nil {
+		return nil, err
+	}
+
+	updateTS, err := texttemplate.New(name).Funcs(f).Parse(n.UpdateTS)
 	if err != nil {
 		return nil, err
 	}
@@ -87,6 +99,18 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 			return err
 		}
 		notification.Slack.GroupingKey = groupingKeyData.String()
+
+		var threadTSData bytes.Buffer
+		if err := threadTS.Execute(&threadTSData, vars); err != nil {
+			return err
+		}
+		notification.Slack.ThreadTS = threadTSData.String()
+
+		var updateTSData bytes.Buffer
+		if err := updateTS.Execute(&updateTSData, vars); err != nil {
+			return err
+		}
+		notification.Slack.UpdateTS = updateTSData.String()
 
 		notification.Slack.NotifyBroadcast = n.NotifyBroadcast
 		notification.Slack.DeliveryPolicy = n.DeliveryPolicy
@@ -187,6 +211,8 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		slackNotification.GroupingKey,
 		slackNotification.NotifyBroadcast,
 		slackNotification.DeliveryPolicy,
+		slackNotification.ThreadTS,
+		slackNotification.UpdateTS,
 		msgOptions,
 	)
 }
