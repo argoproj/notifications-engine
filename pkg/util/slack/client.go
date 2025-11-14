@@ -123,7 +123,44 @@ func (c *threadedClient) setThreadTimestamp(recipient string, groupingKey string
 	thread[groupingKey] = ts
 }
 
-func (c *threadedClient) SendMessage(ctx context.Context, recipient string, groupingKey string, broadcast bool, policy DeliveryPolicy, options []sl.MsgOption) error {
+func (c *threadedClient) SendMessage(ctx context.Context, recipient string, groupingKey string, broadcast bool, policy DeliveryPolicy, threadTS string, updateTS string, options []sl.MsgOption) error {
+	// If explicit updateTS is provided, update that specific message and return
+	if updateTS != "" {
+		_, _, err := SendMessageRateLimited(
+			c.Client,
+			ctx,
+			c.Limiter,
+			c.getChannelID(recipient),
+			sl.MsgOptionUpdate(updateTS),
+			sl.MsgOptionAsUser(true),
+			sl.MsgOptionCompose(options...),
+		)
+		return err
+	}
+
+	// If explicit threadTS is provided, post as a reply in that thread and return
+	if threadTS != "" {
+		options = append(options, sl.MsgOptionTS(threadTS))
+		_, channelID, err := SendMessageRateLimited(
+			c.Client,
+			ctx,
+			c.Limiter,
+			recipient,
+			sl.MsgOptionPost(),
+			buildPostOptions(broadcast, options),
+		)
+		if err != nil {
+			return err
+		}
+
+		c.lock.Lock()
+		c.ChannelIDs[recipient] = channelID
+		c.lock.Unlock()
+
+		return nil
+	}
+
+	// Otherwise, use the existing groupingKey + policy logic
 	ts := c.getThreadTimestamp(recipient, groupingKey)
 	if groupingKey != "" && ts != "" {
 		options = append(options, sl.MsgOptionTS(ts))
