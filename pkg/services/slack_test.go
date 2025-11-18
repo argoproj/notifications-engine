@@ -11,10 +11,10 @@ import (
 	"testing"
 	"text/template"
 
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 	"github.com/slack-go/slack"
-
 	"github.com/stretchr/testify/assert"
+
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 )
 
 func TestValidIconEmoji(t *testing.T) {
@@ -687,7 +687,7 @@ func TestProcessSlackMentions(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"ok":   true,
 				"user": response,
 			})
@@ -714,7 +714,7 @@ func TestProcessSlackMentions(t *testing.T) {
 			}
 			response.ResponseMetadata.NextCursor = ""
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		case strings.Contains(r.URL.Path, "usergroups.list"):
 			// Mock GetUserGroups response
 			response := struct {
@@ -731,7 +731,7 @@ func TestProcessSlackMentions(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(response)
+			_ = json.NewEncoder(w).Encode(response)
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -800,7 +800,7 @@ func TestLookupCaching(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"ok":   true,
 				"user": response,
 			})
@@ -848,7 +848,7 @@ func TestSlackSendWithMentions(t *testing.T) {
 				},
 			}
 			writer.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(writer).Encode(map[string]interface{}{
+			_ = json.NewEncoder(writer).Encode(map[string]interface{}{
 				"ok":   true,
 				"user": response,
 			})
