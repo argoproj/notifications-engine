@@ -11,12 +11,12 @@ import (
 	"sync"
 	texttemplate "text/template"
 
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
-
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 )
 
 // No rate limit unless Slack requests it (allows for Slack to control bursting)
@@ -38,9 +38,9 @@ var globalLookupCache = &slackLookupCache{
 
 // Regex patterns to match special markers in messages
 var (
-	slackUserEmailPattern  = regexp.MustCompile(`__SLACK_USER_EMAIL__(.+?)__`)
-	slackChannelPattern    = regexp.MustCompile(`__SLACK_CHANNEL__(.+?)__`)
-	slackUserGroupPattern  = regexp.MustCompile(`__SLACK_USERGROUP__(.+?)__`)
+	slackUserEmailPattern = regexp.MustCompile(`__SLACK_USER_EMAIL__(.+?)__`)
+	slackChannelPattern   = regexp.MustCompile(`__SLACK_CHANNEL__(.+?)__`)
+	slackUserGroupPattern = regexp.MustCompile(`__SLACK_USERGROUP__(.+?)__`)
 )
 
 type SlackNotification struct {
