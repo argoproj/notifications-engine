@@ -319,6 +319,7 @@ func lookupChannelByName(client *slack.Client, channelName string) (string, erro
 	// Make API call to get all channels
 	// Implements pagination for workspaces with many channels
 	var cursor string
+	var targetChannelID string
 	for {
 		params := &slack.GetConversationsParameters{
 			Cursor:          cursor,
@@ -331,11 +332,11 @@ func lookupChannelByName(client *slack.Client, channelName string) (string, erro
 			return "", fmt.Errorf("failed to lookup channel %s: %w", channelName, err)
 		}
 
+		// Opportunistically cache all channels to improve future lookups
 		for _, channel := range channels {
+			globalLookupCache.channels[channel.Name] = channel.ID
 			if channel.Name == channelName {
-				// Cache the result
-				globalLookupCache.channels[channelName] = channel.ID
-				return channel.ID, nil
+				targetChannelID = channel.ID
 			}
 		}
 
@@ -343,6 +344,10 @@ func lookupChannelByName(client *slack.Client, channelName string) (string, erro
 			break
 		}
 		cursor = nextCursor
+	}
+
+	if targetChannelID != "" {
+		return targetChannelID, nil
 	}
 
 	return "", fmt.Errorf("channel %s not found", channelName)
@@ -374,12 +379,23 @@ func lookupUserGroupByName(client *slack.Client, groupName string) (string, erro
 		return "", fmt.Errorf("failed to lookup user group %s: %w", groupName, err)
 	}
 
+	// Opportunistically cache all user groups to improve future lookups
+	var targetGroupID string
 	for _, group := range groups {
-		if group.Handle == groupName || group.Name == groupName {
-			// Cache the result
-			globalLookupCache.userGroups[groupName] = group.ID
-			return group.ID, nil
+		// Cache by both handle and name for flexible lookup
+		if group.Handle != "" {
+			globalLookupCache.userGroups[group.Handle] = group.ID
 		}
+		if group.Name != "" {
+			globalLookupCache.userGroups[group.Name] = group.ID
+		}
+		if group.Handle == groupName || group.Name == groupName {
+			targetGroupID = group.ID
+		}
+	}
+
+	if targetGroupID != "" {
+		return targetGroupID, nil
 	}
 
 	return "", fmt.Errorf("user group %s not found", groupName)
