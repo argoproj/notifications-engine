@@ -672,7 +672,7 @@ func TestProcessSlackMentions(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"ok":   true,
 				"user": response,
 			})
@@ -785,7 +785,7 @@ func TestLookupCaching(t *testing.T) {
 				},
 			}
 			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]any{
 				"ok":   true,
 				"user": response,
 			})
@@ -802,13 +802,13 @@ func TestLookupCaching(t *testing.T) {
 
 	// First lookup should make an API call
 	userID1, err := lookupUserByEmail(client, "user@example.com")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "U024BE7LH", userID1)
 	assert.Equal(t, 1, callCount)
 
 	// Second lookup should use cache, no additional API call
 	userID2, err := lookupUserByEmail(client, "user@example.com")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "U024BE7LH", userID2)
 	assert.Equal(t, 1, callCount) // Call count should not increase
 }
@@ -820,7 +820,7 @@ func TestSlackSendWithMentions(t *testing.T) {
 		MessageTimeStamp: "1503435956.000247",
 		Text:             "text",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch {
@@ -833,7 +833,7 @@ func TestSlackSendWithMentions(t *testing.T) {
 				},
 			}
 			writer.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(writer).Encode(map[string]interface{}{
+			_ = json.NewEncoder(writer).Encode(map[string]any{
 				"ok":   true,
 				"user": response,
 			})

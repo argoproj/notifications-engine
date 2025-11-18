@@ -264,7 +264,7 @@ This will render as: `<!subteam^SAZ94GDB8>, critical issue detected in my-app!`
 ```yaml
 template.deployment-notification: |
   message: |
-    Hey {{slackUserByEmail .author.email}}, your deployment to {{slackChannel "production"}} is complete.
+    Hey {{slackUserByEmail (call .repo.GetCommitMetadata .app.status.sync.revision).Author}}, your deployment to {{slackChannel "production"}} is complete.
     {{slackUserGroup "platform-team"}} has been notified.
 ```
 
