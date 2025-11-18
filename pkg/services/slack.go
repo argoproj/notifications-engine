@@ -271,6 +271,16 @@ func lookupUserByEmail(client *slack.Client, email string) (string, error) {
 	}
 	globalLookupCache.RUnlock()
 
+	// Acquire write lock to prevent thundering herd
+	globalLookupCache.Lock()
+	defer globalLookupCache.Unlock()
+
+	// Double-check cache after acquiring write lock
+	// (another goroutine might have populated it while we were waiting)
+	if userID, ok := globalLookupCache.usersByEmail[email]; ok {
+		return userID, nil
+	}
+
 	// Make API call
 	user, err := client.GetUserByEmail(email)
 	if err != nil {
@@ -278,9 +288,7 @@ func lookupUserByEmail(client *slack.Client, email string) (string, error) {
 	}
 
 	// Cache the result
-	globalLookupCache.Lock()
 	globalLookupCache.usersByEmail[email] = user.ID
-	globalLookupCache.Unlock()
 
 	return user.ID, nil
 }
@@ -297,6 +305,16 @@ func lookupChannelByName(client *slack.Client, channelName string) (string, erro
 		return channelID, nil
 	}
 	globalLookupCache.RUnlock()
+
+	// Acquire write lock to prevent thundering herd
+	globalLookupCache.Lock()
+	defer globalLookupCache.Unlock()
+
+	// Double-check cache after acquiring write lock
+	// (another goroutine might have populated it while we were waiting)
+	if channelID, ok := globalLookupCache.channels[channelName]; ok {
+		return channelID, nil
+	}
 
 	// Make API call to get all channels
 	// Implements pagination for workspaces with many channels
@@ -316,9 +334,7 @@ func lookupChannelByName(client *slack.Client, channelName string) (string, erro
 		for _, channel := range channels {
 			if channel.Name == channelName {
 				// Cache the result
-				globalLookupCache.Lock()
 				globalLookupCache.channels[channelName] = channel.ID
-				globalLookupCache.Unlock()
 				return channel.ID, nil
 			}
 		}
@@ -342,6 +358,16 @@ func lookupUserGroupByName(client *slack.Client, groupName string) (string, erro
 	}
 	globalLookupCache.RUnlock()
 
+	// Acquire write lock to prevent thundering herd
+	globalLookupCache.Lock()
+	defer globalLookupCache.Unlock()
+
+	// Double-check cache after acquiring write lock
+	// (another goroutine might have populated it while we were waiting)
+	if groupID, ok := globalLookupCache.userGroups[groupName]; ok {
+		return groupID, nil
+	}
+
 	// Make API call
 	groups, err := client.GetUserGroups(slack.GetUserGroupsOptionIncludeDisabled(false))
 	if err != nil {
@@ -351,9 +377,7 @@ func lookupUserGroupByName(client *slack.Client, groupName string) (string, erro
 	for _, group := range groups {
 		if group.Handle == groupName || group.Name == groupName {
 			// Cache the result
-			globalLookupCache.Lock()
 			globalLookupCache.userGroups[groupName] = group.ID
-			globalLookupCache.Unlock()
 			return group.ID, nil
 		}
 	}
