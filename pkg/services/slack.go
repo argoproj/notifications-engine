@@ -38,9 +38,9 @@ var globalLookupCache = &slackLookupCache{
 
 // Regex patterns to match special markers in messages
 var (
-	slackUserEmailPattern  = regexp.MustCompile(`__SLACK_USER_EMAIL__([^_]+)__`)
-	slackChannelPattern    = regexp.MustCompile(`__SLACK_CHANNEL__([^_]+)__`)
-	slackUserGroupPattern  = regexp.MustCompile(`__SLACK_USERGROUP__([^_]+)__`)
+	slackUserEmailPattern  = regexp.MustCompile(`__SLACK_USER_EMAIL__(.+?)__`)
+	slackChannelPattern    = regexp.MustCompile(`__SLACK_CHANNEL__(.+?)__`)
+	slackUserGroupPattern  = regexp.MustCompile(`__SLACK_USERGROUP__(.+?)__`)
 )
 
 type SlackNotification struct {
@@ -299,7 +299,7 @@ func lookupChannelByName(client *slack.Client, channelName string) (string, erro
 	globalLookupCache.RUnlock()
 
 	// Make API call to get all channels
-	// Note: This might need pagination for workspaces with many channels
+	// Implements pagination for workspaces with many channels
 	var cursor string
 	for {
 		params := &slack.GetConversationsParameters{
