@@ -63,6 +63,159 @@ func TestGetTemplater_Slack(t *testing.T) {
 	assert.Equal(t, true, notification.Slack.NotifyBroadcast)
 }
 
+func TestGetTemplater_Slack_InvalidTemplates(t *testing.T) {
+	tests := []struct {
+		name         string
+		notification SlackNotification
+		expectError  bool
+	}{
+		{
+			name: "Invalid username template",
+			notification: SlackNotification{
+				Username: "{{.foo",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid icon template",
+			notification: SlackNotification{
+				Icon: "{{.foo",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid attachments template",
+			notification: SlackNotification{
+				Attachments: "{{.foo",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid blocks template",
+			notification: SlackNotification{
+				Blocks: "{{.foo",
+			},
+			expectError: true,
+		},
+		{
+			name: "Invalid grouping key template",
+			notification: SlackNotification{
+				GroupingKey: "{{.foo",
+			},
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.notification.GetTemplater("test", template.FuncMap{})
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestGetTemplater_Slack_NilNotification(t *testing.T) {
+	n := Notification{
+		Slack: &SlackNotification{
+			Username: "{{.name}}",
+		},
+	}
+
+	templater, err := n.GetTemplater("", template.FuncMap{})
+	assert.NoError(t, err)
+
+	// Test with nil Slack on target notification
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{
+		"name": "test",
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, notification.Slack)
+	assert.Equal(t, "test", notification.Slack.Username)
+}
+
+func TestGetTemplater_Slack_DeliveryPolicy(t *testing.T) {
+	n := Notification{
+		Slack: &SlackNotification{
+			Username:       "bot",
+			DeliveryPolicy: slackutil.Update,
+		},
+	}
+
+	templater, err := n.GetTemplater("", template.FuncMap{})
+	assert.NoError(t, err)
+
+	var notification Notification
+	err = templater(&notification, map[string]interface{}{})
+
+	assert.NoError(t, err)
+	assert.Equal(t, slackutil.Update, notification.Slack.DeliveryPolicy)
+}
+
+func TestGetTemplater_Slack_TemplateExecutionError(t *testing.T) {
+	// Create a FuncMap with the required function
+	funcMap := template.FuncMap{
+		"required": func(msg string, val interface{}) (interface{}, error) {
+			if val == nil || val == "" {
+				return nil, assert.AnError
+			}
+			return val, nil
+		},
+	}
+
+	tests := []struct {
+		name         string
+		notification SlackNotification
+	}{
+		{
+			name: "Username execution error",
+			notification: SlackNotification{
+				Username: "{{.missing | required \"missing is required\"}}",
+			},
+		},
+		{
+			name: "Icon execution error",
+			notification: SlackNotification{
+				Icon: "{{.missing | required \"missing is required\"}}",
+			},
+		},
+		{
+			name: "Attachments execution error",
+			notification: SlackNotification{
+				Attachments: "{{.missing | required \"missing is required\"}}",
+			},
+		},
+		{
+			name: "Blocks execution error",
+			notification: SlackNotification{
+				Blocks: "{{.missing | required \"missing is required\"}}",
+			},
+		},
+		{
+			name: "GroupingKey execution error",
+			notification: SlackNotification{
+				GroupingKey: "{{.missing | required \"missing is required\"}}",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			templater, err := tt.notification.GetTemplater("", funcMap)
+			assert.NoError(t, err)
+
+			var notification Notification
+			err = templater(&notification, map[string]interface{}{})
+			assert.Error(t, err)
+		})
+	}
+}
+
 func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
 	n := Notification{}
 
@@ -71,6 +224,115 @@ func TestBuildMessageOptionsWithNonExistTemplate(t *testing.T) {
 	assert.Len(t, opts, 1)
 	assert.Empty(t, sn.GroupingKey)
 	assert.Equal(t, slackutil.Post, sn.DeliveryPolicy)
+}
+
+func TestBuildMessageOptions_IconURL(t *testing.T) {
+	t.Run("Valid icon URL from notification", func(t *testing.T) {
+		n := Notification{
+			Message: "test",
+			Slack: &SlackNotification{
+				Icon: "https://example.com/icon.png",
+			},
+		}
+
+		_, opts, err := buildMessageOptions(n, SlackOptions{})
+		assert.NoError(t, err)
+		// Should have text + icon_url options
+		assert.GreaterOrEqual(t, len(opts), 2)
+	})
+
+	t.Run("Valid icon URL from options", func(t *testing.T) {
+		n := Notification{
+			Message: "test",
+		}
+
+		_, opts, err := buildMessageOptions(n, SlackOptions{
+			Icon: "http://example.com/icon.png",
+		})
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, len(opts), 2)
+	})
+
+	t.Run("Invalid icon - neither emoji nor URL", func(t *testing.T) {
+		n := Notification{
+			Message: "test",
+			Slack: &SlackNotification{
+				Icon: "invalid-icon",
+			},
+		}
+
+		_, opts, err := buildMessageOptions(n, SlackOptions{})
+		assert.NoError(t, err)
+		// Should have text + attachments + blocks (but no icon option because it's invalid)
+		assert.Equal(t, 3, len(opts))
+	})
+}
+
+func TestBuildMessageOptions_DisableUnfurl(t *testing.T) {
+	n := Notification{
+		Message: "test",
+	}
+
+	_, opts, err := buildMessageOptions(n, SlackOptions{
+		DisableUnfurl: true,
+	})
+	assert.NoError(t, err)
+	// Should have text + 2 unfurl options
+	assert.GreaterOrEqual(t, len(opts), 3)
+}
+
+func TestBuildMessageOptions_InvalidAttachments(t *testing.T) {
+	n := Notification{
+		Message: "test",
+		Slack: &SlackNotification{
+			Attachments: "invalid json",
+		},
+	}
+
+	_, _, err := buildMessageOptions(n, SlackOptions{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmarshal attachments")
+}
+
+func TestBuildMessageOptions_InvalidBlocks(t *testing.T) {
+	n := Notification{
+		Message: "test",
+		Slack: &SlackNotification{
+			Blocks: "invalid json",
+		},
+	}
+
+	_, _, err := buildMessageOptions(n, SlackOptions{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmarshal blocks")
+}
+
+func TestGetSigningSecret(t *testing.T) {
+	service := NewSlackService(SlackOptions{
+		Token:         "test-token",
+		SigningSecret: "test-signing-secret",
+	})
+
+	slackService, ok := service.(*slackService)
+	assert.True(t, ok)
+	assert.Equal(t, "test-signing-secret", slackService.GetSigningSecret())
+}
+
+func TestNewSlackClient_CustomAPIURL(t *testing.T) {
+	client, err := newSlackClient(SlackOptions{
+		Token:  "test-token",
+		ApiURL: "https://custom.slack.com/api/",
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+}
+
+func TestNewSlackClient_DefaultAPIURL(t *testing.T) {
+	client, err := newSlackClient(SlackOptions{
+		Token: "test-token",
+	})
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
 }
 
 type chatResponseFull struct {
@@ -318,4 +580,23 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 			t.FailNow()
 		}
 	})
+}
+
+func TestSlack_SendNotification_WithInvalidJSON(t *testing.T) {
+	service := NewSlackService(SlackOptions{
+		Token:              "something-token",
+		InsecureSkipVerify: true,
+	})
+
+	err := service.Send(
+		Notification{
+			Message: "test",
+			Slack: &SlackNotification{
+				Attachments: "invalid json",
+			},
+		},
+		Destination{Recipient: "test", Service: "slack"},
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to unmarshal")
 }
