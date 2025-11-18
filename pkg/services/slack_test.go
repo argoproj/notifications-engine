@@ -7,10 +7,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 
 	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
+	"github.com/slack-go/slack"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -576,4 +578,300 @@ func TestSlack_SendNotification_WithInvalidJSON(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmarshal")
+}
+
+func TestSlackUserEmailPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "valid user email marker",
+			input:    "__SLACK_USER_EMAIL__user@example.com__",
+			expected: true,
+		},
+		{
+			name:     "invalid marker",
+			input:    "user@example.com",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := slackUserEmailPattern.MatchString(tt.input)
+			assert.Equal(t, tt.expected, matches)
+		})
+	}
+}
+
+func TestSlackChannelPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "valid channel marker",
+			input:    "__SLACK_CHANNEL__general__",
+			expected: true,
+		},
+		{
+			name:     "invalid marker",
+			input:    "general",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := slackChannelPattern.MatchString(tt.input)
+			assert.Equal(t, tt.expected, matches)
+		})
+	}
+}
+
+func TestSlackUserGroupPattern(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected bool
+	}{
+		{
+			name:     "valid usergroup marker",
+			input:    "__SLACK_USERGROUP__developers__",
+			expected: true,
+		},
+		{
+			name:     "invalid marker",
+			input:    "developers",
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matches := slackUserGroupPattern.MatchString(tt.input)
+			assert.Equal(t, tt.expected, matches)
+		})
+	}
+}
+
+func TestProcessSlackMentions(t *testing.T) {
+	// Mock server to handle Slack API calls
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "users.lookupByEmail"):
+			// Mock GetUserByEmail response
+			response := slack.User{
+				ID:   "U024BE7LH",
+				Name: "testuser",
+				Profile: slack.UserProfile{
+					Email: "user@example.com",
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":   true,
+				"user": response,
+			})
+		case strings.Contains(r.URL.Path, "conversations.list"):
+			// Mock GetConversations response
+			response := struct {
+				OK               bool            `json:"ok"`
+				Channels         []slack.Channel `json:"channels"`
+				ResponseMetadata struct {
+					NextCursor string `json:"next_cursor"`
+				} `json:"response_metadata"`
+			}{
+				OK: true,
+				Channels: []slack.Channel{
+					{
+						GroupConversation: slack.GroupConversation{
+							Conversation: slack.Conversation{
+								ID: "C123ABC456",
+							},
+							Name: "general",
+						},
+					},
+				},
+			}
+			response.ResponseMetadata.NextCursor = ""
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+		case strings.Contains(r.URL.Path, "usergroups.list"):
+			// Mock GetUserGroups response
+			response := struct {
+				OK         bool              `json:"ok"`
+				UserGroups []slack.UserGroup `json:"usergroups"`
+			}{
+				OK: true,
+				UserGroups: []slack.UserGroup{
+					{
+						ID:     "SAZ94GDB8",
+						Handle: "developers",
+						Name:   "Developers",
+					},
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(response)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer server.Close()
+
+	client := slack.New("test-token", slack.OptionAPIURL(server.URL+"/"))
+
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "user mention by email",
+			input:    "Hey __SLACK_USER_EMAIL__user@example.com__, thanks!",
+			expected: "Hey <@U024BE7LH>, thanks!",
+		},
+		{
+			name:     "channel mention",
+			input:    "Check __SLACK_CHANNEL__general__ for updates",
+			expected: "Check <#C123ABC456> for updates",
+		},
+		{
+			name:     "user group mention",
+			input:    "Hey __SLACK_USERGROUP__developers__, new task!",
+			expected: "Hey <!subteam^SAZ94GDB8>, new task!",
+		},
+		{
+			name:     "multiple mentions",
+			input:    "Hey __SLACK_USER_EMAIL__user@example.com__, check __SLACK_CHANNEL__general__",
+			expected: "Hey <@U024BE7LH>, check <#C123ABC456>",
+		},
+		{
+			name:     "no mentions",
+			input:    "Just a regular message",
+			expected: "Just a regular message",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clear cache before each test
+			globalLookupCache.Lock()
+			globalLookupCache.usersByEmail = make(map[string]string)
+			globalLookupCache.channels = make(map[string]string)
+			globalLookupCache.userGroups = make(map[string]string)
+			globalLookupCache.Unlock()
+
+			result := processSlackMentions(client, tt.input)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestLookupCaching(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		if strings.Contains(r.URL.Path, "users.lookupByEmail") {
+			response := slack.User{
+				ID:   "U024BE7LH",
+				Name: "testuser",
+				Profile: slack.UserProfile{
+					Email: "user@example.com",
+				},
+			}
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"ok":   true,
+				"user": response,
+			})
+		}
+	}))
+	defer server.Close()
+
+	client := slack.New("test-token", slack.OptionAPIURL(server.URL+"/"))
+
+	// Clear cache
+	globalLookupCache.Lock()
+	globalLookupCache.usersByEmail = make(map[string]string)
+	globalLookupCache.Unlock()
+
+	// First lookup should make an API call
+	userID1, err := lookupUserByEmail(client, "user@example.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "U024BE7LH", userID1)
+	assert.Equal(t, 1, callCount)
+
+	// Second lookup should use cache, no additional API call
+	userID2, err := lookupUserByEmail(client, "user@example.com")
+	assert.NoError(t, err)
+	assert.Equal(t, "U024BE7LH", userID2)
+	assert.Equal(t, 1, callCount) // Call count should not increase
+}
+
+func TestSlackSendWithMentions(t *testing.T) {
+	dummyResponse, err := json.Marshal(chatResponseFull{
+		Channel:          "test",
+		Timestamp:        "1503435956.000247",
+		MessageTimeStamp: "1503435956.000247",
+		Text:             "text",
+	})
+	assert.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch {
+		case strings.Contains(request.URL.Path, "users.lookupByEmail"):
+			response := slack.User{
+				ID:   "U024BE7LH",
+				Name: "testuser",
+				Profile: slack.UserProfile{
+					Email: "user@example.com",
+				},
+			}
+			writer.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(writer).Encode(map[string]interface{}{
+				"ok":   true,
+				"user": response,
+			})
+		case strings.Contains(request.URL.Path, "chat.postMessage"):
+			data, err := io.ReadAll(request.Body)
+			assert.NoError(t, err)
+
+			// Verify that the message contains the processed mention
+			// URL decode the body first since it's form-encoded
+			bodyStr, err := url.QueryUnescape(string(data))
+			assert.NoError(t, err)
+			assert.Contains(t, bodyStr, "<@U024BE7LH>")
+
+			writer.WriteHeader(http.StatusOK)
+			_, err = writer.Write(dummyResponse)
+			assert.NoError(t, err)
+		default:
+			writer.WriteHeader(http.StatusOK)
+			_, err = writer.Write(dummyResponse)
+			assert.NoError(t, err)
+		}
+	}))
+	defer server.Close()
+
+	// Clear cache
+	globalLookupCache.Lock()
+	globalLookupCache.usersByEmail = make(map[string]string)
+	globalLookupCache.Unlock()
+
+	service := NewSlackService(SlackOptions{
+		ApiURL:             server.URL + "/",
+		Token:              "something-token",
+		InsecureSkipVerify: true,
+	})
+
+	err = service.Send(
+		Notification{Message: "Hey __SLACK_USER_EMAIL__user@example.com__, thanks for your commit!"},
+		Destination{Recipient: "test-channel", Service: "slack"},
+	)
+	assert.NoError(t, err)
 }

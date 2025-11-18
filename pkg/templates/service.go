@@ -21,6 +21,17 @@ func NewService(templates map[string]services.Notification) (*service, error) {
 	delete(f, "env")
 	delete(f, "expandenv")
 
+	// Add Slack-specific template functions
+	f["slackUserByEmail"] = func(email string) string {
+		return fmt.Sprintf("__SLACK_USER_EMAIL__%s__", email)
+	}
+	f["slackChannel"] = func(channelName string) string {
+		return fmt.Sprintf("__SLACK_CHANNEL__%s__", channelName)
+	}
+	f["slackUserGroup"] = func(groupName string) string {
+		return fmt.Sprintf("__SLACK_USERGROUP__%s__", groupName)
+	}
+
 	svc := &service{templaters: map[string]services.Templater{}}
 	for name, cfg := range templates {
 		templater, err := cfg.GetTemplater(name, f)
