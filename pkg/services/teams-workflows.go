@@ -355,7 +355,7 @@ type adaptiveCardAction struct {
 }
 
 // teamsWorkflowsNotificationToAdaptiveCard converts a Notification to an Adaptive Card format
-func teamsWorkflowsNotificationToAdaptiveCard(n Notification) (*adaptiveCard, error) {
+func teamsWorkflowsNotificationToAdaptiveCard(n Notification) *adaptiveCard {
 	card := &adaptiveCard{
 		Type:    "message",
 		Version: "1.4",
@@ -479,7 +479,7 @@ func teamsWorkflowsNotificationToAdaptiveCard(n Notification) (*adaptiveCard, er
 		}
 	}
 
-	return card, nil
+	return card
 }
 
 func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
@@ -500,10 +500,7 @@ func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
 
 	// Generate message based on card format
 	if cardFormat == "adaptivecard" {
-		adaptiveCard, err := teamsWorkflowsNotificationToAdaptiveCard(n)
-		if err != nil {
-			return nil, err
-		}
+		adaptiveCard := teamsWorkflowsNotificationToAdaptiveCard(n)
 		return json.Marshal(adaptiveCard)
 	}
 
