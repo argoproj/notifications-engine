@@ -1,10 +1,12 @@
-# Teams
+# Teams (Office 365 Connectors)
 
 ## Parameters
 
-The Teams notification service send message notifications using Teams bot and requires specifying the following settings:
+The Teams notification service sends message notifications using Office 365 Connectors and requires specifying the following settings:
 
-* `recipientUrls` - the webhook url map, e.g. `channelName: https://example.com`
+* `recipientUrls` - the webhook url map, e.g. `channelName: https://outlook.office.com/webhook/...`
+
+> **⚠️ Deprecation Notice:** Office 365 Connectors will be retired by Microsoft on **March 31, 2026**. We recommend migrating to the [Teams Workflows service](./teams-workflows.md) for continued support and enhanced features.
 
 ## Configuration
 
@@ -31,7 +33,7 @@ kind: Secret
 metadata:
   name: <secret-name>
 stringData:
-  channel-teams-url: https://example.com
+  channel-teams-url: https://outlook.office.com/webhook/...
 ```
 
 6. Create subscription for your Teams integration:
@@ -44,11 +46,19 @@ metadata:
     notifications.argoproj.io/subscribe.on-sync-succeeded.teams: channelName
 ```
 
+## Channel Support
+
+- ✅ Standard Teams channels only
+
+> **Note:** Office 365 Connectors only support standard Teams channels. For shared channels or private channels, use the [Teams Workflows service](./teams-workflows.md).
+
 ## Templates
 
 ![](https://user-images.githubusercontent.com/18019529/114271500-9d2b8880-9a4c-11eb-85c1-f6935f0431d5.png)
 
 [Notification templates](../templates.md) can be customized to leverage teams message sections, facts, themeColor, summary and potentialAction [feature](https://docs.microsoft.com/en-us/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using).
+
+The Teams service uses the **messageCard** format (MessageCard schema) which is compatible with Office 365 Connectors.
 
 ```yaml
 template.app-sync-succeeded: |
@@ -124,3 +134,7 @@ template.app-sync-succeeded: |
   teams:
     summary: "Sync Succeeded"
 ```
+
+## Migration to Teams Workflows
+
+If you're currently using Office 365 Connectors, see the [Teams Workflows documentation](./teams-workflows.md) for migration instructions and enhanced features.
