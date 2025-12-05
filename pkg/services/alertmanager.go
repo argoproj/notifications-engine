@@ -38,8 +38,9 @@ type AlertmanagerOptions struct {
 	APIPath            string     `json:"apiPath"`
 	BasicAuth          *BasicAuth `json:"basicAuth"`
 	BearerToken        string     `json:"bearerToken"`
-	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
 	Timeout            int        `json:"timeout"`
+	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 // NewAlertmanagerService new service
@@ -204,14 +205,13 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 	return nil
 }
 
-func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
+func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) (err error) {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	transport := httputil.NewTransport(rawURL, s.opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, s.entry),
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, rawURL, "alertmanager")
+	if err != nil {
+		return err
 	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(rawBody))
 	if err != nil {
 		return err

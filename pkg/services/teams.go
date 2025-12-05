@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	texttemplate "text/template"
-
-	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
@@ -139,7 +136,9 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type TeamsOptions struct {
-	RecipientUrls map[string]string `json:"recipientUrls"`
+	RecipientUrls      map[string]string `json:"recipientUrls"`
+	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type teamsService struct {
@@ -150,14 +149,15 @@ func NewTeamsService(opts TeamsOptions) NotificationService {
 	return &teamsService{opts: opts}
 }
 
-func (s teamsService) Send(notification Notification, dest Destination) error {
+func (s teamsService) Send(notification Notification, dest Destination) (err error) {
 	webhookUrl, ok := s.opts.RecipientUrls[dest.Recipient]
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "teams")),
+
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, webhookUrl, "teams")
+	if err != nil {
+		return err
 	}
 
 	message, err := teamsNotificationToReader(notification)
