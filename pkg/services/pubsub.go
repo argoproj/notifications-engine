@@ -1,8 +1,10 @@
 package services
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	texttemplate "text/template"
 
 	"cloud.google.com/go/pubsub"
 	log "github.com/sirupsen/logrus"
@@ -109,5 +111,40 @@ func (s *gcpPubsubService) Send(notif Notification, dest Destination) error {
 	}
 	log.Debugf("Published message to Pub/Sub with ID: %s", id)
 	topic.Stop()
+	return nil
+}
+
+func (n *GcpPubsubNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	return func(notification *Notification, vars map[string]interface{}) error {
+		if notification.GcpPubsub == nil {
+			notification.GcpPubsub = &GcpPubsubNotification{}
+		}
+
+		if len(n.Attributes) > 0 {
+			notification.GcpPubsub.Attributes = n.Attributes
+			if err := notification.GcpPubsub.parseAttributes(name, f, vars); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}, nil
+}
+
+func (n *GcpPubsubNotification) parseAttributes(name string, f texttemplate.FuncMap, vars map[string]interface{}) error {
+	for k, v := range n.Attributes {
+		var tempData bytes.Buffer
+
+		tmpl, err := texttemplate.New(name).Funcs(f).Parse(v)
+		if err != nil {
+			continue
+		}
+		if err := tmpl.Execute(&tempData, vars); err != nil {
+			return err
+		}
+		if val := tempData.String(); val != "" {
+			n.Attributes[k] = val
+		}
+	}
 	return nil
 }
