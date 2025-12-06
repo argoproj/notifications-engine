@@ -67,6 +67,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	if n.AwsSqs != nil {
 		sources = append(sources, n.AwsSqs)
 	}
+	if n.GcpPubsub != nil {
+		sources = append(sources, n.GcpPubsub)
+	}
 	if n.Slack != nil {
 		sources = append(sources, n.Slack)
 	}
@@ -251,6 +254,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewNatsService(opts), nil
+	case "gcppubsub":
+		var opts GcpPubsubOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewGcpPubsubService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
