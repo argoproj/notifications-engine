@@ -6,7 +6,7 @@ This notification service is capable of sending messages to Google Cloud Pub/Sub
 
 * `project` - GCP project ID where the Pub/Sub topic is located.
 * `topic` - name of the Pub/Sub topic you are intending to send messages to. Can be overridden with target destination annotation.
-* `keyFile` - optional, path to GCP service account key file. If not provided, uses Application Default Credentials (enables GKE Workload Identity).
+* `keyFile` - optional, path to GCP service account key file. If not provided, uses Application Default Credentials
 
 ## Example
 
