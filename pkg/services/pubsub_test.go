@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"testing"
+	"text/template"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/stretchr/testify/assert"
@@ -68,4 +69,38 @@ func TestSend_GcpPubsub(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "hello world", topic.publishedMsg)
 	assert.Equal(t, map[string]string{"foo": "bar"}, topic.publishedAttr)
+}
+
+func TestGetTemplater_GcpPubsub(t *testing.T) {
+	n := Notification{
+		Message: "{{.message}}",
+		GcpPubsub: &GcpPubsubNotification{
+			Attributes: map[string]string{
+				"app":       "{{.app}}",
+				"namespace": "{{.namespace}}",
+			},
+		},
+	}
+
+	templater, err := n.GetTemplater("", template.FuncMap{})
+	if !assert.NoError(t, err) {
+		return
+	}
+
+	var notification Notification
+
+	err = templater(&notification, map[string]interface{}{
+		"message":   "deployment ready",
+		"app":       "my-app",
+		"namespace": "production",
+	})
+
+	if !assert.NoError(t, err) {
+		return
+	}
+	assert.Equal(t, "deployment ready", notification.Message)
+	assert.Equal(t, map[string]string{
+		"app":       "my-app",
+		"namespace": "production",
+	}, notification.GcpPubsub.Attributes)
 }
