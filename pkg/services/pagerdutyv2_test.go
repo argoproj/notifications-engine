@@ -19,6 +19,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}}",
 				Class:     "{{.class}}",
 				URL:       "{{.url}}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -37,6 +38,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 			"group":     "test-group",
 			"class":     "test-class",
 			"url":       "http://example.com",
+			"dedupKey":  "app-123",
 		})
 
 		if !assert.NoError(t, err) {
@@ -50,6 +52,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		assert.Equal(t, "test-group", notification.PagerdutyV2.Group)
 		assert.Equal(t, "test-class", notification.PagerdutyV2.Class)
 		assert.Equal(t, "http://example.com", notification.PagerdutyV2.URL)
+		assert.Equal(t, "app-123", notification.PagerdutyV2.DedupKey)
 	})
 
 	t.Run("handle error for summary", func(t *testing.T) {
@@ -62,6 +65,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -79,6 +83,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -96,6 +101,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -113,6 +119,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -130,6 +137,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -147,6 +155,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -164,6 +173,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}}",
 				Class:     "{{.class}}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
@@ -201,6 +211,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		assert.Equal(t, "", notification.PagerdutyV2.Component)
 		assert.Equal(t, "", notification.PagerdutyV2.Group)
 		assert.Equal(t, "", notification.PagerdutyV2.Class)
+		assert.Equal(t, "", notification.PagerdutyV2.DedupKey)
 	})
 }
 
@@ -214,6 +225,7 @@ func TestSend_PagerDuty(t *testing.T) {
 		group := "platform"
 		class := "test-class"
 		url := "https://www.example.com/"
+		dedupKey := "app-123"
 
 		event := buildEvent(routingKey, Notification{
 			Message: "message",
@@ -225,6 +237,7 @@ func TestSend_PagerDuty(t *testing.T) {
 				Group:     group,
 				Class:     class,
 				URL:       url,
+				DedupKey:  dedupKey,
 			},
 		})
 
@@ -236,6 +249,7 @@ func TestSend_PagerDuty(t *testing.T) {
 		assert.Equal(t, group, event.Payload.Group)
 		assert.Equal(t, class, event.Payload.Class)
 		assert.Equal(t, url, event.ClientURL)
+		assert.Equal(t, dedupKey, event.DedupKey)
 	})
 
 	t.Run("missing config", func(t *testing.T) {

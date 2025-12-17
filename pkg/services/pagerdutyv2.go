@@ -18,6 +18,7 @@ type PagerDutyV2Notification struct {
 	Group     string `json:"group,omitempty"`
 	Class     string `json:"class,omitempty"`
 	URL       string `json:"url"`
+	DedupKey  string `json:"dedupKey,omitempty"`
 }
 
 type PagerdutyV2Options struct {
@@ -50,6 +51,10 @@ func (p *PagerDutyV2Notification) GetTemplater(name string, f texttemplate.FuncM
 		return nil, err
 	}
 	url, err := texttemplate.New(name).Funcs(f).Parse(p.URL)
+	if err != nil {
+		return nil, err
+	}
+	dedupKey, err := texttemplate.New(name).Funcs(f).Parse(p.DedupKey)
 	if err != nil {
 		return nil, err
 	}
@@ -99,6 +104,12 @@ func (p *PagerDutyV2Notification) GetTemplater(name string, f texttemplate.FuncM
 			return err
 		}
 		notification.PagerdutyV2.URL = urlData.String()
+
+		var dedupKeyData bytes.Buffer
+		if err := dedupKey.Execute(&dedupKeyData, vars); err != nil {
+			return err
+		}
+		notification.PagerdutyV2.DedupKey = dedupKeyData.String()
 
 		return nil
 	}, nil
@@ -155,6 +166,10 @@ func buildEvent(routingKey string, notification Notification) pagerduty.V2Event 
 		Action:     "trigger",
 		Payload:    &payload,
 		Client:     "ArgoCD",
+	}
+
+	if notification.PagerdutyV2.DedupKey != "" {
+		event.DedupKey = notification.PagerdutyV2.DedupKey
 	}
 
 	if notification.PagerdutyV2.URL != "" {
