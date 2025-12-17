@@ -494,48 +494,48 @@ func TestLogTriggerResults(t *testing.T) {
 	logger.SetOutput(&buf)
 	logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: true})
 	logEntry := logrus.NewEntry(logger)
-	
+
 	t.Run("TriggeredResult", func(t *testing.T) {
 		buf.Reset()
 		results := []triggers.ConditionResult{{
 			Key: "app.status == 'Healthy'", OncePer: "abc123", Templates: []string{"template1"}, Triggered: true,
 		}}
-		
+
 		logTriggerResults(logEntry, "test-trigger", results)
-		
+
 		output := buf.String()
 		assert.Contains(t, output, "test-trigger")
 		assert.Contains(t, output, "TRIGGERED")
 		assert.Contains(t, output, "abc123")
 		assert.Contains(t, output, "template1")
 	})
-	
+
 	t.Run("NotTriggeredResult", func(t *testing.T) {
 		buf.Reset()
 		results := []triggers.ConditionResult{{
 			Key: "app.status == 'Failed'", OncePer: "def456", Templates: []string{"template2"}, Triggered: false,
 		}}
-		
+
 		logTriggerResults(logEntry, "fail-trigger", results)
-		
+
 		output := buf.String()
 		assert.Contains(t, output, "fail-trigger")
 		assert.Contains(t, output, "FAILED")
 		assert.Contains(t, output, "def456")
 		assert.Contains(t, output, "template2")
 	})
-	
+
 	t.Run("LongRevisionTruncation", func(t *testing.T) {
 		buf.Reset()
 		longRevision := "1234567890abcdefghijklmnopqrstuvwxyz"
 		results := []triggers.ConditionResult{{
 			Key: "test", OncePer: longRevision, Templates: []string{"tmpl"}, Triggered: true,
 		}}
-		
+
 		logTriggerResults(logEntry, "truncate-test", results)
-		
+
 		output := buf.String()
-		assert.Contains(t, output, "12345678") // First 8 chars
+		assert.Contains(t, output, "12345678")      // First 8 chars
 		assert.NotContains(t, output, longRevision) // Full revision should not appear
 	})
 }

@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/argoproj/notifications-engine/pkg/triggers"
 	"reflect"
 	"runtime/debug"
 	"time"
+
+	"github.com/argoproj/notifications-engine/pkg/triggers"
 
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
