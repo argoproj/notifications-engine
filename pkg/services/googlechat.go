@@ -13,8 +13,6 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"google.golang.org/api/chat/v1"
-
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
@@ -24,10 +22,14 @@ type GoogleChatNotification struct {
 	ThreadKey string `json:"threadKey,omitempty"`
 }
 
-type googleChatMessage struct {
-	Text    string            `json:"text"`
-	Cards   []chat.Card       `json:"cards,omitempty"`
-	CardsV2 []chat.CardWithId `json:"cardsV2,omitempty"`
+type GoogleChatMessage struct {
+	Text    string   `json:"text,omitempty"`
+	Cards   []any    `json:"cards,omitempty"`
+	CardsV2 []CardV2 `json:"cardsV2,omitempty"`
+}
+type CardV2 struct {
+	CardId string `json:"card_id,omitempty"`
+	Card   any    `json:"card,omitempty"`
 }
 
 func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -120,7 +122,7 @@ type googlechatClient struct {
 	url        string
 }
 
-func (c *googlechatClient) sendMessage(message *googleChatMessage, threadKey string) (*webhookReturn, error) {
+func (c *googlechatClient) sendMessage(message *GoogleChatMessage, threadKey string) (*webhookReturn, error) {
 	jsonMessage, err := json.Marshal(message)
 	if err != nil {
 		return nil, err
@@ -183,24 +185,24 @@ func (s googleChatService) Send(notification Notification, dest Destination) err
 	return nil
 }
 
-func googleChatNotificationToMessage(n Notification) (*googleChatMessage, error) {
-	message := &googleChatMessage{}
+func googleChatNotificationToMessage(n Notification) (*GoogleChatMessage, error) {
+	message := &GoogleChatMessage{}
 	if n.GoogleChat != nil && (n.GoogleChat.CardsV2 != "" || n.GoogleChat.Cards != "") {
 		if n.GoogleChat.CardsV2 != "" {
 			// Unmarshal Modern Type
 
-			var cardData []chat.GoogleAppsCardV1Card
+			var cardData []any
 			err := yaml.Unmarshal([]byte(n.GoogleChat.CardsV2), &cardData)
 			if err != nil {
 				return nil, err
 			}
 
-			message.CardsV2 = make([]chat.CardWithId, len(cardData))
+			message.CardsV2 = make([]CardV2, len(cardData))
 
 			for i, datum := range cardData {
-				message.CardsV2[i] = chat.CardWithId{
+				message.CardsV2[i] = CardV2{
 					CardId: uuid.New().String(),
-					Card:   &datum,
+					Card:   datum,
 				}
 			}
 		}
