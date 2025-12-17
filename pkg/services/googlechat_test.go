@@ -7,11 +7,83 @@ import (
 	"text/template"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/go-cmp/cmp/cmpopts"
-	"google.golang.org/api/chat/v1"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// func TestGoogleChat_CardV2(t *testing.T) {
+// 	called := false
+// 	testServer := httptest.NewServer(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+// 		called = true
+
+// 		bodyBytes, err := io.ReadAll(req.Body)
+// 		if err != nil {
+// 			t.Fatal(err)
+// 		}
+// 		bodyParsed := map[string]interface{}{}
+// 		err = json.Unmarshal(bodyBytes, &bodyParsed)
+// 		if err != nil {
+// 			t.Fatal("error on write response body")
+// 		}
+// 		if diff := cmp.Diff(
+// 			bodyParsed,
+// 			map[string]interface{}{
+// 				"cardsV2": []interface{}{},
+// 			},
+// 			cmp.FilterPath(
+// 				func(path cmp.Path) bool {
+// 					return path.Last().String() == ".CardId"
+// 				},
+// 				cmp.Ignore(),
+// 			),
+// 		); diff != "" {
+// 			assert.Fail(t, "%s", diff)
+// 		}
+
+// 		res.WriteHeader(http.StatusOK)
+// 		_, err = res.Write([]byte("{}"))
+// 		if err != nil {
+// 			t.Fatal("error on write response body")
+// 		}
+// 	}))
+// 	defer func() { testServer.Close() }()
+
+// 	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": testServer.URL}}
+// 	service := NewGoogleChatService(opts).(*googleChatService)
+
+// 	notification := Notification{
+// 		Message: "message {{.value}}",
+// 		GoogleChat: &GoogleChatNotification{
+// 			CardsV2: `- sections:
+//   - widgets:
+//     - textParagraph:
+//         textSyntax: "MARKDOWN"
+//         text: "❗Application **[my-app](https://argocd.local/applications/my-app)** on **MyEnv** has degraded."
+//     - columns:
+//         columnItems:
+//         - widgets:
+//           - decoratedText:
+//               topLabelText:
+//                 textSyntax: "MARKDOWN"
+//                 text: "*Health Status*"
+//               text: "Degraded"
+//         - widgets:
+//           - decoratedText:
+//               topLabelText:
+//                 textSyntax: "MARKDOWN"
+//                 text: "*Repository*"
+//               contentText:
+//                 textSyntax: "MARKDOWN"
+//                 text: "https://github.com/loganmzz/my-repository"
+// `,
+// 		},
+// 	}
+// 	destination := Destination{Recipient: "test"}
+
+// 	err := service.Send(notification, destination)
+// 	assert.Nil(t, err)
+// 	assert.True(t, called)
+// }
 
 func TestTextMessage_GoogleChat(t *testing.T) {
 	notificationTemplate := Notification{
@@ -130,28 +202,31 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 	}
 
 	assert.NotNil(t, message)
-	assert.Equal(t, message.Cards, []chat.Card{
-		{
-			Sections: []*chat.Section{
-				{
-					Widgets: []*chat.WidgetMarkup{
-						{
-							TextParagraph: &chat.TextParagraph{
-								Text: "text",
+	assert.Equal(t, message.Cards, []interface{}{
+		map[string]interface{}{
+			"sections": []interface{}{
+				map[string]interface{}{
+					"widgets": []interface{}{
+						map[string]interface{}{
+							"textParagraph": map[string]interface{}{
+								"text": "text",
 							},
-						}, {
-							KeyValue: &chat.KeyValue{
-								TopLabel: "topLabel",
+						},
+						map[string]interface{}{
+							"keyValue": map[string]interface{}{
+								"topLabel": "topLabel",
 							},
-						}, {
-							Image: &chat.Image{
-								ImageUrl: "imageUrl",
+						},
+						map[string]interface{}{
+							"image": map[string]interface{}{
+								"imageUrl": "imageUrl",
 							},
-						}, {
-							Buttons: []*chat.Button{
-								{
-									TextButton: &chat.TextButton{
-										Text: "button",
+						},
+						map[string]interface{}{
+							"buttons": []interface{}{
+								map[string]interface{}{
+									"textButton": map[string]interface{}{
+										"text": "button",
 									},
 								},
 							},
@@ -161,6 +236,81 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 			},
 		},
 	})
+	// {
+	// 	"sections": []interface{
+	// 			Widgets: []interface{
+	// 				{
+	// 					"textParagraph": {
+	// 							"text": "text",
+	// 						},
+	// 					},
+	// 				},
+	// 				{
+	// 					"keyValue": {
+	// 							"topLabel": "topLabel",
+	// 						},
+	// 					},
+	// 				},
+	// 				{
+	// 					"image": {
+	// 							"imageUrl": "imageUrl",
+	// 						},
+	// 					},
+	// 				},
+	// 				{
+	// 					Buttons: []interface{
+	// 						{
+	// 							"type": {
+	// 								"textButton": {
+	// 									"text": "button",
+	// 								},
+	// 							},
+	// 						},
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// },
+	// {
+	// 	Sections: []*card.Card_Section{
+	// 		{
+	// 			Widgets: []*card.Widget{
+	// 				&card.Widget{
+	// 					Data: &card.Widget_TextParagraph{
+	// 						TextParagraph: &card.TextParagraph{
+	// 							Text: "text",
+	// 					},
+	// 				},
+	// 				&card.Widget{
+	// 				  Data: {
+	// 						KeyValue: &card.KeyValue{
+	// 							TopLabel: "topLabel",
+	// 						},
+	// 					},
+	// 				},
+	// 				&card.Widget{
+	// 				  Data: {
+	// 						Image: &card.Image{
+	// 							ImageUrl: "imageUrl",
+	// 						},
+	// 					},
+	// 				},
+	// 				&card.Widget{
+	// 					Data: {
+	// 						Buttons: []*card.Button{
+	// 							{
+	// 								TextButton: &card.TextButton{
+	// 									Text: "button",
+	// 								},
+	// 							},
+	// 						},
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// },
 }
 
 func TestCardV2Message_GoogleChat(t *testing.T) {
@@ -189,7 +339,26 @@ func TestCardV2Message_GoogleChat(t *testing.T) {
                 text: Docs
                 onClick:
                   openLink:
-                    url: "{{ .button }}"`,
+                    url: "{{ .button }}"
+        - textParagraph:
+            textSyntax: "MARKDOWN"
+            text: "**[my-app](https://argocd.local/applications/my-app)**"
+        - columns:
+            columnItems:
+            - widgets:
+              - decoratedText:
+                  topLabelText:
+                    textSyntax: "MARKDOWN"
+                    text: "*Health Status*"
+                  text: "Degraded"
+            - widgets:
+              - decoratedText:
+                  topLabelText:
+                    textSyntax: "MARKDOWN"
+                    text: "*Repository*"
+                  contentText:
+                    textSyntax: "MARKDOWN"
+                    text: "https://github.com/my-org/my-repository"`,
 		},
 	}
 
@@ -218,41 +387,83 @@ func TestCardV2Message_GoogleChat(t *testing.T) {
 		return
 	}
 
-	expected := []chat.CardWithId{
+	expected := []CardV2{
 		{
-			Card: &chat.GoogleAppsCardV1Card{
-				Header: &chat.GoogleAppsCardV1CardHeader{
-					Title:        "Action test as been completed",
-					Subtitle:     "Argo Notifications",
-					ImageUrl:     "https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png",
-					ImageType:    "CIRCLE",
-					ImageAltText: "Argo Logo",
+			CardId: "",
+			Card: map[string]interface{}{
+				"header": map[string]interface{}{
+					"title":        "Action test as been completed",
+					"subtitle":     "Argo Notifications",
+					"imageUrl":     "https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png",
+					"imageType":    "CIRCLE",
+					"imageAltText": "Argo Logo",
 				},
-				Sections: []*chat.GoogleAppsCardV1Section{
-					{
-						Collapsible:               false,
-						Header:                    "Metadata",
-						UncollapsibleWidgetsCount: 1,
-						Widgets: []*chat.GoogleAppsCardV1Widget{
-							{
-								DecoratedText: &chat.GoogleAppsCardV1DecoratedText{
-									StartIcon: &chat.GoogleAppsCardV1Icon{
-										KnownIcon: "BOOKMARK",
+				"sections": []interface{}{
+					map[string]interface{}{
+						"header":                    "Metadata",
+						"collapsible":               false,
+						"uncollapsibleWidgetsCount": float64(1),
+						"widgets": []interface{}{
+							map[string]interface{}{
+								"decoratedText": map[string]interface{}{
+									"startIcon": map[string]interface{}{
+										"knownIcon": "BOOKMARK",
 									},
-									Text: "text",
+									"text": "text",
 								},
 							},
-							{
-								ButtonList: &chat.GoogleAppsCardV1ButtonList{
-									Buttons: []*chat.GoogleAppsCardV1Button{
-										{
-											Icon: &chat.GoogleAppsCardV1Icon{
-												KnownIcon: "BOOKMARK",
+							map[string]interface{}{
+								"buttonList": map[string]interface{}{
+									"buttons": []interface{}{
+										map[string]interface{}{
+											"icon": map[string]interface{}{
+												"knownIcon": "BOOKMARK",
 											},
-											Text: "Docs",
-											OnClick: &chat.GoogleAppsCardV1OnClick{
-												OpenLink: &chat.GoogleAppsCardV1OpenLink{
-													Url: "button",
+											"text": "Docs",
+											"onClick": map[string]interface{}{
+												"openLink": map[string]interface{}{
+													"url": "button",
+												},
+											},
+										},
+									},
+								},
+							},
+							map[string]interface{}{
+								"textParagraph": map[string]interface{}{
+									"textSyntax": "MARKDOWN",
+									"text":       "**[my-app](https://argocd.local/applications/my-app)**",
+								},
+							},
+							map[string]interface{}{
+								"columns": map[string]interface{}{
+									"columnItems": []interface{}{
+										map[string]interface{}{
+											"widgets": []interface{}{
+												map[string]interface{}{
+													"decoratedText": map[string]interface{}{
+														"topLabelText": map[string]interface{}{
+															"textSyntax": "MARKDOWN",
+															"text":       "*Health Status*",
+														},
+														"text": "Degraded",
+													},
+												},
+											},
+										},
+										map[string]interface{}{
+											"widgets": []interface{}{
+												map[string]interface{}{
+													"decoratedText": map[string]interface{}{
+														"topLabelText": map[string]interface{}{
+															"textSyntax": "MARKDOWN",
+															"text":       "*Repository*",
+														},
+														"contentText": map[string]interface{}{
+															"textSyntax": "MARKDOWN",
+															"text":       "https://github.com/my-org/my-repository",
+														},
+													},
 												},
 											},
 										},
@@ -266,8 +477,18 @@ func TestCardV2Message_GoogleChat(t *testing.T) {
 		},
 	}
 	assert.NotNil(t, message)
-	assert.True(t, cmp.Equal(message.CardsV2, expected, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
-		cmp.Diff(message.CardsV2, expected, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")))
+	if diff := cmp.Diff(
+		message.CardsV2,
+		expected,
+		cmp.FilterPath(
+			func(path cmp.Path) bool {
+				return path.Last().String() == ".CardId"
+			},
+			cmp.Ignore(),
+		),
+	); diff != "" {
+		assert.Fail(t, "%s", diff)
+	}
 }
 
 func TestCreateClient_NoError(t *testing.T) {
