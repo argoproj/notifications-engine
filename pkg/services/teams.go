@@ -180,7 +180,7 @@ func (s teamsService) Send(notification Notification, dest Destination) (err err
 		return err
 	}
 
-	if string(bodyBytes) != "1" {
+	if string(bodyBytes) != "1" && string(bodyBytes) != "" {
 		return fmt.Errorf("teams webhook post error: %s", bodyBytes)
 	}
 
