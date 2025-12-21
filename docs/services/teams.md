@@ -29,11 +29,14 @@ The Teams notification service send message notifications using Teams bot and re
 
 ### Option 1: Power Automate Workflows (Recommended)
 
-1. Open `Teams` and go to `Apps`
-2. Find `Workflows` app and click on it
-3. Select `Create workflow` -> `Incoming webhook`
-4. Choose your team and channel
-5. Configure the webhook name and settings
+1. Open `Teams` and go to the channel you wish to set notifications for
+2. Click on the 3 dots next to the channel name
+3. Select`Workflows`
+4. Click on `Manage`
+5. Click `New flow`
+6. Write `Send webhook alerts to a channel` in the search bar or select it from the template list 
+7. Choose your team and channel
+8. Configure the webhook name and settings
 6. Copy the webhook URL (it will be from `api.powerautomate.com`, `api.powerplatform.com`, or `flow.microsoft.com`)
 7. Store it in `argocd-notifications-secret` and define it in `argocd-notifications-cm`
 
