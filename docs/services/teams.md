@@ -1,5 +1,24 @@
 # Teams
 
+## ⚠️ Deprecation Notice
+
+**Office 365 Connectors are being retired by Microsoft.**
+
+Microsoft is retiring the Office 365 Connectors service in Teams. The service will be fully retired by **March 31, 2026** (extended from the original timeline of December 2025). 
+
+### What this means:
+- **Old Office 365 Connectors** (webhook URLs from `webhook.office.com`) will stop working after the retirement date
+- **New Power Automate Workflows** (webhook URLs from `api.powerautomate.com`, `api.powerplatform.com`, or `flow.microsoft.com`) are the recommended replacement
+
+### Migration Required:
+If you are currently using Office 365 Connectors (Incoming Webhook), you should migrate to Power Automate Workflows before the retirement date. The notifications-engine automatically detects the webhook type and handles both formats, but you should plan your migration.
+
+**Migration Resources:**
+- [Microsoft Deprecation Notice](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/)
+- [Create incoming webhooks with Workflows for Microsoft Teams](https://support.microsoft.com/en-us/office/create-incoming-webhooks-with-workflows-for-microsoft-teams-4b3b0b0e-0b5a-4b5a-9b5a-0b5a-4b5a-9b5a)
+
+---
+
 ## Parameters
 
 The Teams notification service send message notifications using Teams bot and requires specifying the following settings:
@@ -8,11 +27,29 @@ The Teams notification service send message notifications using Teams bot and re
 
 ## Configuration
 
+### Option 1: Power Automate Workflows (Recommended)
+
+1. Open `Teams` and go to the channel you wish to set notifications for
+2. Click on the 3 dots next to the channel name
+3. Select`Workflows`
+4. Click on `Manage`
+5. Click `New flow`
+6. Write `Send webhook alerts to a channel` in the search bar or select it from the template list 
+7. Choose your team and channel
+8. Configure the webhook name and settings
+6. Copy the webhook URL (it will be from `api.powerautomate.com`, `api.powerplatform.com`, or `flow.microsoft.com`)
+7. Store it in `argocd-notifications-secret` and define it in `argocd-notifications-cm`
+
+### Option 2: Office 365 Connectors (Deprecated - Retiring March 31, 2026)
+
+> **⚠️ Warning:** This method is deprecated and will stop working after March 31, 2026. Please migrate to Power Automate Workflows.
+
 1. Open `Teams` and goto `Apps`
 2. Find `Incoming Webhook` microsoft app and click on it
 3. Press `Add to a team` -> select team and channel -> press `Set up a connector`
 4. Enter webhook name and upload image (optional)
-5. Press `Create` then copy webhook url and store it in `argocd-notifications-secret` and define it in `argocd-notifications-cm`
+5. Press `Create` then copy webhook url (it will be from `webhook.office.com`)
+6. Store it in `argocd-notifications-secret` and define it in `argocd-notifications-cm`
 
 ```yaml
 apiVersion: v1
@@ -31,10 +68,24 @@ kind: Secret
 metadata:
   name: <secret-name>
 stringData:
-  channel-teams-url: https://example.com
+  channel-teams-url: https://api.powerautomate.com/webhook/your-webhook-id  # Power Automate Workflows (recommended)
+  # OR
+  # channel-teams-url: https://webhook.office.com/webhook/your-webhook-id  # Office 365 Connector (deprecated)
 ```
 
-6. Create subscription for your Teams integration:
+### Webhook Type Detection
+
+The notifications-engine automatically detects the webhook type based on the URL:
+
+- **Power Automate Workflows**: URLs from `api.powerautomate.com`, `api.powerplatform.com`, `flow.microsoft.com`, or containing `/powerautomate/` in the path
+  - Uses HTTP status codes (200-299) for success/failure
+  - More flexible and feature-rich
+  
+- **Office 365 Connectors**: URLs from `webhook.office.com` (deprecated)
+  - Requires response body to be exactly `"1"` for success
+  - Will stop working after March 31, 2026
+
+7. Create subscription for your Teams integration:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
