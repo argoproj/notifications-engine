@@ -5,9 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	texttemplate "text/template"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	log "github.com/sirupsen/logrus"
+)
+
+var (
+	// WorkflowsURLPattern matches Microsoft Teams Workflows webhook URLs (Power Automate)
+	// Matches: api.powerautomate.com, api.powerplatform.com, flow.microsoft.com
+	// Also matches URLs with /powerautomate/ in the path (Power Platform URLs)
+	// Note: webhook.office.com is the old Office 365 connectors service (deprecated, retiring Dec 2025)
+	// and should NOT match this pattern - it uses the old solution behavior
+	WorkflowsURLPattern = regexp.MustCompile(`(?i)(api\.(powerautomate|powerplatform)\.com|flow\.microsoft\.com|/powerautomate/)`)
 )
 
 type TeamsNotification struct {
@@ -180,8 +191,26 @@ func (s teamsService) Send(notification Notification, dest Destination) (err err
 		return err
 	}
 
-	if string(bodyBytes) != "1" && len(bodyBytes) != 0 {
+	isWorkflowsWebhook := WorkflowsURLPattern.MatchString(webhookUrl)
+	webhookType := "office365-connector"
+	if isWorkflowsWebhook {
+		webhookType = "workflows"
+	}
+	log.Debugf("Teams webhook type detected: %s (URL: %s)", webhookType, webhookUrl)
+
+	if string(bodyBytes) != "1" && !isWorkflowsWebhook {
 		return fmt.Errorf("teams webhook post error: %s", bodyBytes)
+	}
+
+	// Workflows webhooks return HTTP status codes for success/failure
+	// 200-299 indicates success, anything else is an error
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		bodyBytes, err := io.ReadAll(response.Body)
+		errorMsg := "no error details provided"
+		if err == nil && len(bodyBytes) > 0 {
+			errorMsg = string(bodyBytes)
+		}
+		return fmt.Errorf("teams webhook post error (status %d): %s", response.StatusCode, errorMsg)
 	}
 
 	return nil
