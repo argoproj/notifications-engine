@@ -9,6 +9,7 @@ import (
 	texttemplate "text/template"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+
 	log "github.com/sirupsen/logrus"
 )
 
