@@ -29,10 +29,8 @@ type TeamsWorkflowsNotification struct {
 	Facts           string `json:"facts,omitempty"`
 	Sections        string `json:"sections,omitempty"`
 	PotentialAction string `json:"potentialAction,omitempty"`
-	// AdaptiveCard specifies the Adaptive Card JSON payload (alternative to messageCard)
+	// AdaptiveCard specifies the Adaptive Card JSON payload
 	AdaptiveCard string `json:"adaptiveCard,omitempty"`
-	// CardFormat specifies which card format to use: "messageCard" (default) or "adaptiveCard"
-	CardFormat string `json:"cardFormat,omitempty"`
 }
 
 func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -79,11 +77,6 @@ func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.Fu
 	adaptiveCard, err := texttemplate.New(name).Funcs(f).Parse(n.AdaptiveCard)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.adaptiveCard: %w", name, err)
-	}
-
-	cardFormat, err := texttemplate.New(name).Funcs(f).Parse(n.CardFormat)
-	if err != nil {
-		return nil, fmt.Errorf("error in '%s' teams-workflows.cardFormat: %w", name, err)
 	}
 
 	return func(notification *Notification, vars map[string]interface{}) error {
@@ -161,14 +154,6 @@ func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.Fu
 		}
 		if val := adaptiveCardBuff.String(); val != "" {
 			notification.TeamsWorkflows.AdaptiveCard = val
-		}
-
-		var cardFormatBuff bytes.Buffer
-		if err := cardFormat.Execute(&cardFormatBuff, vars); err != nil {
-			return err
-		}
-		if val := cardFormatBuff.String(); val != "" {
-			notification.TeamsWorkflows.CardFormat = val
 		}
 
 		return nil
@@ -267,63 +252,73 @@ func (s teamsWorkflowsService) Send(notification Notification, dest Destination)
 	return nil
 }
 
-func teamsWorkflowsNotificationToMessage(n Notification) (*teamsMessage, error) {
-	message := &teamsMessage{
-		Type:    "MessageCard",
-		Context: "https://schema.org/extensions",
-		Text:    n.Message,
+// notificationData holds the unified data structure extracted from a Notification
+// This is used as an intermediate format that is converted to AdaptiveCard format
+type notificationData struct {
+	Title           string
+	Summary         string
+	Text            string
+	ThemeColor      string
+	Sections        []teamsSection
+	Facts           []map[string]interface{}
+	PotentialAction []teamsAction
+}
+
+// extractNotificationData extracts common data from a Notification into a unified structure
+// This data is then converted to AdaptiveCard format
+func extractNotificationData(n Notification) (*notificationData, error) {
+	data := &notificationData{
+		Text: n.Message,
 	}
 
 	if n.TeamsWorkflows == nil {
-		return message, nil
+		return data, nil
 	}
 
 	if n.TeamsWorkflows.Title != "" {
-		message.Title = n.TeamsWorkflows.Title
+		data.Title = n.TeamsWorkflows.Title
 	}
 
 	if n.TeamsWorkflows.Summary != "" {
-		message.Summary = n.TeamsWorkflows.Summary
+		data.Summary = n.TeamsWorkflows.Summary
 	}
 
 	if n.TeamsWorkflows.Text != "" {
-		message.Text = n.TeamsWorkflows.Text
+		data.Text = n.TeamsWorkflows.Text
 	}
 
 	if n.TeamsWorkflows.ThemeColor != "" {
-		message.ThemeColor = n.TeamsWorkflows.ThemeColor
+		data.ThemeColor = n.TeamsWorkflows.ThemeColor
 	}
 
 	if n.TeamsWorkflows.Sections != "" {
-		unmarshalledSections := make([]teamsSection, 2)
-		err := json.Unmarshal([]byte(n.TeamsWorkflows.Sections), &unmarshalledSections)
+		var sections []teamsSection
+		err := json.Unmarshal([]byte(n.TeamsWorkflows.Sections), &sections)
 		if err != nil {
 			return nil, fmt.Errorf("teams-workflows sections unmarshalling error %w", err)
 		}
-		message.Sections = unmarshalledSections
+		data.Sections = sections
 	}
 
 	if n.TeamsWorkflows.Facts != "" {
-		unmarshalledFacts := make([]map[string]interface{}, 2)
-		err := json.Unmarshal([]byte(n.TeamsWorkflows.Facts), &unmarshalledFacts)
+		var facts []map[string]interface{}
+		err := json.Unmarshal([]byte(n.TeamsWorkflows.Facts), &facts)
 		if err != nil {
 			return nil, fmt.Errorf("teams-workflows facts unmarshalling error %w", err)
 		}
-		message.Sections = append(message.Sections, teamsSection{
-			"facts": unmarshalledFacts,
-		})
+		data.Facts = facts
 	}
 
 	if n.TeamsWorkflows.PotentialAction != "" {
-		unmarshalledActions := make([]teamsAction, 2)
-		err := json.Unmarshal([]byte(n.TeamsWorkflows.PotentialAction), &unmarshalledActions)
+		var actions []teamsAction
+		err := json.Unmarshal([]byte(n.TeamsWorkflows.PotentialAction), &actions)
 		if err != nil {
 			return nil, fmt.Errorf("teams-workflows potential action unmarshalling error %w", err)
 		}
-		message.PotentialAction = unmarshalledActions
+		data.PotentialAction = actions
 	}
 
-	return message, nil
+	return data, nil
 }
 
 // Adaptive Card structures for Teams Workflows
@@ -339,6 +334,7 @@ type adaptiveCardElement struct {
 	Text   string             `json:"text,omitempty"`
 	Size   string             `json:"size,omitempty"`
 	Weight string             `json:"weight,omitempty"`
+	Color  string             `json:"color,omitempty"`
 	Wrap   bool               `json:"wrap,omitempty"`
 	Facts  []adaptiveCardFact `json:"facts,omitempty"`
 }
@@ -354,58 +350,103 @@ type adaptiveCardAction struct {
 	URL   string `json:"url,omitempty"`
 }
 
-// teamsWorkflowsNotificationToAdaptiveCard converts a Notification to an Adaptive Card format
-func teamsWorkflowsNotificationToAdaptiveCard(n Notification) *adaptiveCard {
+// adaptiveMessage is the outer wrapper for Teams Workflows Adaptive Card messages
+// It matches the expected structure:
+//
+//	{
+//	  "type": "message",
+//	  "attachments": [
+//	    {
+//	      "contentType": "application/vnd.microsoft.card.adaptive",
+//	      "content": { ... AdaptiveCard ... }
+//	    }
+//	  ]
+//	}
+type adaptiveMessage struct {
+	Type        string               `json:"type"`
+	Attachments []adaptiveAttachment `json:"attachments"`
+}
+
+type adaptiveAttachment struct {
+	ContentType string        `json:"contentType"`
+	Content     *adaptiveCard `json:"content"`
+}
+
+// buildAdaptiveCard converts notificationData to Adaptive Card format
+func buildAdaptiveCard(data *notificationData) *adaptiveCard {
 	card := &adaptiveCard{
-		Type:    "message",
+		Type:    "AdaptiveCard",
 		Version: "1.4",
 		Body:    []adaptiveCardElement{},
 	}
 
 	// Add title if present
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.Title != "" {
+	if data.Title != "" {
 		card.Body = append(card.Body, adaptiveCardElement{
 			Type:   "TextBlock",
-			Text:   n.TeamsWorkflows.Title,
+			Text:   data.Title,
 			Size:   "Large",
 			Weight: "Bolder",
+			Color:  data.ThemeColor, // ThemeColor can contain values like "Good", "Warning", etc.
 			Wrap:   true,
 		})
 	}
 
-	// Add summary/text if present
-	textContent := n.Message
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.Text != "" {
-		textContent = n.TeamsWorkflows.Text
-	}
-	if textContent != "" {
+	// Add text if present
+	if data.Text != "" {
 		card.Body = append(card.Body, adaptiveCardElement{
 			Type: "TextBlock",
-			Text: textContent,
+			Text: data.Text,
 			Wrap: true,
 		})
 	}
 
-	// Add facts if present
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.Facts != "" {
-		var facts []map[string]interface{}
-		if err := json.Unmarshal([]byte(n.TeamsWorkflows.Facts), &facts); err == nil {
+	// Add facts if present (from Facts field)
+	if len(data.Facts) > 0 {
+		factSet := adaptiveCardElement{
+			Type:  "FactSet",
+			Facts: []adaptiveCardFact{},
+		}
+		for _, fact := range data.Facts {
+			if name, ok := fact["name"].(string); ok {
+				value := ""
+				if v, ok := fact["value"].(string); ok {
+					value = v
+				} else if v, ok := fact["value"]; ok {
+					value = fmt.Sprintf("%v", v)
+				}
+				factSet.Facts = append(factSet.Facts, adaptiveCardFact{
+					Title: name,
+					Value: value,
+				})
+			}
+		}
+		if len(factSet.Facts) > 0 {
+			card.Body = append(card.Body, factSet)
+		}
+	}
+
+	// Add sections if present (convert section facts to Adaptive Card facts)
+	for _, section := range data.Sections {
+		if facts, ok := section["facts"].([]interface{}); ok {
 			factSet := adaptiveCardElement{
 				Type:  "FactSet",
 				Facts: []adaptiveCardFact{},
 			}
 			for _, fact := range facts {
-				if name, ok := fact["name"].(string); ok {
-					value := ""
-					if v, ok := fact["value"].(string); ok {
-						value = v
-					} else if v, ok := fact["value"]; ok {
-						value = fmt.Sprintf("%v", v)
+				if factMap, ok := fact.(map[string]interface{}); ok {
+					if name, ok := factMap["name"].(string); ok {
+						value := ""
+						if v, ok := factMap["value"].(string); ok {
+							value = v
+						} else if v, ok := factMap["value"]; ok {
+							value = fmt.Sprintf("%v", v)
+						}
+						factSet.Facts = append(factSet.Facts, adaptiveCardFact{
+							Title: name,
+							Value: value,
+						})
 					}
-					factSet.Facts = append(factSet.Facts, adaptiveCardFact{
-						Title: name,
-						Value: value,
-					})
 				}
 			}
 			if len(factSet.Facts) > 0 {
@@ -414,65 +455,27 @@ func teamsWorkflowsNotificationToAdaptiveCard(n Notification) *adaptiveCard {
 		}
 	}
 
-	// Add sections if present (convert to Adaptive Card format)
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.Sections != "" {
-		var sections []teamsSection
-		if err := json.Unmarshal([]byte(n.TeamsWorkflows.Sections), &sections); err == nil {
-			for _, section := range sections {
-				// Convert section facts to Adaptive Card facts
-				if facts, ok := section["facts"].([]interface{}); ok {
-					factSet := adaptiveCardElement{
-						Type:  "FactSet",
-						Facts: []adaptiveCardFact{},
-					}
-					for _, fact := range facts {
-						if factMap, ok := fact.(map[string]interface{}); ok {
-							if name, ok := factMap["name"].(string); ok {
-								value := ""
-								if v, ok := factMap["value"].(string); ok {
-									value = v
-								} else if v, ok := factMap["value"]; ok {
-									value = fmt.Sprintf("%v", v)
-								}
-								factSet.Facts = append(factSet.Facts, adaptiveCardFact{
-									Title: name,
-									Value: value,
-								})
-							}
-						}
-					}
-					if len(factSet.Facts) > 0 {
-						card.Body = append(card.Body, factSet)
-					}
-				}
-			}
-		}
-	}
-
 	// Add actions if present
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.PotentialAction != "" {
-		var actions []teamsAction
-		if err := json.Unmarshal([]byte(n.TeamsWorkflows.PotentialAction), &actions); err == nil {
-			card.Actions = []adaptiveCardAction{}
-			for _, action := range actions {
-				if actionType, ok := action["@type"].(string); ok {
-					if actionType == "OpenUri" {
-						acAction := adaptiveCardAction{
-							Type: "Action.OpenUrl",
-						}
-						if name, ok := action["name"].(string); ok {
-							acAction.Title = name
-						}
-						if targets, ok := action["targets"].([]interface{}); ok && len(targets) > 0 {
-							if target, ok := targets[0].(map[string]interface{}); ok {
-								if uri, ok := target["uri"].(string); ok {
-									acAction.URL = uri
-								}
+	if len(data.PotentialAction) > 0 {
+		card.Actions = []adaptiveCardAction{}
+		for _, action := range data.PotentialAction {
+			if actionType, ok := action["@type"].(string); ok {
+				if actionType == "OpenUri" {
+					acAction := adaptiveCardAction{
+						Type: "Action.OpenUrl",
+					}
+					if name, ok := action["name"].(string); ok {
+						acAction.Title = name
+					}
+					if targets, ok := action["targets"].([]interface{}); ok && len(targets) > 0 {
+						if target, ok := targets[0].(map[string]interface{}); ok {
+							if uri, ok := target["uri"].(string); ok {
+								acAction.URL = uri
 							}
 						}
-						if acAction.URL != "" {
-							card.Actions = append(card.Actions, acAction)
-						}
+					}
+					if acAction.URL != "" {
+						card.Actions = append(card.Actions, acAction)
 					}
 				}
 			}
@@ -483,37 +486,43 @@ func teamsWorkflowsNotificationToAdaptiveCard(n Notification) *adaptiveCard {
 }
 
 func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.Template != "" {
-		return []byte(n.TeamsWorkflows.Template), nil
-	}
-
-	// Check if Adaptive Card is explicitly requested
+	// Check if a custom AdaptiveCard template is provided
 	if n.TeamsWorkflows != nil && n.TeamsWorkflows.AdaptiveCard != "" {
-		return []byte(n.TeamsWorkflows.AdaptiveCard), nil
+		// Use the custom AdaptiveCard template directly, wrapped in message envelope
+		var card adaptiveCard
+		if err := json.Unmarshal([]byte(n.TeamsWorkflows.AdaptiveCard), &card); err != nil {
+			return nil, fmt.Errorf("teams-workflows adaptiveCard unmarshalling error %w", err)
+		}
+
+		payload := adaptiveMessage{
+			Type: "message",
+			Attachments: []adaptiveAttachment{
+				{
+					ContentType: "application/vnd.microsoft.card.adaptive",
+					Content:     &card,
+				},
+			},
+		}
+		return json.Marshal(payload)
 	}
 
-	// Determine card format based on notification settings
-	cardFormat := "messageCard" // default
-	if n.TeamsWorkflows != nil && n.TeamsWorkflows.CardFormat != "" {
-		cardFormat = strings.ToLower(n.TeamsWorkflows.CardFormat)
-	}
-
-	// Generate message based on card format
-	if cardFormat == "adaptivecard" {
-		adaptiveCard := teamsWorkflowsNotificationToAdaptiveCard(n)
-		return json.Marshal(adaptiveCard)
-	}
-
-	// Default to messageCard format
-	message, err := teamsWorkflowsNotificationToMessage(n)
+	// Extract unified notification data
+	data, err := extractNotificationData(n)
 	if err != nil {
 		return nil, err
 	}
 
-	marshal, err := json.Marshal(message)
-	if err != nil {
-		return nil, err
+	// Build AdaptiveCard and wrap it in the message envelope
+	card := buildAdaptiveCard(data)
+	payload := adaptiveMessage{
+		Type: "message",
+		Attachments: []adaptiveAttachment{
+			{
+				ContentType: "application/vnd.microsoft.card.adaptive",
+				Content:     card,
+			},
+		},
 	}
 
-	return marshal, nil
+	return json.Marshal(payload)
 }

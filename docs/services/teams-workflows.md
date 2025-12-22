@@ -66,86 +66,86 @@ metadata:
 
 Teams Workflows provides enhanced channel support compared to Office 365 Connectors, allowing you to post to shared and private channels in addition to standard channels.
 
-## Card Formats
+## Adaptive Card Format
 
-The Teams Workflows service supports two card formats:
+The Teams Workflows service uses **Adaptive Cards** exclusively, which is the modern, flexible card format for Microsoft Teams. All notifications are automatically converted to Adaptive Card format and wrapped in the required message envelope.
 
-1. **messageCard** (default) - Compatible with Office 365 Connector format for easy migration
-2. **Adaptive Card** - Modern card format with enhanced capabilities
+### Option 1: Using Template Fields (Recommended)
 
-### Using messageCard Format (Default)
-
-The default format uses the messageCard schema, which is compatible with Office 365 Connectors. You can use all the same template fields as the Teams service:
+The service automatically converts template fields to Adaptive Card format. This is the simplest and most maintainable approach:
 
 ```yaml
 template.app-sync-succeeded: |
   teams-workflows:
-    themeColor: "#000080"
+    # ThemeColor supports Adaptive Card semantic colors: "Good", "Warning", "Attention", "Accent"
+    # or hex colors like "#000080"
+    themeColor: "Good"
+    title: Application {{.app.metadata.name}} has been successfully synced
+    text: Application {{.app.metadata.name}} has been successfully synced at {{.app.status.operationState.finishedAt}}.
+    summary: "{{.app.metadata.name}} sync succeeded"
+    facts: |
+      [{
+        "name": "Sync Status",
+        "value": "{{.app.status.sync.status}}"
+      }, {
+        "name": "Repository",
+        "value": "{{.app.spec.source.repoURL}}"
+      }]
     sections: |
       [{
         "facts": [
           {
-            "name": "Sync Status",
-            "value": "{{.app.status.sync.status}}"
+            "name": "Namespace",
+            "value": "{{.app.metadata.namespace}}"
           },
           {
-            "name": "Repository",
-            "value": "{{.app.spec.source.repoURL}}"
+            "name": "Cluster",
+            "value": "{{.app.spec.destination.server}}"
           }
         ]
       }]
     potentialAction: |-
       [{
-        "@type":"OpenUri",
-        "name":"Operation Details",
-        "targets":[{
-          "os":"default",
-          "uri":"{{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true"
+        "@type": "OpenUri",
+        "name": "View in Argo CD",
+        "targets": [{
+          "os": "default",
+          "uri": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}"
         }]
       }]
-    title: Application {{.app.metadata.name}} has been successfully synced
-    text: Application {{.app.metadata.name}} has been successfully synced at {{.app.status.operationState.finishedAt}}.
-    summary: "{{.app.metadata.name}} sync succeeded"
 ```
 
-### Using Adaptive Cards
+**How it works:**
+- `title` → Converted to a large, bold TextBlock
+- `text` → Converted to a regular TextBlock
+- `facts` → Converted to a FactSet element
+- `sections` → Facts within sections are extracted and converted to FactSet elements
+- `potentialAction` → OpenUri actions are converted to Action.OpenUrl
+- `themeColor` → Applied to the title TextBlock (supports semantic colors like "Good", "Warning", "Attention", "Accent" or hex colors)
 
-Adaptive Cards provide a more flexible and modern card format. You can either:
+### Option 2: Custom Adaptive Card JSON
 
-#### Option 1: Use cardFormat field
-
-The service will automatically convert your messageCard fields to Adaptive Card format:
-
-```yaml
-template.app-sync-succeeded: |
-  teams-workflows:
-    cardFormat: "adaptiveCard"
-    title: Application {{.app.metadata.name}} has been successfully synced
-    text: Application {{.app.metadata.name}} has been successfully synced.
-    facts: |
-      [{
-        "name": "Sync Status",
-        "value": "{{.app.status.sync.status}}"
-      }]
-```
-
-#### Option 2: Provide custom Adaptive Card JSON
-
-For full control, you can provide a complete Adaptive Card JSON:
+For full control and advanced features, you can provide a complete Adaptive Card JSON template:
 
 ```yaml
 template.app-sync-succeeded: |
   teams-workflows:
     adaptiveCard: |
       {
-        "type": "message",
+        "type": "AdaptiveCard",
         "version": "1.4",
         "body": [
           {
             "type": "TextBlock",
             "text": "Application {{.app.metadata.name}} synced successfully",
             "size": "Large",
-            "weight": "Bolder"
+            "weight": "Bolder",
+            "color": "Good"
+          },
+          {
+            "type": "TextBlock",
+            "text": "Application {{.app.metadata.name}} has been successfully synced at {{.app.status.operationState.finishedAt}}.",
+            "wrap": true
           },
           {
             "type": "FactSet",
@@ -164,27 +164,79 @@ template.app-sync-succeeded: |
         "actions": [
           {
             "type": "Action.OpenUrl",
-            "title": "View Details",
+            "title": "View in Argo CD",
             "url": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}"
           }
         ]
       }
 ```
 
+**Note:** When using `adaptiveCard`, you only need to provide the AdaptiveCard JSON structure (not the full message envelope). The service automatically wraps it in the required `message` + `attachments` format for Teams Workflows.
+
+**Important:** If you provide `adaptiveCard`, it takes precedence over all other template fields (`title`, `text`, `facts`, etc.).
+
 ## Template Fields
 
-The Teams Workflows service supports the same template fields as the Teams service for messageCard format:
+The Teams Workflows service supports the following template fields, which are automatically converted to Adaptive Card format:
 
-- `title` - Message title
-- `text` - Message text content
-- `summary` - Summary text shown in notifications feed
-- `themeColor` - Hex color code for message theme
-- `sections` - JSON array of message sections
-- `facts` - JSON array of fact key-value pairs
-- `potentialAction` - JSON array of action buttons
-- `template` - Raw JSON template (overrides other fields)
-- `adaptiveCard` - Custom Adaptive Card JSON
-- `cardFormat` - Set to `"adaptiveCard"` to auto-convert messageCard fields
+### Standard Fields
+
+- `title` - Message title (converted to large, bold TextBlock)
+- `text` - Message text content (converted to TextBlock)
+- `summary` - Summary text (currently not used in Adaptive Cards, but preserved for compatibility)
+- `themeColor` - Color for the title. Supports:
+  - Semantic colors: `"Good"` (green), `"Warning"` (yellow), `"Attention"` (red), `"Accent"` (blue)
+  - Hex colors: `"#000080"`, `"#FF0000"`, etc.
+- `facts` - JSON array of fact key-value pairs (converted to FactSet)
+  ```yaml
+  facts: |
+    [{
+      "name": "Status",
+      "value": "{{.app.status.sync.status}}"
+    }]
+  ```
+- `sections` - JSON array of sections containing facts (facts are extracted and converted to FactSet)
+  ```yaml
+  sections: |
+    [{
+      "facts": [{
+        "name": "Namespace",
+        "value": "{{.app.metadata.namespace}}"
+      }]
+    }]
+  ```
+- `potentialAction` - JSON array of action buttons (OpenUri actions converted to Action.OpenUrl)
+  ```yaml
+  potentialAction: |-
+    [{
+      "@type": "OpenUri",
+      "name": "View Details",
+      "targets": [{
+        "os": "default",
+        "uri": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}"
+      }]
+    }]
+  ```
+
+### Advanced Fields
+
+- `adaptiveCard` - Complete Adaptive Card JSON template (takes precedence over all other fields)
+  - Only provide the AdaptiveCard structure, not the message envelope
+  - Supports full Adaptive Card 1.4 specification
+  - Allows access to all Adaptive Card features (containers, columns, images, etc.)
+
+- `template` - Raw JSON template (legacy, use `adaptiveCard` instead)
+
+### Field Conversion Details
+
+| Template Field | Adaptive Card Element | Notes |
+|---------------|----------------------|-------|
+| `title` | `TextBlock` with `size: "Large"`, `weight: "Bolder"` | ThemeColor applied to this element |
+| `text` | `TextBlock` with `wrap: true` | Uses `n.Message` if `text` is empty |
+| `facts` | `FactSet` | Each fact becomes a `title`/`value` pair |
+| `sections[].facts` | `FactSet` | Facts extracted from sections |
+| `potentialAction[OpenUri]` | `Action.OpenUrl` | Only OpenUri actions are converted |
+| `themeColor` | Applied to title `TextBlock.color` | Supports semantic and hex colors |
 
 ## Migration from Office 365 Connectors
 
@@ -198,7 +250,8 @@ If you're currently using the `teams` service with Office 365 Connectors, follow
 
 3. **Update your templates:**
    - Change `teams:` to `teams-workflows:` in your templates
-   - Your existing messageCard format templates will work as-is
+   - Your existing template fields (`title`, `text`, `facts`, `sections`, `potentialAction`) will automatically be converted to Adaptive Card format
+   - No changes needed to your template structure - the conversion is automatic
 
 4. **Update your subscriptions:**
    ```yaml
@@ -213,7 +266,7 @@ If you're currently using the `teams` service with Office 365 Connectors, follow
    - Send a test notification to verify it works correctly
    - Once verified, you can remove the old Office 365 Connector configuration
 
-**Note:** Your existing templates using messageCard format will work without modification. The service maintains compatibility with the same messageCard schema used by Office 365 Connectors.
+**Note:** Your existing templates will work without modification. The service automatically converts your template fields to Adaptive Card format, so you get the benefits of modern cards without changing your templates.
 
 ## Differences from Office 365 Connectors
 
@@ -223,6 +276,91 @@ If you're currently using the `teams` service with Office 365 Connectors, follow
 | Standard Channels | ✅ | ✅ |
 | Shared Channels | ❌ | ✅ (Dec 2025+) |
 | Private Channels | ❌ | ✅ (Dec 2025+) |
-| Card Formats | messageCard only | messageCard + Adaptive Cards |
+| Card Format | messageCard (legacy) | Adaptive Cards (modern) |
+| Template Conversion | N/A | Automatic conversion from template fields |
 | Retirement Date | March 31, 2026 | Active |
 
+## Adaptive Card Features
+
+The Teams Workflows service leverages Adaptive Cards, which provide:
+
+- **Rich Content**: Support for text, images, fact sets, and more
+- **Flexible Layout**: Containers, columns, and adaptive layouts
+- **Interactive Elements**: Action buttons, input fields, and more
+- **Semantic Colors**: Built-in color schemes (Good, Warning, Attention, Accent)
+- **Cross-Platform**: Works across Teams, Outlook, and other Microsoft 365 apps
+
+### Example: Advanced Adaptive Card Template
+
+For complex notifications, you can use the full Adaptive Card specification:
+
+```yaml
+template.app-sync-succeeded-advanced: |
+  teams-workflows:
+    adaptiveCard: |
+      {
+        "type": "AdaptiveCard",
+        "version": "1.4",
+        "body": [
+          {
+            "type": "Container",
+            "items": [
+              {
+                "type": "ColumnSet",
+                "columns": [
+                  {
+                    "type": "Column",
+                    "width": "auto",
+                    "items": [
+                      {
+                        "type": "Image",
+                        "url": "https://example.com/success-icon.png",
+                        "size": "Small"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "Column",
+                    "width": "stretch",
+                    "items": [
+                      {
+                        "type": "TextBlock",
+                        "text": "Application {{.app.metadata.name}}",
+                        "weight": "Bolder",
+                        "size": "Large"
+                      },
+                      {
+                        "type": "TextBlock",
+                        "text": "Successfully synced",
+                        "spacing": "None",
+                        "isSubtle": true
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "FactSet",
+                "facts": [
+                  {
+                    "title": "Status",
+                    "value": "{{.app.status.sync.status}}"
+                  },
+                  {
+                    "title": "Repository",
+                    "value": "{{.app.spec.source.repoURL}}"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "actions": [
+          {
+            "type": "Action.OpenUrl",
+            "title": "View in Argo CD",
+            "url": "{{.context.argocdUrl}}/applications/{{.app.metadata.name}}"
+          }
+        ]
+      }
+```
