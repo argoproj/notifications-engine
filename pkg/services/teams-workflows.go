@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -177,7 +178,7 @@ func NewTeamsWorkflowsService(opts TeamsWorkflowsOptions) NotificationService {
 // validateWorkflowsWebhookURL validates that the webhook URL is properly formatted for Workflows
 func validateWorkflowsWebhookURL(webhookURL string) error {
 	if webhookURL == "" {
-		return fmt.Errorf("webhook URL cannot be empty")
+		return errors.New("webhook URL cannot be empty")
 	}
 
 	parsedURL, err := url.Parse(webhookURL)
@@ -188,20 +189,20 @@ func validateWorkflowsWebhookURL(webhookURL string) error {
 	// Allow HTTP only for localhost/test URLs, enforce HTTPS for production
 	isLocalhost := parsedURL.Hostname() == "localhost" || parsedURL.Hostname() == "127.0.0.1" || strings.HasPrefix(parsedURL.Hostname(), "127.")
 	if parsedURL.Scheme != "https" && !isLocalhost {
-		return fmt.Errorf("webhook URL must use HTTPS scheme")
+		return errors.New("webhook URL must use HTTPS scheme")
 	}
 
 	if parsedURL.Scheme != "https" && parsedURL.Scheme != "http" {
-		return fmt.Errorf("webhook URL must use HTTP or HTTPS scheme")
+		return errors.New("webhook URL must use HTTP or HTTPS scheme")
 	}
 
 	if parsedURL.Host == "" {
-		return fmt.Errorf("webhook URL must have a valid host")
+		return errors.New("webhook URL must have a valid host")
 	}
 
 	// Validate it matches Workflows URL pattern
 	if !WorkflowsURLPattern.MatchString(webhookURL) {
-		return fmt.Errorf("webhook URL does not appear to be a valid Microsoft Teams Workflows URL (Power Automate). Expected patterns: api.powerautomate.com, api.powerplatform.com, flow.microsoft.com, or webhook.office.com/workflows")
+		return errors.New("webhook URL does not appear to be a valid Microsoft Teams Workflows URL (Power Automate). Expected patterns: api.powerautomate.com, api.powerplatform.com, flow.microsoft.com, or webhook.office.com/workflows")
 	}
 
 	return nil
