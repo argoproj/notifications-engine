@@ -36,7 +36,7 @@ type TeamsWorkflowsNotification struct {
 
 func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
 	tpl := texttemplate.New(name).Funcs(f)
-	
+
 	template, err := tpl.Parse(n.Template)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.template : %w", name, err)
@@ -223,18 +223,18 @@ func (s teamsWorkflowsService) Send(notification Notification, dest Destination)
 
 	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, webhookUrl, "teams-workflows")
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to create HTTP client for teams-workflows webhook: %w", err)
 	}
 
 	// Generate message payload
 	message, err := teamsWorkflowsNotificationToReader(notification)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to generate message payload for teams-workflows: %w", err)
 	}
 
 	response, err := client.Post(webhookUrl, "application/json", bytes.NewReader(message))
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to post message to teams-workflows webhook %s: %w", webhookUrl, err)
 	}
 
 	defer func() {
