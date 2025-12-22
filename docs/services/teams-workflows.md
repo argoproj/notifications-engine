@@ -17,7 +17,6 @@ The service supports the following Microsoft Teams Workflows webhook URL pattern
 - `https://api.powerautomate.com/...`
 - `https://api.powerplatform.com/...`
 - `https://flow.microsoft.com/...`
-- `https://webhook.office.com/workflows/...`
 - URLs containing `/powerautomate/` in the path
 
 ## Configuration
