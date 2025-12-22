@@ -44,15 +44,15 @@ func TestGetTemplater_TeamsWorkflows(t *testing.T) {
 		return
 	}
 
-	assert.Equal(t, notification.TeamsWorkflows.Template, "template value")
-	assert.Equal(t, notification.TeamsWorkflows.Title, "title value")
-	assert.Equal(t, notification.TeamsWorkflows.Summary, "summary value")
-	assert.Equal(t, notification.TeamsWorkflows.Text, "text value")
-	assert.Equal(t, notification.TeamsWorkflows.Sections, "sections value")
-	assert.Equal(t, notification.TeamsWorkflows.Facts, "facts value")
-	assert.Equal(t, notification.TeamsWorkflows.PotentialAction, "actions value")
-	assert.Equal(t, notification.TeamsWorkflows.ThemeColor, "theme color value")
-	assert.Equal(t, notification.TeamsWorkflows.AdaptiveCard, "adaptiveCard value")
+	assert.Equal(t, "template value", notification.TeamsWorkflows.Template)
+	assert.Equal(t, "title value", notification.TeamsWorkflows.Title)
+	assert.Equal(t, "summary value", notification.TeamsWorkflows.Summary)
+	assert.Equal(t, "text value", notification.TeamsWorkflows.Text)
+	assert.Equal(t, "sections value", notification.TeamsWorkflows.Sections)
+	assert.Equal(t, "facts value", notification.TeamsWorkflows.Facts)
+	assert.Equal(t, "actions value", notification.TeamsWorkflows.PotentialAction)
+	assert.Equal(t, "theme color value", notification.TeamsWorkflows.ThemeColor)
+	assert.Equal(t, "adaptiveCard value", notification.TeamsWorkflows.AdaptiveCard)
 }
 
 func TestTeamsWorkflows_DefaultMessage(t *testing.T) {

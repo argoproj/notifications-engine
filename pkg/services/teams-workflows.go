@@ -35,49 +35,47 @@ type TeamsWorkflowsNotification struct {
 }
 
 func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
-	tpl := texttemplate.New(name).Funcs(f)
-
-	template, err := tpl.Parse(n.Template)
+	template, err := texttemplate.New(name).Funcs(f).Parse(n.Template)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.template : %w", name, err)
 	}
 
-	title, err := tpl.Parse(n.Title)
+	title, err := texttemplate.New(name).Funcs(f).Parse(n.Title)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.title : %w", name, err)
 	}
 
-	summary, err := tpl.Parse(n.Summary)
+	summary, err := texttemplate.New(name).Funcs(f).Parse(n.Summary)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.summary : %w", name, err)
 	}
 
-	text, err := tpl.Parse(n.Text)
+	text, err := texttemplate.New(name).Funcs(f).Parse(n.Text)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.text : %w", name, err)
 	}
 
-	themeColor, err := tpl.Parse(n.ThemeColor)
+	themeColor, err := texttemplate.New(name).Funcs(f).Parse(n.ThemeColor)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.themeColor: %w", name, err)
 	}
 
-	facts, err := tpl.Parse(n.Facts)
+	facts, err := texttemplate.New(name).Funcs(f).Parse(n.Facts)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.facts : %w", name, err)
 	}
 
-	sections, err := tpl.Parse(n.Sections)
+	sections, err := texttemplate.New(name).Funcs(f).Parse(n.Sections)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.sections : %w", name, err)
 	}
 
-	potentialActions, err := tpl.Parse(n.PotentialAction)
+	potentialActions, err := texttemplate.New(name).Funcs(f).Parse(n.PotentialAction)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.potentialAction: %w", name, err)
 	}
 
-	adaptiveCard, err := tpl.Parse(n.AdaptiveCard)
+	adaptiveCard, err := texttemplate.New(name).Funcs(f).Parse(n.AdaptiveCard)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' teams-workflows.adaptiveCard: %w", name, err)
 	}

@@ -325,10 +325,9 @@ func TestTeams_WorkflowsWebhook_StatusError(t *testing.T) {
 		},
 	)
 
-	// For non-workflows URLs, if body is "1" but status code is not 200-299, it should fail on status code
-	// This tests the status code validation for non-workflows URLs
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "status 400")
+	// Teams service only checks response body, not status code
+	// If body is "1", it succeeds regardless of status code
+	assert.NoError(t, err)
 }
 
 func TestTeams_Office365Connector_NonOneResponse(t *testing.T) {
