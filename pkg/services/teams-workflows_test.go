@@ -217,13 +217,14 @@ func TestTeamsWorkflows_MessageFields(t *testing.T) {
 	// Check title
 	foundTitle := false
 	for _, element := range card.Body {
-		if element.Type == "TextBlock" && element.Text == "Title" {
-			foundTitle = true
-			assert.Equal(t, "Large", element.Size)
-			assert.Equal(t, "Bolder", element.Weight)
-			assert.Equal(t, "Good", element.Color)
-			break
+		if element.Type != "TextBlock" || element.Text != "Title" {
+			continue
 		}
+		foundTitle = true
+		assert.Equal(t, "Large", element.Size)
+		assert.Equal(t, "Bolder", element.Weight)
+		assert.Equal(t, "Good", element.Color)
+		break
 	}
 	assert.True(t, foundTitle, "Title should be present")
 
@@ -240,13 +241,14 @@ func TestTeamsWorkflows_MessageFields(t *testing.T) {
 	// Check facts
 	foundFactSet := false
 	for _, element := range card.Body {
-		if element.Type == "FactSet" {
-			foundFactSet = true
-			assert.Len(t, element.Facts, 1)
-			assert.Equal(t, "Status", element.Facts[0].Title)
-			assert.Equal(t, "Success", element.Facts[0].Value)
-			break
+		if element.Type != "FactSet" {
+			continue
 		}
+		foundFactSet = true
+		assert.Len(t, element.Facts, 1)
+		assert.Equal(t, "Status", element.Facts[0].Title)
+		assert.Equal(t, "Success", element.Facts[0].Value)
+		break
 	}
 	assert.True(t, foundFactSet, "FactSet should be present")
 
@@ -650,13 +652,14 @@ func TestTeamsWorkflows_FactsWithNonStringValue(t *testing.T) {
 	card := receivedBody.Attachments[0].Content
 	foundFactSet := false
 	for _, element := range card.Body {
-		if element.Type == "FactSet" {
-			foundFactSet = true
-			assert.Len(t, element.Facts, 1)
-			assert.Equal(t, "Count", element.Facts[0].Title)
-			assert.Equal(t, "42", element.Facts[0].Value) // Should be converted to string
-			break
+		if element.Type != "FactSet" {
+			continue
 		}
+		foundFactSet = true
+		assert.Len(t, element.Facts, 1)
+		assert.Equal(t, "Count", element.Facts[0].Title)
+		assert.Equal(t, "42", element.Facts[0].Value) // Should be converted to string
+		break
 	}
 	assert.True(t, foundFactSet, "FactSet should be present")
 }
@@ -707,15 +710,16 @@ func TestTeamsWorkflows_SectionsWithFacts(t *testing.T) {
 	card := receivedBody.Attachments[0].Content
 	foundFactSet := false
 	for _, element := range card.Body {
-		if element.Type == "FactSet" {
-			foundFactSet = true
-			assert.Len(t, element.Facts, 2)
-			assert.Equal(t, "Namespace", element.Facts[0].Title)
-			assert.Equal(t, "default", element.Facts[0].Value)
-			assert.Equal(t, "Cluster", element.Facts[1].Title)
-			assert.Equal(t, "production", element.Facts[1].Value)
-			break
+		if element.Type != "FactSet" {
+			continue
 		}
+		foundFactSet = true
+		assert.Len(t, element.Facts, 2)
+		assert.Equal(t, "Namespace", element.Facts[0].Title)
+		assert.Equal(t, "default", element.Facts[0].Value)
+		assert.Equal(t, "Cluster", element.Facts[1].Title)
+		assert.Equal(t, "production", element.Facts[1].Value)
+		break
 	}
 	assert.True(t, foundFactSet, "FactSet should be present")
 }
