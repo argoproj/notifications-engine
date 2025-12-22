@@ -22,11 +22,16 @@ The service supports the following Microsoft Teams Workflows webhook URL pattern
 
 ## Configuration
 
-1. Open Microsoft Teams and navigate to the channel where you want to receive notifications
-2. Click **Workflows** in the channel menu
-3. Click **Create** and select **When a webhook request is received**
-4. Configure the workflow and copy the webhook URL
-5. Store the webhook URL in `argocd-notifications-secret` and define it in `argocd-notifications-cm`
+1. Open `Teams` and go to the channel you wish to set notifications for
+2. Click on the 3 dots next to the channel name
+3. Select`Workflows`
+4. Click on `Manage`
+5. Click `New flow`
+6. Write `Send webhook alerts to a channel` in the search bar or select it from the template list 
+7. Choose your team and channel
+8. Configure the webhook name and settings
+9. Copy the webhook URL (it will be from `api.powerautomate.com`, `api.powerplatform.com`, or `flow.microsoft.com`)
+10. Store it in `argocd-notifications-secret` and define it in `argocd-notifications-cm`
 
 ```yaml
 apiVersion: v1
@@ -45,10 +50,10 @@ kind: Secret
 metadata:
   name: <secret-name>
 stringData:
-  channel-workflows-url: https://api.powerautomate.com/webhook/...
+  channel-workflows-url: https://api.powerautomate.com/webhook/your-webhook-id
 ```
 
-6. Create subscription for your Teams Workflows integration:
+11. Create subscription for your Teams Workflows integration:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
