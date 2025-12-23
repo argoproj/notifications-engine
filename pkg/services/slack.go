@@ -7,18 +7,41 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
+	"sync"
 	texttemplate "text/template"
-
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 )
 
 // No rate limit unless Slack requests it (allows for Slack to control bursting)
 var slackState = slackutil.NewState(rate.NewLimiter(rate.Inf, 1))
+
+// Cache for Slack API lookups to avoid repeated calls
+type slackLookupCache struct {
+	sync.RWMutex
+	usersByEmail map[string]string
+	channels     map[string]string
+	userGroups   map[string]string
+}
+
+var globalLookupCache = &slackLookupCache{
+	usersByEmail: make(map[string]string),
+	channels:     make(map[string]string),
+	userGroups:   make(map[string]string),
+}
+
+// Regex patterns to match special markers in messages
+var (
+	slackUserEmailPattern = regexp.MustCompile(`__SLACK_USER_EMAIL__(.+?)__`)
+	slackChannelPattern   = regexp.MustCompile(`__SLACK_CHANNEL__(.+?)__`)
+	slackUserGroupPattern = regexp.MustCompile(`__SLACK_USERGROUP__(.+?)__`)
+)
 
 type SlackNotification struct {
 	Username        string                   `json:"username,omitempty"`
@@ -170,14 +193,29 @@ func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNo
 }
 
 func (s *slackService) Send(notification Notification, dest Destination) error {
-	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
-	if err != nil {
-		return err
-	}
 	client, err := newSlackClient(s.opts)
 	if err != nil {
 		return err
 	}
+
+	// Process Slack mentions in the message
+	notification.Message = processSlackMentions(client, notification.Message)
+
+	// Also process mentions in attachments and blocks if present
+	if notification.Slack != nil {
+		if notification.Slack.Attachments != "" {
+			notification.Slack.Attachments = processSlackMentions(client, notification.Slack.Attachments)
+		}
+		if notification.Slack.Blocks != "" {
+			notification.Slack.Blocks = processSlackMentions(client, notification.Slack.Blocks)
+		}
+	}
+
+	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
+	if err != nil {
+		return err
+	}
+
 	return slackutil.NewThreadedClient(
 		client,
 		slackState,
@@ -221,4 +259,194 @@ func isValidIconURL(iconURL string) bool {
 	}
 
 	return true
+}
+
+// lookupUserByEmail retrieves a Slack user ID by email address
+func lookupUserByEmail(client *slack.Client, email string) (string, error) {
+	// Check cache first
+	globalLookupCache.RLock()
+	if userID, ok := globalLookupCache.usersByEmail[email]; ok {
+		globalLookupCache.RUnlock()
+		return userID, nil
+	}
+	globalLookupCache.RUnlock()
+
+	// Acquire write lock to prevent thundering herd
+	globalLookupCache.Lock()
+	defer globalLookupCache.Unlock()
+
+	// Double-check cache after acquiring write lock
+	// (another goroutine might have populated it while we were waiting)
+	if userID, ok := globalLookupCache.usersByEmail[email]; ok {
+		return userID, nil
+	}
+
+	// Make API call
+	user, err := client.GetUserByEmail(email)
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup user by email %s: %w", email, err)
+	}
+
+	// Cache the result
+	globalLookupCache.usersByEmail[email] = user.ID
+
+	return user.ID, nil
+}
+
+// lookupChannelByName retrieves a Slack channel ID by channel name
+func lookupChannelByName(client *slack.Client, channelName string) (string, error) {
+	// Normalize channel name (remove # if present)
+	channelName = strings.TrimPrefix(channelName, "#")
+
+	// Check cache first
+	globalLookupCache.RLock()
+	if channelID, ok := globalLookupCache.channels[channelName]; ok {
+		globalLookupCache.RUnlock()
+		return channelID, nil
+	}
+	globalLookupCache.RUnlock()
+
+	// Acquire write lock to prevent thundering herd
+	globalLookupCache.Lock()
+	defer globalLookupCache.Unlock()
+
+	// Double-check cache after acquiring write lock
+	// (another goroutine might have populated it while we were waiting)
+	if channelID, ok := globalLookupCache.channels[channelName]; ok {
+		return channelID, nil
+	}
+
+	// Make API call to get all channels
+	// Implements pagination for workspaces with many channels
+	var cursor string
+	var targetChannelID string
+	for {
+		params := &slack.GetConversationsParameters{
+			Cursor:          cursor,
+			ExcludeArchived: true,
+			Limit:           1000,
+			Types:           []string{"public_channel", "private_channel"},
+		}
+		channels, nextCursor, err := client.GetConversations(params)
+		if err != nil {
+			return "", fmt.Errorf("failed to lookup channel %s: %w", channelName, err)
+		}
+
+		// Opportunistically cache all channels to improve future lookups
+		for _, channel := range channels {
+			globalLookupCache.channels[channel.Name] = channel.ID
+			if channel.Name == channelName {
+				targetChannelID = channel.ID
+			}
+		}
+
+		if nextCursor == "" {
+			break
+		}
+		cursor = nextCursor
+	}
+
+	if targetChannelID != "" {
+		return targetChannelID, nil
+	}
+
+	return "", fmt.Errorf("channel %s not found", channelName)
+}
+
+// lookupUserGroupByName retrieves a Slack user group ID by group name
+func lookupUserGroupByName(client *slack.Client, groupName string) (string, error) {
+	// Check cache first
+	globalLookupCache.RLock()
+	if groupID, ok := globalLookupCache.userGroups[groupName]; ok {
+		globalLookupCache.RUnlock()
+		return groupID, nil
+	}
+	globalLookupCache.RUnlock()
+
+	// Acquire write lock to prevent thundering herd
+	globalLookupCache.Lock()
+	defer globalLookupCache.Unlock()
+
+	// Double-check cache after acquiring write lock
+	// (another goroutine might have populated it while we were waiting)
+	if groupID, ok := globalLookupCache.userGroups[groupName]; ok {
+		return groupID, nil
+	}
+
+	// Make API call
+	groups, err := client.GetUserGroups(slack.GetUserGroupsOptionIncludeDisabled(false))
+	if err != nil {
+		return "", fmt.Errorf("failed to lookup user group %s: %w", groupName, err)
+	}
+
+	// Opportunistically cache all user groups to improve future lookups
+	var targetGroupID string
+	for _, group := range groups {
+		// Cache by both handle and name for flexible lookup
+		if group.Handle != "" {
+			globalLookupCache.userGroups[group.Handle] = group.ID
+		}
+		if group.Name != "" {
+			globalLookupCache.userGroups[group.Name] = group.ID
+		}
+		if group.Handle == groupName || group.Name == groupName {
+			targetGroupID = group.ID
+		}
+	}
+
+	if targetGroupID != "" {
+		return targetGroupID, nil
+	}
+
+	return "", fmt.Errorf("user group %s not found", groupName)
+}
+
+// processSlackMentions processes the notification message and replaces special markers with actual Slack mentions
+func processSlackMentions(client *slack.Client, message string) string {
+	// Process user mentions by email
+	message = slackUserEmailPattern.ReplaceAllStringFunc(message, func(match string) string {
+		matches := slackUserEmailPattern.FindStringSubmatch(match)
+		if len(matches) < 2 {
+			return match
+		}
+		email := matches[1]
+		userID, err := lookupUserByEmail(client, email)
+		if err != nil {
+			log.Warnf("Failed to lookup Slack user by email %s: %v", email, err)
+			return match
+		}
+		return fmt.Sprintf("<@%s>", userID)
+	})
+
+	// Process channel mentions
+	message = slackChannelPattern.ReplaceAllStringFunc(message, func(match string) string {
+		matches := slackChannelPattern.FindStringSubmatch(match)
+		if len(matches) < 2 {
+			return match
+		}
+		channelName := matches[1]
+		channelID, err := lookupChannelByName(client, channelName)
+		if err != nil {
+			log.Warnf("Failed to lookup Slack channel %s: %v", channelName, err)
+			return match
+		}
+		return fmt.Sprintf("<#%s>", channelID)
+	})
+
+	// Process user group mentions
+	message = slackUserGroupPattern.ReplaceAllStringFunc(message, func(match string) string {
+		matches := slackUserGroupPattern.FindStringSubmatch(match)
+		if len(matches) < 2 {
+			return match
+		}
+		groupName := matches[1]
+		groupID, err := lookupUserGroupByName(client, groupName)
+		if err != nil {
+			log.Warnf("Failed to lookup Slack user group %s: %v", groupName, err)
+			return match
+		}
+		return fmt.Sprintf("<!subteam^%s>", groupID)
+	})
+
+	return message
 }
