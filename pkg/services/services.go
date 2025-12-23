@@ -12,21 +12,22 @@ import (
 )
 
 type Notification struct {
-	Message      string                    `json:"message,omitempty"`
-	AwsSqs       *AwsSqsNotification       `json:"awssqs,omitempty"`
-	Email        *EmailNotification        `json:"email,omitempty"`
-	Slack        *SlackNotification        `json:"slack,omitempty"`
-	Mattermost   *MattermostNotification   `json:"mattermost,omitempty"`
-	RocketChat   *RocketChatNotification   `json:"rocketchat,omitempty"`
-	Teams        *TeamsNotification        `json:"teams,omitempty"`
-	Webhook      WebhookNotifications      `json:"webhook,omitempty"`
-	Opsgenie     *OpsgenieNotification     `json:"opsgenie,omitempty"`
-	GitHub       *GitHubNotification       `json:"github,omitempty"`
-	Alertmanager *AlertmanagerNotification `json:"alertmanager,omitempty"`
-	GoogleChat   *GoogleChatNotification   `json:"googlechat,omitempty"`
-	Pagerduty    *PagerDutyNotification    `json:"pagerduty,omitempty"`
-	PagerdutyV2  *PagerDutyV2Notification  `json:"pagerdutyv2,omitempty"`
-	Newrelic     *NewrelicNotification     `json:"newrelic,omitempty"`
+	Message        string                      `json:"message,omitempty"`
+	AwsSqs         *AwsSqsNotification         `json:"awssqs,omitempty"`
+	Email          *EmailNotification          `json:"email,omitempty"`
+	Slack          *SlackNotification          `json:"slack,omitempty"`
+	Mattermost     *MattermostNotification     `json:"mattermost,omitempty"`
+	RocketChat     *RocketChatNotification     `json:"rocketchat,omitempty"`
+	Teams          *TeamsNotification          `json:"teams,omitempty"`
+	TeamsWorkflows *TeamsWorkflowsNotification `json:"teams-workflows,omitempty"`
+	Webhook        WebhookNotifications        `json:"webhook,omitempty"`
+	Opsgenie       *OpsgenieNotification       `json:"opsgenie,omitempty"`
+	GitHub         *GitHubNotification         `json:"github,omitempty"`
+	Alertmanager   *AlertmanagerNotification   `json:"alertmanager,omitempty"`
+	GoogleChat     *GoogleChatNotification     `json:"googlechat,omitempty"`
+	Pagerduty      *PagerDutyNotification      `json:"pagerduty,omitempty"`
+	PagerdutyV2    *PagerDutyV2Notification    `json:"pagerdutyv2,omitempty"`
+	Newrelic       *NewrelicNotification       `json:"newrelic,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -87,6 +88,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.Teams != nil {
 		sources = append(sources, n.Teams)
+	}
+	if n.TeamsWorkflows != nil {
+		sources = append(sources, n.TeamsWorkflows)
 	}
 	if n.Alertmanager != nil {
 		sources = append(sources, n.Alertmanager)
@@ -181,6 +185,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewTeamsService(opts), nil
+	case "teams-workflows":
+		var opts TeamsWorkflowsOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewTeamsWorkflowsService(opts), nil
 	case "googlechat":
 		var opts GoogleChatOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
