@@ -181,3 +181,121 @@ func TestTeams_MessageFields(t *testing.T) {
 			},
 		})
 }
+
+func TestTeams_Office365Connector_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		_, err := writer.Write([]byte("1"))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	assert.NoError(t, err)
+}
+
+func TestTeams_Office365Connector_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte("error message"))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "teams webhook post error")
+	assert.Contains(t, err.Error(), "error message")
+}
+
+func TestTeams_WorkflowsWebhook_StatusError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusBadRequest)
+		_, err := writer.Write([]byte("1"))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	// Teams service only checks response body, not status code
+	// If body is "1", it succeeds regardless of status code
+	assert.NoError(t, err)
+}
+
+func TestTeams_Office365Connector_NonOneResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte("not one"))
+		assert.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	// Office365-connector requires "1" response, so this should fail
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "teams webhook post error")
+	assert.Contains(t, err.Error(), "not one")
+}
