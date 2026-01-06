@@ -429,7 +429,7 @@ func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
 }
 
 // Update mock implementation to match the interface from github.go
-func (m *mockPullRequestsService) ListPullRequestsWithCommit(ctx context.Context, owner, repo, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
+func (m *mockPullRequestsService) ListPullRequestsWithCommit(ctx context.Context, owner, repo, sha string, opts *github.ListOptions) ([]*github.PullRequest, *github.Response, error) {
 	return m.prs, nil, nil
 }
 
