@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_AwsSqs(t *testing.T) {
@@ -211,6 +212,32 @@ func TestGetClientOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 
 	options := GetClientOptions(s)
 	assert.Equal(t, 2, len(options))
+}
+
+func TestGetConfigOptions_StaticCredentials_EmptySessionToken(t *testing.T) {
+	s := awsSqsService{opts: AwsSqsOptions{
+		AwsAccess: AwsAccess{
+			Key:    "test-key",
+			Secret: "test-secret",
+		},
+		Region: "us-east-1",
+	}}
+
+	var opts config.LoadOptions
+	for _, f := range s.getConfigOptions() {
+		require.NoError(t, f(&opts), "applying config option failed")
+	}
+
+	// Ensure Credentials provider is present
+	require.NotNil(t, opts.Credentials, "expected Credentials provider to be set in LoadOptions")
+
+	creds, err := opts.Credentials.Retrieve(context.TODO())
+	require.NoError(t, err, "failed to retrieve credentials")
+
+	assert.Equal(t, s.opts.Key, creds.AccessKeyID)
+	assert.Equal(t, s.opts.Secret, creds.SecretAccessKey)
+	// a session token must be empty when no session/token provided
+	assert.Equal(t, "", creds.SessionToken)
 }
 
 // Helpers
