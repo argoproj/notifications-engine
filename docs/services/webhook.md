@@ -75,7 +75,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   annotations:
-    notifications.argoproj.io/subscribe.<trigger-name>.<webhook-name>: ""
+    notifications.argoproj.io/subscribe.<trigger-name>.<webhook-name>: <optional-url-override>
 ```
 
 ## Examples

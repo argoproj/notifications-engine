@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"strings"
 	texttemplate "text/template"
 	"time"
@@ -107,10 +108,16 @@ type webhookService struct {
 }
 
 func (s webhookService) Send(notification Notification, dest Destination) error {
+	webhookUrl := s.opts.URL
+	_, urlParseError := url.ParseRequestURI(dest.Recipient)
+	if isRecipientUrlValid := len(strings.TrimSpace(dest.Recipient)) > 0 && urlParseError == nil; isRecipientUrlValid {
+		webhookUrl = strings.TrimSpace(dest.Recipient)
+	}
+
 	request := request{
 		body:        notification.Message,
 		method:      http.MethodGet,
-		url:         s.opts.URL,
+		url:         webhookUrl,
 		destService: dest.Service,
 	}
 
