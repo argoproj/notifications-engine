@@ -95,7 +95,8 @@ func (s awsSqsService) getConfigOptions() []func(*config.LoadOptions) error {
 
 	// When Credentials Are provided in service configuration - use them.
 	if (s.opts != AwsSqsOptions{} && s.opts.Key != "" && s.opts.Secret != "") {
-		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.opts.Key, s.opts.Secret, "default")))
+		// Use an empty session token when none is provided (previously used "default" which produced invalid session tokens)
+		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.opts.Key, s.opts.Secret, "")))
 	}
 
 	// Fill Region from configuration

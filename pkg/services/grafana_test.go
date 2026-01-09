@@ -46,8 +46,9 @@ func TestGrafana_UnSuccessfullySendsNotification(t *testing.T) {
 	defer server.Close()
 
 	service := NewGrafanaService(GrafanaOptions{
-		ApiUrl:             server.URL,
-		ApiKey:             "something-secret-but-not-relevant-in-this-test",
+		ApiUrl: server.URL,
+		ApiKey: "something-secret-but-not-relevant-in-this-test",
+
 		InsecureSkipVerify: true,
 	})
 	err := service.Send(
