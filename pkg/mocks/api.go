@@ -43,7 +43,7 @@ func (m *MockAPI) AddNotificationService(arg0 string, arg1 services.Notification
 }
 
 // AddNotificationService indicates an expected call of AddNotificationService.
-func (mr *MockAPIMockRecorder) AddNotificationService(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) AddNotificationService(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AddNotificationService", reflect.TypeOf((*MockAPI)(nil).AddNotificationService), arg0, arg1)
 }
@@ -77,7 +77,7 @@ func (mr *MockAPIMockRecorder) GetNotificationServices() *gomock.Call {
 }
 
 // RunTrigger mocks base method.
-func (m *MockAPI) RunTrigger(arg0 string, arg1 map[string]interface{}) ([]triggers.ConditionResult, error) {
+func (m *MockAPI) RunTrigger(arg0 string, arg1 map[string]any) ([]triggers.ConditionResult, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RunTrigger", arg0, arg1)
 	ret0, _ := ret[0].([]triggers.ConditionResult)
@@ -86,13 +86,13 @@ func (m *MockAPI) RunTrigger(arg0 string, arg1 map[string]interface{}) ([]trigge
 }
 
 // RunTrigger indicates an expected call of RunTrigger.
-func (mr *MockAPIMockRecorder) RunTrigger(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) RunTrigger(arg0, arg1 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunTrigger", reflect.TypeOf((*MockAPI)(nil).RunTrigger), arg0, arg1)
 }
 
 // Send mocks base method.
-func (m *MockAPI) Send(arg0 map[string]interface{}, arg1 []string, arg2 services.Destination) error {
+func (m *MockAPI) Send(arg0 map[string]any, arg1 []string, arg2 services.Destination) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Send", arg0, arg1, arg2)
 	ret0, _ := ret[0].(error)
@@ -100,7 +100,7 @@ func (m *MockAPI) Send(arg0 map[string]interface{}, arg1 []string, arg2 services
 }
 
 // Send indicates an expected call of Send.
-func (mr *MockAPIMockRecorder) Send(arg0, arg1, arg2 interface{}) *gomock.Call {
+func (mr *MockAPIMockRecorder) Send(arg0, arg1, arg2 any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockAPI)(nil).Send), arg0, arg1, arg2)
 }

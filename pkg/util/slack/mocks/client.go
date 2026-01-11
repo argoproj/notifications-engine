@@ -38,7 +38,7 @@ func (m *MockSlackClient) EXPECT() *MockSlackClientMockRecorder {
 // SendMessageContext mocks base method.
 func (m *MockSlackClient) SendMessageContext(ctx context.Context, channelID string, options ...slack.MsgOption) (string, string, string, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{ctx, channelID}
+	varargs := []any{ctx, channelID}
 	for _, a := range options {
 		varargs = append(varargs, a)
 	}
@@ -51,8 +51,8 @@ func (m *MockSlackClient) SendMessageContext(ctx context.Context, channelID stri
 }
 
 // SendMessageContext indicates an expected call of SendMessageContext.
-func (mr *MockSlackClientMockRecorder) SendMessageContext(ctx, channelID interface{}, options ...interface{}) *gomock.Call {
+func (mr *MockSlackClientMockRecorder) SendMessageContext(ctx, channelID any, options ...any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{ctx, channelID}, options...)
+	varargs := append([]any{ctx, channelID}, options...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendMessageContext", reflect.TypeOf((*MockSlackClient)(nil).SendMessageContext), varargs...)
 }

@@ -181,9 +181,9 @@ func TestTeams_MessageFields(t *testing.T) {
 }
 
 func TestTeams_Office365Connector_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		_, err := writer.Write([]byte("1"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -204,14 +204,14 @@ func TestTeams_Office365Connector_Success(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestTeams_Office365Connector_Error(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		_, err := writer.Write([]byte("error message"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -232,16 +232,16 @@ func TestTeams_Office365Connector_Error(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams webhook post error")
 	assert.Contains(t, err.Error(), "error message")
 }
 
 func TestTeams_WorkflowsWebhook_StatusError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		_, err := writer.Write([]byte("1"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -264,14 +264,14 @@ func TestTeams_WorkflowsWebhook_StatusError(t *testing.T) {
 
 	// Teams service only checks response body, not status code
 	// If body is "1", it succeeds regardless of status code
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestTeams_Office365Connector_NonOneResponse(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 		_, err := writer.Write([]byte("not one"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -293,7 +293,7 @@ func TestTeams_Office365Connector_NonOneResponse(t *testing.T) {
 	)
 
 	// Office365-connector requires "1" response, so this should fail
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams webhook post error")
 	assert.Contains(t, err.Error(), "not one")
 }

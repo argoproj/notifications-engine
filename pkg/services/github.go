@@ -24,11 +24,11 @@ import (
 var gitSuffix = regexp.MustCompile(`\.git$`)
 
 type GitHubOptions struct {
-	AppID              any `json:"appID"`
-	InstallationID     any `json:"installationID"`
-	PrivateKey         string      `json:"privateKey"`
-	EnterpriseBaseURL  string      `json:"enterpriseBaseURL"`
-	InsecureSkipVerify bool        `json:"insecureSkipVerify"`
+	AppID              any    `json:"appID"`
+	InstallationID     any    `json:"installationID"`
+	PrivateKey         string `json:"privateKey"`
+	EnterpriseBaseURL  string `json:"enterpriseBaseURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
 	httputil.TransportOptions
 }
 

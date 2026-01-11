@@ -203,7 +203,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		_, err := notification.GetTemplater(name, f)
 
 		// Assert that an error occurred during the call
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("InvalidTemplateVisibleTo", func(t *testing.T) {
@@ -218,7 +218,7 @@ func TestOpsgenieNotification_GetTemplater(t *testing.T) {
 		_, err := notification.GetTemplater(name, f)
 
 		// Assert that an error occurred during the call
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("ValidTemplateTags", func(t *testing.T) {
@@ -367,7 +367,7 @@ func TestOpsgenie_SendNotification_WithDescriptionOnly(t *testing.T) {
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
 	// Assert the result for description present and no priority
-	assert.NoError(t, err) // Expect no error
+	require.NoError(t, err) // Expect no error
 }
 
 func TestOpsgenie_SendNotification_WithDescriptionAndPriority(t *testing.T) {
@@ -407,7 +407,7 @@ func TestOpsgenie_SendNotification_WithDescriptionAndPriority(t *testing.T) {
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
 	// Assert the result for description and priority present
-	assert.NoError(t, err) // Expect no error
+	require.NoError(t, err) // Expect no error
 }
 
 func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
@@ -470,5 +470,5 @@ func TestOpsgenie_SendNotification_WithAllFields(t *testing.T) {
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
 	// Assert the result for all fields present
-	assert.NoError(t, err) // Expect no error
+	require.NoError(t, err) // Expect no error
 }

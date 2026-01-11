@@ -63,7 +63,7 @@ func TestSend_AwsSqs(t *testing.T) {
 	}
 
 	if err := s.Send(notification, destination); err != nil {
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -89,7 +89,7 @@ func TestSendFail_AwsSqs(t *testing.T) {
 	require.NoError(t, err)
 
 	if _, err := SendMsg(context.TODO(), client, SendMessageInput(s, queueUrl.QueueUrl, notification)); err != nil {
-		assert.Error(t, err)
+		require.Error(t, err)
 	}
 }
 
@@ -233,7 +233,7 @@ func TestGetConfigOptions_StaticCredentials_EmptySessionToken(t *testing.T) {
 	assert.Equal(t, s.opts.Key, creds.AccessKeyID)
 	assert.Equal(t, s.opts.Secret, creds.SecretAccessKey)
 	// a session token must be empty when no session/token provided
-	assert.Equal(t, "", creds.SessionToken)
+	assert.Empty(t, creds.SessionToken)
 }
 
 // Helpers

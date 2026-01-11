@@ -54,5 +54,5 @@ func TestGrafana_UnSuccessfullySendsNotification(t *testing.T) {
 	})
 	err := service.Send(
 		Notification{}, Destination{Recipient: "tag1|tag2", Service: "test-service"})
-	assert.Error(t, err)
+	require.Error(t, err)
 }

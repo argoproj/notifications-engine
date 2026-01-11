@@ -101,7 +101,7 @@ func TestGetTemplater_Slack_InvalidTemplates(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := tt.notification.GetTemplater("test", template.FuncMap{})
-			assert.Error(t, err)
+			require.Error(t, err)
 		})
 	}
 }
@@ -114,15 +114,15 @@ func TestGetTemplater_Slack_NilNotification(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Test with nil Slack on target notification
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"name": "test",
 	})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, notification.Slack)
 	assert.Equal(t, "test", notification.Slack.Username)
 }
@@ -136,19 +136,19 @@ func TestGetTemplater_Slack_DeliveryPolicy(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{})
+	err = templater(&notification, map[string]any{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, slackutil.Update, notification.Slack.DeliveryPolicy)
 }
 
 func TestGetTemplater_Slack_TemplateExecutionError(t *testing.T) {
 	// Create a FuncMap with the required function
 	funcMap := template.FuncMap{
-		"required": func(msg string, val interface{}) (interface{}, error) {
+		"required": func(msg string, val any) (any, error) {
 			if val == nil || val == "" {
 				return nil, fmt.Errorf("%s", msg)
 			}
@@ -195,11 +195,11 @@ func TestGetTemplater_Slack_TemplateExecutionError(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			templater, err := tt.notification.GetTemplater("", funcMap)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 
 			var notification Notification
-			err = templater(&notification, map[string]interface{}{})
-			assert.Error(t, err)
+			err = templater(&notification, map[string]any{})
+			require.Error(t, err)
 		})
 	}
 }
@@ -224,7 +224,7 @@ func TestBuildMessageOptions_IconURL(t *testing.T) {
 		}
 
 		_, opts, err := buildMessageOptions(n, SlackOptions{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Should have text + icon_url options
 		assert.GreaterOrEqual(t, len(opts), 2)
 	})
@@ -237,7 +237,7 @@ func TestBuildMessageOptions_IconURL(t *testing.T) {
 		_, opts, err := buildMessageOptions(n, SlackOptions{
 			Icon: "http://example.com/icon.png",
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.GreaterOrEqual(t, len(opts), 2)
 	})
 
@@ -250,7 +250,7 @@ func TestBuildMessageOptions_IconURL(t *testing.T) {
 		}
 
 		_, opts, err := buildMessageOptions(n, SlackOptions{})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		// Should have text + attachments + blocks (but no icon option because it's invalid)
 		// Use GreaterOrEqual to make test less fragile to implementation changes
 		assert.GreaterOrEqual(t, len(opts), 3)
@@ -265,7 +265,7 @@ func TestBuildMessageOptions_DisableUnfurl(t *testing.T) {
 	_, opts, err := buildMessageOptions(n, SlackOptions{
 		DisableUnfurl: true,
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	// Should have text + 2 unfurl options
 	assert.GreaterOrEqual(t, len(opts), 3)
 }
@@ -279,7 +279,7 @@ func TestBuildMessageOptions_InvalidAttachments(t *testing.T) {
 	}
 
 	_, _, err := buildMessageOptions(n, SlackOptions{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmarshal attachments")
 }
 
@@ -292,7 +292,7 @@ func TestBuildMessageOptions_InvalidBlocks(t *testing.T) {
 	}
 
 	_, _, err := buildMessageOptions(n, SlackOptions{})
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmarshal blocks")
 }
 
@@ -312,7 +312,7 @@ func TestNewSlackClient_CustomAPIURL(t *testing.T) {
 		Token:  "test-token",
 		ApiURL: "https://custom.slack.com/api/",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, client)
 }
 
@@ -320,7 +320,7 @@ func TestNewSlackClient_DefaultAPIURL(t *testing.T) {
 	client, err := newSlackClient(SlackOptions{
 		Token: "test-token",
 	})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, client)
 }
 
@@ -574,6 +574,6 @@ func TestSlack_SendNotification_WithInvalidJSON(t *testing.T) {
 		},
 		Destination{Recipient: "test", Service: "slack"},
 	)
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmarshal")
 }

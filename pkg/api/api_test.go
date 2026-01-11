@@ -53,7 +53,7 @@ func TestSend(t *testing.T) {
 		[]string{"my-template"},
 		services.Destination{Service: "slack", Recipient: "my-channel"},
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestAddService(t *testing.T) {

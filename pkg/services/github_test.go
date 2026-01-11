@@ -114,7 +114,7 @@ func TestSend_GitHubService_BadURL(t *testing.T) {
 			Recipient: "",
 		},
 	)
-	assert.ErrorContains(t, e, "does not have a `/`")
+	require.ErrorContains(t, e, "does not have a `/`")
 }
 
 func TestGetTemplater_GitHub_Deployment(t *testing.T) {
