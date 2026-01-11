@@ -43,7 +43,7 @@ func (m *MockNotificationService) Send(arg0 services.Notification, arg1 services
 }
 
 // Send indicates an expected call of Send.
-func (mr *MockNotificationServiceMockRecorder) Send(arg0, arg1 any) *gomock.Call {
+func (mr *MockNotificationServiceMockRecorder) Send(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockNotificationService)(nil).Send), arg0, arg1)
 }
