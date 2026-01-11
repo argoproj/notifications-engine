@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -26,7 +27,7 @@ func addOutputFlags(cmd *cobra.Command, output *string) {
 	cmd.Flags().StringVarP(output, "output", "o", "wide", "Output format. One of:json|yaml|wide|name")
 }
 
-func NewToolsCommand(name string, cliName string, resource schema.GroupVersionResource, settings api.Settings, opts ...func(cfg clientcmd.ClientConfig)) *cobra.Command {
+func NewToolsCommand(name string, cliName string, resource schema.GroupVersionResource, settings api.Settings, opts ...func(ctx context.Context, cfg clientcmd.ClientConfig)) *cobra.Command {
 	var (
 		cmdContext = commandContext{
 			Settings: settings,
@@ -55,7 +56,7 @@ func NewToolsCommand(name string, cliName string, resource schema.GroupVersionRe
 	clientConfig := addK8SFlagsToCmd(&command)
 	command.PersistentPreRun = func(cmd *cobra.Command, args []string) {
 		for i := range opts {
-			opts[i](clientConfig)
+			opts[i](cmd.Context(), clientConfig)
 		}
 		ns, _, err := clientConfig.Namespace()
 		if err != nil {
