@@ -5,12 +5,13 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/services/mocks"
 )
 
-func getVars(in map[string]interface{}, _ services.Destination) map[string]interface{} {
+func getVars(in map[string]any, _ services.Destination) map[string]any {
 	return in
 }
 
@@ -32,6 +33,7 @@ func getConfig(ctrl *gomock.Controller, opts ...func(service *mocks.MockNotifica
 		},
 	}
 }
+
 func TestSend(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -44,16 +46,14 @@ func TestSend(t *testing.T) {
 			Recipient: "my-channel",
 		}).Return(nil)
 	}), getVars)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	err = api.Send(
-		map[string]interface{}{"foo": "world"},
+		map[string]any{"foo": "world"},
 		[]string{"my-template"},
 		services.Destination{Service: "slack", Recipient: "my-channel"},
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestAddService(t *testing.T) {
@@ -61,9 +61,7 @@ func TestAddService(t *testing.T) {
 	defer ctrl.Finish()
 
 	api, err := NewAPI(getConfig(ctrl), getVars)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	api.AddNotificationService("hello", mocks.NewMockNotificationService(ctrl))
 

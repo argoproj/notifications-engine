@@ -73,6 +73,7 @@ func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *s
 		DelaySeconds: 10,
 	}
 }
+
 func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
 	result := &sqs.GetQueueUrlInput{}
 	result.QueueName = &s.opts.Queue
@@ -132,7 +133,7 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.AwsSqs == nil {
 			notification.AwsSqs = &AwsSqsNotification{}
 		}
@@ -156,7 +157,7 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}, nil
 }
 
-func (n *AwsSqsNotification) parseMessageAttributes(name string, f texttemplate.FuncMap, vars map[string]interface{}) error {
+func (n *AwsSqsNotification) parseMessageAttributes(name string, f texttemplate.FuncMap, vars map[string]any) error {
 	for k, v := range n.MessageAttributes {
 		var tempData bytes.Buffer
 

@@ -1,7 +1,6 @@
 package controller
 
 import (
-	"fmt"
 	"strconv"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -10,7 +9,7 @@ import (
 func NewMetricsRegistry(prefix string) *MetricsRegistry {
 	deliveriesCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_notifications_deliveries_total", prefix),
+			Name: prefix + "_notifications_deliveries_total",
 			Help: "Number of delivered notifications.",
 		},
 		[]string{"trigger", "service", "succeeded"},
@@ -18,7 +17,7 @@ func NewMetricsRegistry(prefix string) *MetricsRegistry {
 
 	triggerEvaluationsCounter := prometheus.NewCounterVec(
 		prometheus.CounterOpts{
-			Name: fmt.Sprintf("%s_notifications_trigger_eval_total", prefix),
+			Name: prefix + "_notifications_trigger_eval_total",
 			Help: "Number of trigger evaluations.",
 		},
 		[]string{"name", "triggered"},

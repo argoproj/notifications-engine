@@ -11,6 +11,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 )
 
@@ -28,7 +29,7 @@ func TestDeliveryPolicy_MarshalJSON(t *testing.T) {
 	for i, tc := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			bs, err := json.Marshal(tc.input)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, string(bs))
 		})
 	}
@@ -49,7 +50,7 @@ func TestDeliveryPolicy_UnmarshalJSON(t *testing.T) {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			var got DeliveryPolicy
 			err := json.Unmarshal([]byte(tc.input), &got)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
 	}
@@ -63,7 +64,7 @@ type slackAPIMethodMatcher struct {
 	wantAPIMethod string
 }
 
-func (m slackAPIMethodMatcher) Matches(maybeMsgOption interface{}) bool {
+func (m slackAPIMethodMatcher) Matches(maybeMsgOption any) bool {
 	msgOption, ok := maybeMsgOption.(slack.MsgOption)
 	if !ok {
 		return false
@@ -181,7 +182,7 @@ func TestThreadedClient(t *testing.T) {
 				},
 			)
 			err := client.SendMessage(context.TODO(), channel, tc.groupingKey, false, tc.policy, []slack.MsgOption{})
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tc.wantthreadTSs, client.ThreadTSs)
 		})
 	}

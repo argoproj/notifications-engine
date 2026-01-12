@@ -16,17 +16,13 @@ func TestFormat_Message(t *testing.T) {
 		},
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
-	notification, err := svc.FormatNotification(map[string]interface{}{
+	notification, err := svc.FormatNotification(map[string]any{
 		"foo": "hello",
 	}, "test")
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.Message)
 }
@@ -64,7 +60,7 @@ func TestNewService_Success(t *testing.T) {
 		svc, err := NewService(map[string]services.Notification{})
 		require.NoError(t, err)
 		require.NotNil(t, svc)
-		assert.Len(t, svc.templaters, 0)
+		assert.Empty(t, svc.templaters)
 	})
 
 	t.Run("Env and expandenv functions are removed", func(t *testing.T) {
@@ -86,7 +82,7 @@ func TestNewService_InvalidTemplate(t *testing.T) {
 				Message: "{{.foo",
 			},
 		})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 }
 
@@ -99,7 +95,7 @@ func TestFormatNotification_Success(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		notification, err := svc.FormatNotification(map[string]interface{}{
+		notification, err := svc.FormatNotification(map[string]any{
 			"name": "World",
 		}, "greeting")
 
@@ -119,7 +115,7 @@ func TestFormatNotification_Success(t *testing.T) {
 		require.NoError(t, err)
 
 		// When multiple templates are used, the last one should overwrite
-		notification, err := svc.FormatNotification(map[string]interface{}{
+		notification, err := svc.FormatNotification(map[string]any{
 			"first":  "First",
 			"second": "Second",
 		}, "template1", "template2")
@@ -136,7 +132,7 @@ func TestFormatNotification_Success(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		notification, err := svc.FormatNotification(map[string]interface{}{
+		notification, err := svc.FormatNotification(map[string]any{
 			"name": "test",
 		}, "complex")
 
@@ -152,7 +148,7 @@ func TestFormatNotification_Success(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		notification, err := svc.FormatNotification(map[string]interface{}{})
+		notification, err := svc.FormatNotification(map[string]any{})
 		require.NoError(t, err)
 		assert.NotNil(t, notification)
 		assert.Empty(t, notification.Message)
@@ -167,8 +163,8 @@ func TestFormatNotification_TemplateNotFound(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	notification, err := svc.FormatNotification(map[string]interface{}{}, "nonexistent")
-	assert.Error(t, err)
+	notification, err := svc.FormatNotification(map[string]any{}, "nonexistent")
+	require.Error(t, err)
 	assert.Nil(t, notification)
 	assert.Contains(t, err.Error(), "template 'nonexistent' is not supported")
 }
@@ -182,11 +178,11 @@ func TestFormatNotification_TemplateExecutionError(t *testing.T) {
 	require.NoError(t, err)
 
 	// This should trigger an error during template execution
-	notification, err := svc.FormatNotification(map[string]interface{}{
+	notification, err := svc.FormatNotification(map[string]any{
 		"other": "value",
 	}, "test")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, notification)
 }
 
@@ -199,11 +195,11 @@ func TestFormatNotification_MultipleTemplatesWithError(t *testing.T) {
 	require.NoError(t, err)
 
 	// First template is valid, second doesn't exist
-	notification, err := svc.FormatNotification(map[string]interface{}{
+	notification, err := svc.FormatNotification(map[string]any{
 		"foo": "bar",
 	}, "valid", "invalid")
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Nil(t, notification)
 	assert.Contains(t, err.Error(), "template 'invalid' is not supported")
 }

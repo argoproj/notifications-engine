@@ -62,7 +62,7 @@ func splitYAML(yamlData []byte) ([]*unstructured.Unstructured, error) {
 	return objs, nil
 }
 
-func (c *commandContext) unmarshalFromFile(filePath string, name string, gk schema.GroupKind, result interface{}) error {
+func (c *commandContext) unmarshalFromFile(filePath string, name string, gk schema.GroupKind, result any) error {
 	var err error
 	var data []byte
 	if filePath == "-" {

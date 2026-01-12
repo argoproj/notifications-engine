@@ -14,12 +14,10 @@ import (
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
-var (
-	// WorkflowsURLPattern matches Microsoft Teams Workflows webhook URLs (Power Automate)
-	// Matches: api.powerautomate.com, api.powerplatform.com, flow.microsoft.com, or webhook.office.com/workflows
-	// Also matches URLs with /powerautomate/ in the path (Power Platform URLs)
-	WorkflowsURLPattern = regexp.MustCompile(`(?i)(api\.(powerautomate|powerplatform)\.com|flow\.microsoft\.com|webhook\.office\.com/workflows|/powerautomate/)`)
-)
+// WorkflowsURLPattern matches Microsoft Teams Workflows webhook URLs (Power Automate)
+// Matches: api.powerautomate.com, api.powerplatform.com, flow.microsoft.com, or webhook.office.com/workflows
+// Also matches URLs with /powerautomate/ in the path (Power Platform URLs)
+var WorkflowsURLPattern = regexp.MustCompile(`(?i)(api\.(powerautomate|powerplatform)\.com|flow\.microsoft\.com|webhook\.office\.com/workflows|/powerautomate/)`)
 
 type TeamsWorkflowsNotification struct {
 	Template        string `json:"template,omitempty"`
@@ -80,7 +78,7 @@ func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.Fu
 		return nil, fmt.Errorf("error in '%s' teams-workflows.adaptiveCard: %w", name, err)
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.TeamsWorkflows == nil {
 			notification.TeamsWorkflows = &TeamsWorkflowsNotification{}
 		}
@@ -261,7 +259,7 @@ type notificationData struct {
 	Text            string
 	ThemeColor      string
 	Sections        []teamsSection
-	Facts           []map[string]interface{}
+	Facts           []map[string]any
 	PotentialAction []teamsAction
 }
 
@@ -302,7 +300,7 @@ func extractNotificationData(n Notification) (*notificationData, error) {
 	}
 
 	if n.TeamsWorkflows.Facts != "" {
-		var facts []map[string]interface{}
+		var facts []map[string]any
 		err := json.Unmarshal([]byte(n.TeamsWorkflows.Facts), &facts)
 		if err != nil {
 			return nil, fmt.Errorf("teams-workflows facts unmarshalling error %w", err)
@@ -429,13 +427,13 @@ func buildAdaptiveCard(data *notificationData) *adaptiveCard {
 
 	// Add sections if present (convert section facts to Adaptive Card facts)
 	for _, section := range data.Sections {
-		if facts, ok := section["facts"].([]interface{}); ok {
+		if facts, ok := section["facts"].([]any); ok {
 			factSet := adaptiveCardElement{
 				Type:  "FactSet",
 				Facts: []adaptiveCardFact{},
 			}
 			for _, fact := range facts {
-				if factMap, ok := fact.(map[string]interface{}); ok {
+				if factMap, ok := fact.(map[string]any); ok {
 					if name, ok := factMap["name"].(string); ok {
 						value := ""
 						if v, ok := factMap["value"].(string); ok {
@@ -468,8 +466,8 @@ func buildAdaptiveCard(data *notificationData) *adaptiveCard {
 					if name, ok := action["name"].(string); ok {
 						acAction.Title = name
 					}
-					if targets, ok := action["targets"].([]interface{}); ok && len(targets) > 0 {
-						if target, ok := targets[0].(map[string]interface{}); ok {
+					if targets, ok := action["targets"].([]any); ok && len(targets) > 0 {
+						if target, ok := targets[0].(map[string]any); ok {
 							if uri, ok := target["uri"].(string); ok {
 								acAction.URL = uri
 							}
