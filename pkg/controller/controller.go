@@ -8,6 +8,8 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/argoproj/notifications-engine/pkg/triggers"
+
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -207,7 +209,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 			logEntry.Errorf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
 			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
 		}
-		logEntry.Infof("Trigger %s result: %v", trigger, res)
+		logTriggerResults(logEntry, trigger, res)
 
 		for _, cr := range res {
 			c.metricsRegistry.IncTriggerEvaluationsCounter(trigger, cr.Triggered)
@@ -401,4 +403,21 @@ func mapsEqual(first, second map[string]string) bool {
 	}
 
 	return reflect.DeepEqual(first, second)
+}
+
+func logTriggerResults(logEntry *log.Entry, trigger string, results []triggers.ConditionResult) {
+	for _, cr := range results {
+		revision := cr.OncePer
+		if len(revision) > 8 {
+			revision = revision[:8]
+		}
+
+		status := "FAILED"
+		if cr.Triggered {
+			status = "TRIGGERED"
+		}
+
+		logEntry.Infof("Trigger '%s' %s | revision: %s | templates: %v",
+			trigger, status, revision, cr.Templates)
+	}
 }
