@@ -204,10 +204,10 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 	for trigger, destinations := range destinations {
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
-			logEntry.Errorf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
-			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
+			logEntry.Errorf("Failed to evaluate condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
+			eventSequence.addWarning(fmt.Errorf("failed to evaluate condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
 		}
-		logEntry.Infof("Trigger %s result: %v", trigger, res)
+		logEntry.Infof("Evaluated trigger %s condition, results: %v", trigger, res)
 
 		for _, cr := range res {
 			c.metricsRegistry.IncTriggerEvaluationsCounter(trigger, cr.Triggered)
