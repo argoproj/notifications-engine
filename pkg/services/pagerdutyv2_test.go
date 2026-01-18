@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_PagerDutyV2(t *testing.T) {
@@ -24,13 +25,11 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
+		err = templater(&notification, map[string]any{
 			"summary":   "hello",
 			"severity":  "critical",
 			"source":    "my-app",
@@ -41,9 +40,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 			"dedupKey":  "app-123",
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
@@ -70,7 +67,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for severity", func(t *testing.T) {
@@ -88,7 +85,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for source", func(t *testing.T) {
@@ -106,7 +103,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for component", func(t *testing.T) {
@@ -124,7 +121,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for group", func(t *testing.T) {
@@ -142,7 +139,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for class", func(t *testing.T) {
@@ -160,7 +157,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for url", func(t *testing.T) {
@@ -178,7 +175,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("only required parameters specified", func(t *testing.T) {
@@ -189,21 +186,17 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
+		err = templater(&notification, map[string]any{
 			"summary":  "hello",
 			"severity": "critical",
 			"source":   "my-app",
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)

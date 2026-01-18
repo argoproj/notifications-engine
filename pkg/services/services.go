@@ -263,7 +263,7 @@ func (n *Notification) getTemplater(name string, f texttemplate.FuncMap, sources
 		return nil, err
 	}
 
-	templaters := []Templater{func(notification *Notification, vars map[string]interface{}) error {
+	templaters := []Templater{func(notification *Notification, vars map[string]any) error {
 		var messageData bytes.Buffer
 		if err := message.Execute(&messageData, vars); err != nil {
 			return err
@@ -283,7 +283,7 @@ func (n *Notification) getTemplater(name string, f texttemplate.FuncMap, sources
 		templaters = append(templaters, t)
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		for _, t := range templaters {
 			if err := t(notification, vars); err != nil {
 				return err
@@ -293,7 +293,7 @@ func (n *Notification) getTemplater(name string, f texttemplate.FuncMap, sources
 	}, nil
 }
 
-type Templater func(notification *Notification, vars map[string]interface{}) error
+type Templater func(notification *Notification, vars map[string]any) error
 
 type TemplaterSource interface {
 	GetTemplater(name string, f texttemplate.FuncMap) (Templater, error)

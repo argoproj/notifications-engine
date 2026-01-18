@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_TeamsWorkflows(t *testing.T) {
@@ -27,7 +28,6 @@ func TestGetTemplater_TeamsWorkflows(t *testing.T) {
 	}
 
 	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -35,10 +35,9 @@ func TestGetTemplater_TeamsWorkflows(t *testing.T) {
 
 	notification := Notification{}
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"value": "value",
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -59,10 +58,10 @@ func TestTeamsWorkflows_DefaultMessage(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -88,7 +87,7 @@ func TestTeamsWorkflows_DefaultMessage(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "message", receivedBody.Type)
 	assert.Len(t, receivedBody.Attachments, 1)
 	assert.Equal(t, "application/vnd.microsoft.card.adaptive", receivedBody.Attachments[0].ContentType)
@@ -101,10 +100,10 @@ func TestTeamsWorkflows_AdaptiveCardTemplate(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -140,7 +139,7 @@ func TestTeamsWorkflows_AdaptiveCardTemplate(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "message", receivedBody.Type)
 	assert.Len(t, receivedBody.Attachments, 1)
 	assert.Equal(t, "application/vnd.microsoft.card.adaptive", receivedBody.Attachments[0].ContentType)
@@ -156,10 +155,10 @@ func TestTeamsWorkflows_MessageFields(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -208,7 +207,7 @@ func TestTeamsWorkflows_MessageFields(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "message", receivedBody.Type)
 	assert.Len(t, receivedBody.Attachments, 1)
 	card := receivedBody.Attachments[0].Content
@@ -340,19 +339,19 @@ func TestTeamsWorkflows_ValidateWebhookURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateWorkflowsWebhookURL(tt.url)
 			if tt.expectError {
-				assert.Error(t, err)
+				require.Error(t, err)
 				if tt.errorMsg != "" {
 					assert.Contains(t, err.Error(), tt.errorMsg)
 				}
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 			}
 		})
 	}
 }
 
 func TestTeamsWorkflows_Success(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -376,14 +375,14 @@ func TestTeamsWorkflows_Success(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestTeamsWorkflows_StatusError(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusBadRequest)
 		_, err := writer.Write([]byte("error details"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -406,14 +405,14 @@ func TestTeamsWorkflows_StatusError(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams workflows webhook post error")
 	assert.Contains(t, err.Error(), "status 400")
 	assert.Contains(t, err.Error(), "error details")
 }
 
 func TestTeamsWorkflows_StatusErrorNoBody(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
@@ -437,7 +436,7 @@ func TestTeamsWorkflows_StatusErrorNoBody(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams workflows webhook post error")
 	assert.Contains(t, err.Error(), "status 500")
 	assert.Contains(t, err.Error(), "no error details provided")
@@ -459,7 +458,7 @@ func TestTeamsWorkflows_MissingRecipient(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no teams-workflows webhook configured for recipient")
 	assert.Contains(t, err.Error(), "nonexistent")
 }
@@ -482,13 +481,13 @@ func TestTeamsWorkflows_InvalidURL(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "invalid webhook URL for recipient")
 	assert.Contains(t, err.Error(), "webhook URL does not appear to be a valid Microsoft Teams Workflows URL")
 }
 
 func TestTeamsWorkflows_InvalidFactsJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -514,12 +513,12 @@ func TestTeamsWorkflows_InvalidFactsJSON(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams-workflows facts unmarshalling error")
 }
 
 func TestTeamsWorkflows_InvalidSectionsJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -545,12 +544,12 @@ func TestTeamsWorkflows_InvalidSectionsJSON(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams-workflows sections unmarshalling error")
 }
 
 func TestTeamsWorkflows_InvalidPotentialActionJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -576,12 +575,12 @@ func TestTeamsWorkflows_InvalidPotentialActionJSON(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams-workflows potential action unmarshalling error")
 }
 
 func TestTeamsWorkflows_InvalidAdaptiveCardJSON(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.WriteHeader(http.StatusOK)
 	}))
 	defer server.Close()
@@ -607,7 +606,7 @@ func TestTeamsWorkflows_InvalidAdaptiveCardJSON(t *testing.T) {
 		},
 	)
 
-	assert.Error(t, err)
+	require.Error(t, err)
 	assert.Contains(t, err.Error(), "teams-workflows adaptiveCard unmarshalling error")
 }
 
@@ -615,10 +614,10 @@ func TestTeamsWorkflows_FactsWithNonStringValue(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -648,7 +647,7 @@ func TestTeamsWorkflows_FactsWithNonStringValue(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	card := receivedBody.Attachments[0].Content
 	foundFactSet := false
 	for _, element := range card.Body {
@@ -668,10 +667,10 @@ func TestTeamsWorkflows_SectionsWithFacts(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -706,7 +705,7 @@ func TestTeamsWorkflows_SectionsWithFacts(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	card := receivedBody.Attachments[0].Content
 	foundFactSet := false
 	for _, element := range card.Body {
@@ -728,10 +727,10 @@ func TestTeamsWorkflows_ActionOpenUri(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -765,7 +764,7 @@ func TestTeamsWorkflows_ActionOpenUri(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	card := receivedBody.Attachments[0].Content
 	assert.Len(t, card.Actions, 1)
 	assert.Equal(t, "Action.OpenUrl", card.Actions[0].Type)
@@ -777,10 +776,10 @@ func TestTeamsWorkflows_ActionNonOpenUri(t *testing.T) {
 	var receivedBody adaptiveMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		writer.WriteHeader(http.StatusOK)
 	}))
@@ -813,8 +812,8 @@ func TestTeamsWorkflows_ActionNonOpenUri(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	card := receivedBody.Attachments[0].Content
 	// Non-OpenUri actions should not be converted
-	assert.Len(t, card.Actions, 0)
+	assert.Empty(t, card.Actions)
 }
