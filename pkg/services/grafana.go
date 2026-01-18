@@ -57,7 +57,6 @@ func (s *grafanaService) Send(notification Notification, dest Destination) (err 
 
 	jsonValue, _ := json.Marshal(ga)
 	apiUrl, err := url.Parse(s.opts.ApiUrl)
-
 	if err != nil {
 		return err
 	}
@@ -70,7 +69,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) (err 
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.opts.ApiKey))
+	req.Header.Set("Authorization", "Bearer "+s.opts.ApiKey)
 
 	response, err := client.Do(req)
 	if err != nil {

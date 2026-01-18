@@ -63,7 +63,7 @@ func (n *NewrelicNotification) GetTemplater(name string, f texttemplate.FuncMap)
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Newrelic == nil {
 			notification.Newrelic = &NewrelicNotification{}
 		}
