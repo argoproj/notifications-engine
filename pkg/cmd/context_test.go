@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/argoproj/notifications-engine/pkg/api"
 )
@@ -48,7 +49,7 @@ func Test_getSecretFromFile(t *testing.T) {
 	}
 
 	secret, err := ctx.getSecret()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotEmpty(t, secret)
-	assert.Equal(t, secret.Name, "argocd-notifications-secret")
+	assert.Equal(t, "argocd-notifications-secret", secret.Name)
 }

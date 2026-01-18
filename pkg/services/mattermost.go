@@ -20,7 +20,7 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 	if err != nil {
 		return nil, err
 	}
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Mattermost == nil {
 			notification.Mattermost = &MattermostNotification{}
 		}
@@ -55,7 +55,7 @@ func (m *mattermostService) Send(notification Notification, dest Destination) (e
 		return err
 	}
 
-	attachments := []interface{}{}
+	attachments := []any{}
 	if notification.Mattermost != nil {
 		if notification.Mattermost.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.Mattermost.Attachments), &attachments); err != nil {
@@ -64,10 +64,10 @@ func (m *mattermostService) Send(notification Notification, dest Destination) (e
 		}
 	}
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"channel_id": dest.Recipient,
 		"message":    notification.Message,
-		"props": map[string]interface{}{
+		"props": map[string]any{
 			"attachments": attachments,
 		},
 	}
@@ -78,7 +78,7 @@ func (m *mattermostService) Send(notification Notification, dest Destination) (e
 		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.opts.Token))
+	req.Header.Set("Authorization", "Bearer "+m.opts.Token)
 
 	res, err := client.Do(req)
 	if err != nil {

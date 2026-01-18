@@ -40,7 +40,7 @@ func (p *PagerDutyNotification) GetTemplater(name string, f texttemplate.FuncMap
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Pagerduty == nil {
 			notification.Pagerduty = &PagerDutyNotification{}
 		}

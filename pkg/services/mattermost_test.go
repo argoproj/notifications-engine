@@ -8,14 +8,13 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSend_Mattermost(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		b, err := io.ReadAll(r.Body)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 
 		assert.JSONEq(t, `{
 			"channel_id": "channel",
@@ -67,9 +66,7 @@ func TestSend_Mattermost(t *testing.T) {
 		Service:   "mattermost",
 		Recipient: "channel",
 	})
-	if !assert.NoError(t, err) {
-		t.FailNow()
-	}
+	require.NoError(t, err)
 }
 
 func TestGetTemplater_Mattermost(t *testing.T) {
@@ -80,18 +77,14 @@ func TestGetTemplater_Mattermost(t *testing.T) {
 	}
 	templater, err := n.GetTemplater("", template.FuncMap{})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"foo": "hello",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.Mattermost.Attachments)
 }

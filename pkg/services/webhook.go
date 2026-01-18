@@ -42,7 +42,7 @@ func (n WebhookNotifications) GetTemplater(name string, f texttemplate.FuncMap) 
 		}
 		webhooks[k] = compiledWebhookTemplate{body: body, method: v.Method, path: path}
 	}
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		for k, v := range webhooks {
 			if notification.Webhook == nil {
 				notification.Webhook = map[string]WebhookNotification{}
