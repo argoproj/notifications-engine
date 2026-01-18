@@ -201,10 +201,10 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
 		assert.Equal(t, "my-app", notification.PagerdutyV2.Source)
-		assert.Equal(t, "", notification.PagerdutyV2.Component)
-		assert.Equal(t, "", notification.PagerdutyV2.Group)
-		assert.Equal(t, "", notification.PagerdutyV2.Class)
-		assert.Equal(t, "", notification.PagerdutyV2.DedupKey)
+		assert.Equal(t, assert.Empty, notification.PagerdutyV2.Component)
+		assert.Equal(t, assert.Empty, notification.PagerdutyV2.Group)
+		assert.Equal(t, assert.Empty, notification.PagerdutyV2.Class)
+		assert.Equal(t, assert.Empty, notification.PagerdutyV2.DedupKey)
 	})
 }
 
