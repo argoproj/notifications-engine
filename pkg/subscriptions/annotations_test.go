@@ -25,6 +25,7 @@ var data_without_trigger = `
        - recipient-1
        - recipient-2
 `
+
 var data_without_destinations = `
  - trigger: [my-trigger1, my-trigger2, my-trigger3]
 `
@@ -235,7 +236,7 @@ func TestSubscribe(t *testing.T) {
 	a := Annotations(map[string]string{})
 	a.Subscribe("my-trigger", "slack", "my-channel1")
 
-	assert.Equal(t, a["notifications.argoproj.io/subscribe.my-trigger.slack"], "my-channel1")
+	assert.Equal(t, "my-channel1", a["notifications.argoproj.io/subscribe.my-trigger.slack"])
 }
 
 func TestSubscribe_AddSecondRecipient(t *testing.T) {
@@ -244,7 +245,7 @@ func TestSubscribe_AddSecondRecipient(t *testing.T) {
 	})
 	a.Subscribe("my-trigger", "slack", "my-channel2")
 
-	assert.Equal(t, a["notifications.argoproj.io/subscribe.my-trigger.slack"], "my-channel1;my-channel2")
+	assert.Equal(t, "my-channel1;my-channel2", a["notifications.argoproj.io/subscribe.my-trigger.slack"])
 }
 
 func TestUnsubscribe(t *testing.T) {
@@ -252,7 +253,7 @@ func TestUnsubscribe(t *testing.T) {
 		"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel1;my-channel2",
 	})
 	a.Unsubscribe("my-trigger", "slack", "my-channel1")
-	assert.Equal(t, a["notifications.argoproj.io/subscribe.my-trigger.slack"], "my-channel2")
+	assert.Equal(t, "my-channel2", a["notifications.argoproj.io/subscribe.my-trigger.slack"])
 	a.Unsubscribe("my-trigger", "slack", "my-channel2")
 	_, ok := a["notifications.argoproj.io/subscribe.my-trigger.slack"]
 	assert.False(t, ok)

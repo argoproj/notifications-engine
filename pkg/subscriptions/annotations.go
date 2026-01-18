@@ -10,9 +10,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
-var (
-	annotationPrefix = "notifications.argoproj.io"
-)
+var annotationPrefix = "notifications.argoproj.io"
 
 // SetAnnotationPrefix sets the annotationPrefix to the provided string.
 // defaults to "notifications.argoproj.io"
@@ -21,7 +19,7 @@ func SetAnnotationPrefix(prefix string) {
 }
 
 func NotifiedAnnotationKey() string {
-	return fmt.Sprintf("notified.%s", annotationPrefix)
+	return "notified." + annotationPrefix
 }
 
 func parseRecipients(v string) []string {
@@ -173,7 +171,7 @@ func (a Annotations) Unsubscribe(trigger string, service string, recipient strin
 
 func (a Annotations) Has(service string, recipient string) bool {
 	has := false
-	a.iterate(func(t string, s string, r []string, k string) {
+	a.iterate(func(_ string, s string, r []string, _ string) {
 		if s != service {
 			return
 		}
@@ -189,7 +187,7 @@ func (a Annotations) Has(service string, recipient string) bool {
 
 func (a Annotations) GetDestinations(defaultTriggers []string, serviceDefaultTriggers map[string][]string) services.Destinations {
 	dests := services.Destinations{}
-	a.iterate(func(trigger string, service string, recipients []string, v string) {
+	a.iterate(func(trigger string, service string, recipients []string, _ string) {
 		for _, recipient := range recipients {
 			triggers := defaultTriggers
 			if trigger != "" {
