@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"regexp"
 	texttemplate "text/template"
@@ -55,7 +54,7 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Slack == nil {
 			notification.Slack = &SlackNotification{}
 		}
@@ -101,9 +100,10 @@ type SlackOptions struct {
 	Token              string   `json:"token"`
 	SigningSecret      string   `json:"signingSecret"`
 	Channels           []string `json:"channels"`
-	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
 	ApiURL             string   `json:"apiURL"`
 	DisableUnfurl      bool     `json:"disableUnfurl"`
+	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type slackService struct {
@@ -116,7 +116,7 @@ func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
 }
 
-func buildMessageOptions(notification Notification, dest Destination, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
+func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
 	slackNotification := &SlackNotification{}
 
@@ -134,11 +134,12 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 			icon = opts.Icon
 		}
 
-		if validIconEmoji.MatchString(icon) {
+		switch {
+		case validIconEmoji.MatchString(icon):
 			msgOptions = append(msgOptions, slack.MsgOptionIconEmoji(icon))
-		} else if isValidIconURL(icon) {
+		case isValidIconURL(icon):
 			msgOptions = append(msgOptions, slack.MsgOptionIconURL(icon))
-		} else {
+		default:
 			log.Warnf("Icon reference '%v' is not a valid emoji or url", icon)
 		}
 	}
@@ -147,14 +148,14 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 		attachments := make([]slack.Attachment, 0)
 		if notification.Slack.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.Slack.Attachments), &attachments); err != nil {
-				return nil, nil, fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Slack.Attachments, err)
+				return nil, nil, fmt.Errorf("failed to unmarshal attachments '%s' : %w", notification.Slack.Attachments, err)
 			}
 		}
 
 		blocks := slack.Blocks{}
 		if notification.Slack.Blocks != "" {
 			if err := json.Unmarshal([]byte(notification.Slack.Blocks), &blocks); err != nil {
-				return nil, nil, fmt.Errorf("failed to unmarshal blocks '%s' : %v", notification.Slack.Blocks, err)
+				return nil, nil, fmt.Errorf("failed to unmarshal blocks '%s' : %w", notification.Slack.Blocks, err)
 			}
 		}
 		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
@@ -169,12 +170,16 @@ func buildMessageOptions(notification Notification, dest Destination, opts Slack
 }
 
 func (s *slackService) Send(notification Notification, dest Destination) error {
-	slackNotification, msgOptions, err := buildMessageOptions(notification, dest, s.opts)
+	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
+	if err != nil {
+		return err
+	}
+	client, err := newSlackClient(s.opts)
 	if err != nil {
 		return err
 	}
 	return slackutil.NewThreadedClient(
-		newSlackClient(s.opts),
+		client,
 		slackState,
 	).SendMessage(
 		context.TODO(),
@@ -191,16 +196,17 @@ func (s *slackService) GetSigningSecret() string {
 	return s.opts.SigningSecret
 }
 
-func newSlackClient(opts SlackOptions) *slack.Client {
+func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	apiURL := slack.APIURL
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	transport := httputil.NewTransport(apiURL, opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
+
+	client, err := httputil.NewServiceHTTPClient(opts.TransportOptions, opts.InsecureSkipVerify, apiURL, "slack")
+	if err != nil {
+		return nil, err
 	}
-	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
+	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), nil
 }
 
 func isValidIconURL(iconURL string) bool {
@@ -210,7 +216,7 @@ func isValidIconURL(iconURL string) bool {
 	}
 
 	u, err := url.Parse(iconURL)
-	if err != nil || (u.Scheme == "" || !(u.Scheme == "http" || u.Scheme == "https")) || u.Host == "" {
+	if err != nil || (u.Scheme == "" || (u.Scheme != "http" && u.Scheme != "https")) || u.Host == "" {
 		return false
 	}
 

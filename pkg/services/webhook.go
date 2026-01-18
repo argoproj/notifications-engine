@@ -11,8 +11,6 @@ import (
 
 	"github.com/hashicorp/go-retryablehttp"
 
-	log "github.com/sirupsen/logrus"
-
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
@@ -44,7 +42,7 @@ func (n WebhookNotifications) GetTemplater(name string, f texttemplate.FuncMap) 
 		}
 		webhooks[k] = compiledWebhookTemplate{body: body, method: v.Method, path: path}
 	}
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		for k, v := range webhooks {
 			if notification.Webhook == nil {
 				notification.Webhook = map[string]WebhookNotification{}
@@ -83,10 +81,11 @@ type WebhookOptions struct {
 	URL                string        `json:"url"`
 	Headers            []Header      `json:"headers"`
 	BasicAuth          *BasicAuth    `json:"basicAuth"`
-	InsecureSkipVerify bool          `json:"insecureSkipVerify"`
 	RetryWaitMin       time.Duration `json:"retryWaitMin"`
 	RetryWaitMax       time.Duration `json:"retryWaitMax"`
 	RetryMax           int           `json:"retryMax"`
+	InsecureSkipVerify bool          `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 func NewWebhookService(opts WebhookOptions) NotificationService {
@@ -125,7 +124,7 @@ func (s webhookService) Send(notification Notification, dest Destination) error 
 	}
 	defer resp.Body.Close()
 
-	if !(resp.StatusCode >= 200 && resp.StatusCode <= 299) {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		data, err := io.ReadAll(resp.Body)
 		if err != nil {
 			data = []byte(fmt.Sprintf("unable to read response data: %v", err))
@@ -173,14 +172,13 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 		return nil, err
 	}
 
-	transport := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(r.url, service.opts.InsecureSkipVerify),
-		log.WithField("service", r.destService))
+	whclient, err := httputil.NewServiceHTTPClient(service.opts.TransportOptions, service.opts.InsecureSkipVerify, service.opts.URL, r.destService)
+	if err != nil {
+		return nil, err
+	}
 
 	client := retryablehttp.NewClient()
-	client.HTTPClient = &http.Client{
-		Transport: transport,
-	}
+	client.HTTPClient = whclient
 	client.RetryWaitMin = service.opts.RetryWaitMin
 	client.RetryWaitMax = service.opts.RetryWaitMax
 	client.RetryMax = service.opts.RetryMax

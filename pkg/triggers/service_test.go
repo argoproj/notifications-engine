@@ -1,10 +1,10 @@
 package triggers
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRun(t *testing.T) {
@@ -15,14 +15,12 @@ func TestRun(t *testing.T) {
 		}},
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
-	conditionKey := fmt.Sprintf("[0].%s", hash("var1 == 'abc'"))
+	conditionKey := "[0]." + hash("var1 == 'abc'")
 
 	t.Run("Triggered", func(t *testing.T) {
-		res, err := svc.Run("my-trigger", map[string]interface{}{"var1": "abc"})
+		res, err := svc.Run("my-trigger", map[string]any{"var1": "abc"})
 		if assert.NoError(t, err) {
 			return
 		}
@@ -34,7 +32,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("NotTriggered", func(t *testing.T) {
-		res, err := svc.Run("my-trigger", map[string]interface{}{"var1": "bcd"})
+		res, err := svc.Run("my-trigger", map[string]any{"var1": "bcd"})
 		if assert.NoError(t, err) {
 			return
 		}
@@ -46,7 +44,7 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("Failed", func(t *testing.T) {
-		res, err := svc.Run("my-trigger", map[string]interface{}{})
+		res, err := svc.Run("my-trigger", map[string]any{})
 		if assert.NoError(t, err) {
 			return
 		}
@@ -68,17 +66,13 @@ func TestRun_OncePerSet(t *testing.T) {
 		}},
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
-	conditionKey := fmt.Sprintf("[0].%s", hash("var1 == 'abc'"))
+	conditionKey := "[0]." + hash("var1 == 'abc'")
 
 	t.Run("Triggered", func(t *testing.T) {
-		res, err := svc.Run("my-trigger", map[string]interface{}{"var1": "abc", "revision": "123"})
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		res, err := svc.Run("my-trigger", map[string]any{"var1": "abc", "revision": "123"})
+		require.NoError(t, err)
 		assert.Equal(t, []ConditionResult{{
 			Key:       conditionKey,
 			Triggered: true,
@@ -88,10 +82,8 @@ func TestRun_OncePerSet(t *testing.T) {
 	})
 
 	t.Run("NotTriggered", func(t *testing.T) {
-		res, err := svc.Run("my-trigger", map[string]interface{}{"var1": "bcd"})
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		res, err := svc.Run("my-trigger", map[string]any{"var1": "bcd"})
+		require.NoError(t, err)
 		assert.Equal(t, []ConditionResult{{
 			Key:       conditionKey,
 			Triggered: false,
@@ -99,16 +91,15 @@ func TestRun_OncePerSet(t *testing.T) {
 			OncePer:   "",
 		}}, res)
 	})
-
 }
 
 func TestRun_OncePer_Evaluate(t *testing.T) {
-	vars := map[string]interface{}{
+	vars := map[string]any{
 		"var1":     "abc",
 		"revision": "123",
-		"app": map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+		"app": map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					"example.com/version": "v0.1",
 				},
 			},
@@ -138,18 +129,12 @@ func TestRun_OncePer_Evaluate(t *testing.T) {
 			}},
 		})
 
-		if !assert.NoError(t, err) {
-			t.FailNow()
-			return
-		}
+		require.NoError(t, err)
 
-		conditionKey := fmt.Sprintf("[0].%s", hash("var1 == 'abc'"))
+		conditionKey := "[0]." + hash("var1 == 'abc'")
 
 		res, err := svc.Run("my-trigger", vars)
-		if !assert.NoError(t, err) {
-			t.FailNow()
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, []ConditionResult{{
 			Key:       conditionKey,

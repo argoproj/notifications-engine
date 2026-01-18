@@ -72,8 +72,8 @@ func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *s
 		MessageBody:  aws.String(notif.Message),
 		DelaySeconds: 10,
 	}
-
 }
+
 func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
 	result := &sqs.GetQueueUrlInput{}
 	result.QueueName = &s.opts.Queue
@@ -95,8 +95,9 @@ func (s awsSqsService) getConfigOptions() []func(*config.LoadOptions) error {
 	var options []func(*config.LoadOptions) error
 
 	// When Credentials Are provided in service configuration - use them.
-	if (s.opts != AwsSqsOptions{} && s.opts.AwsAccess.Key != "" && s.opts.AwsAccess.Secret != "") {
-		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.opts.AwsAccess.Key, s.opts.AwsAccess.Secret, "default")))
+	if (s.opts != AwsSqsOptions{} && s.opts.Key != "" && s.opts.Secret != "") {
+		// Use an empty session token when none is provided (previously used "default" which produced invalid session tokens)
+		options = append(options, config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(s.opts.Key, s.opts.Secret, "")))
 	}
 
 	// Fill Region from configuration
@@ -132,7 +133,7 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.AwsSqs == nil {
 			notification.AwsSqs = &AwsSqsNotification{}
 		}
@@ -156,7 +157,7 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}, nil
 }
 
-func (n *AwsSqsNotification) parseMessageAttributes(name string, f texttemplate.FuncMap, vars map[string]interface{}) error {
+func (n *AwsSqsNotification) parseMessageAttributes(name string, f texttemplate.FuncMap, vars map[string]any) error {
 	for k, v := range n.MessageAttributes {
 		var tempData bytes.Buffer
 

@@ -7,7 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/api/core/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes/fake"
@@ -16,22 +16,20 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
-var (
-	settings = Settings{ConfigMapName: "my-config-map", SecretName: "my-secret", InitGetVars: func(cfg *Config, configMap *v1.ConfigMap, secret *v1.Secret) (GetVars, error) {
-		return func(obj map[string]interface{}, dest services.Destination) map[string]interface{} {
-			return map[string]interface{}{"obj": obj}
-		}, nil
-	}}
-)
+var settings = Settings{ConfigMapName: "my-config-map", SecretName: "my-secret", InitGetVars: func(_ *Config, _ *corev1.ConfigMap, _ *corev1.Secret) (GetVars, error) {
+	return func(obj map[string]any, _ services.Destination) map[string]any {
+		return map[string]any{"obj": obj}
+	}, nil
+}}
 
 func TestGetAPI(t *testing.T) {
-	cm := &v1.ConfigMap{
+	cm := &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-config-map", Namespace: "default"},
 		Data: map[string]string{
 			"service.slack": `{"token": "abc"}`,
 		},
 	}
-	secret := &v1.Secret{
+	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-secret", Namespace: "default"},
 	}
 
@@ -54,13 +52,13 @@ func TestGetAPI(t *testing.T) {
 	assert.Len(t, svcs, 1)
 	assert.NotNil(t, svcs["slack"])
 
-	_, err = clientset.CoreV1().ConfigMaps("default").Update(context.Background(), &v1.ConfigMap{
+	_, err = clientset.CoreV1().ConfigMaps("default").Update(context.Background(), &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{Name: "my-config-map", Namespace: "default"},
 		Data: map[string]string{
 			"service.email": `{"username": "test"}`,
 		},
 	}, metav1.UpdateOptions{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	time.Sleep(1 * time.Second)
 
