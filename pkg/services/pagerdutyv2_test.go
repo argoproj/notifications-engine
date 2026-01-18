@@ -6,6 +6,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_PagerDutyV2(t *testing.T) {
@@ -19,17 +20,16 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}}",
 				Class:     "{{.class}}",
 				URL:       "{{.url}}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
+		err = templater(&notification, map[string]any{
 			"summary":   "hello",
 			"severity":  "critical",
 			"source":    "my-app",
@@ -37,11 +37,10 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 			"group":     "test-group",
 			"class":     "test-class",
 			"url":       "http://example.com",
+			"dedupKey":  "app-123",
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
@@ -50,6 +49,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		assert.Equal(t, "test-group", notification.PagerdutyV2.Group)
 		assert.Equal(t, "test-class", notification.PagerdutyV2.Class)
 		assert.Equal(t, "http://example.com", notification.PagerdutyV2.URL)
+		assert.Equal(t, "app-123", notification.PagerdutyV2.DedupKey)
 	})
 
 	t.Run("handle error for summary", func(t *testing.T) {
@@ -62,11 +62,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for severity", func(t *testing.T) {
@@ -79,11 +80,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for source", func(t *testing.T) {
@@ -96,11 +98,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for component", func(t *testing.T) {
@@ -113,11 +116,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for group", func(t *testing.T) {
@@ -130,11 +134,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for class", func(t *testing.T) {
@@ -147,11 +152,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}}",
 				Class:     "{{.class}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("handle error for url", func(t *testing.T) {
@@ -164,11 +170,12 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 				Group:     "{{.group}}",
 				Class:     "{{.class}}",
 				URL:       "{{.url}",
+				DedupKey:  "{{.dedupKey}}",
 			},
 		}
 
 		_, err := n.GetTemplater("", template.FuncMap{})
-		assert.Error(t, err)
+		require.Error(t, err)
 	})
 
 	t.Run("only required parameters specified", func(t *testing.T) {
@@ -179,28 +186,25 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
+		err = templater(&notification, map[string]any{
 			"summary":  "hello",
 			"severity": "critical",
 			"source":   "my-app",
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
 		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
 		assert.Equal(t, "my-app", notification.PagerdutyV2.Source)
-		assert.Equal(t, "", notification.PagerdutyV2.Component)
-		assert.Equal(t, "", notification.PagerdutyV2.Group)
-		assert.Equal(t, "", notification.PagerdutyV2.Class)
+		assert.Empty(t, notification.PagerdutyV2.Component)
+		assert.Empty(t, notification.PagerdutyV2.Group)
+		assert.Empty(t, notification.PagerdutyV2.Class)
+		assert.Empty(t, notification.PagerdutyV2.DedupKey)
 	})
 }
 
@@ -214,6 +218,7 @@ func TestSend_PagerDuty(t *testing.T) {
 		group := "platform"
 		class := "test-class"
 		url := "https://www.example.com/"
+		dedupKey := "app-123"
 
 		event := buildEvent(routingKey, Notification{
 			Message: "message",
@@ -225,6 +230,7 @@ func TestSend_PagerDuty(t *testing.T) {
 				Group:     group,
 				Class:     class,
 				URL:       url,
+				DedupKey:  dedupKey,
 			},
 		})
 
@@ -236,6 +242,7 @@ func TestSend_PagerDuty(t *testing.T) {
 		assert.Equal(t, group, event.Payload.Group)
 		assert.Equal(t, class, event.Payload.Class)
 		assert.Equal(t, url, event.ClientURL)
+		assert.Equal(t, dedupKey, event.DedupKey)
 	})
 
 	t.Run("missing config", func(t *testing.T) {

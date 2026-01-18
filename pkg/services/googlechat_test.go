@@ -11,6 +11,7 @@ import (
 	"google.golang.org/api/chat/v1"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTextMessage_GoogleChat(t *testing.T) {
@@ -26,10 +27,9 @@ func TestTextMessage_GoogleChat(t *testing.T) {
 
 	notification := Notification{}
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"value": "value",
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -44,7 +44,7 @@ func TestTextMessage_GoogleChat(t *testing.T) {
 	}
 
 	assert.NotNil(t, message)
-	assert.Equal(t, message.Text, "message value")
+	assert.Equal(t, "message value", message.Text)
 }
 
 func TestTextMessageWithThreadKey_GoogleChat(t *testing.T) {
@@ -63,18 +63,17 @@ func TestTextMessageWithThreadKey_GoogleChat(t *testing.T) {
 
 	notification := Notification{}
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"value":     "value",
 		"threadKey": "testThreadKey",
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
 	assert.NotNil(t, notification.GoogleChat)
-	assert.Equal(t, notification.GoogleChat.ThreadKey, "testThreadKey")
+	assert.Equal(t, "testThreadKey", notification.GoogleChat.ThreadKey)
 
 	message, err := googleChatNotificationToMessage(notification)
 	if err != nil {
@@ -111,13 +110,12 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 
 	notification := Notification{}
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"text":     "text",
 		"topLabel": "topLabel",
 		"imageUrl": "imageUrl",
 		"button":   "button",
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -130,7 +128,7 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 	}
 
 	assert.NotNil(t, message)
-	assert.Equal(t, message.Cards, []chat.Card{
+	assert.Equal(t, []chat.Card{
 		{
 			Sections: []*chat.Section{
 				{
@@ -160,7 +158,7 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 				},
 			},
 		},
-	})
+	}, message.Cards)
 }
 
 func TestCardV2Message_GoogleChat(t *testing.T) {
@@ -201,12 +199,11 @@ func TestCardV2Message_GoogleChat(t *testing.T) {
 
 	notification := Notification{}
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"action": "test",
 		"text":   "text",
 		"button": "button",
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -274,7 +271,7 @@ func TestCreateClient_NoError(t *testing.T) {
 	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": "testUrl"}}
 	service := NewGoogleChatService(opts).(*googleChatService)
 	client, err := service.getClient("test")
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, client)
 	assert.Equal(t, "testUrl", client.url)
 }
@@ -283,7 +280,7 @@ func TestCreateClient_Error(t *testing.T) {
 	opts := GoogleChatOptions{WebhookUrls: map[string]string{"test": "testUrl"}}
 	service := NewGoogleChatService(opts).(*googleChatService)
 	client, err := service.getClient("another")
-	assert.NotNil(t, err)
+	require.Error(t, err)
 	assert.Nil(t, client)
 }
 
@@ -310,7 +307,7 @@ func TestSendMessage_NoError(t *testing.T) {
 	notification := Notification{Message: ""}
 	destination := Destination{Recipient: "test"}
 	err := service.Send(notification, destination)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, called)
 }
 
@@ -337,6 +334,6 @@ func TestSendMessageWithThreadKey_NoError(t *testing.T) {
 	notification := Notification{Message: "", GoogleChat: &GoogleChatNotification{ThreadKey: "testThreadKey"}}
 	destination := Destination{Recipient: "test"}
 	err := service.Send(notification, destination)
-	assert.Nil(t, err)
+	require.NoError(t, err)
 	assert.True(t, called)
 }

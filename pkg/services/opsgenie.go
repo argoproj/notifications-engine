@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	texttemplate "text/template"
 
@@ -130,7 +131,7 @@ func (n *OpsgenieNotification) GetTemplater(name string, f texttemplate.FuncMap)
 		}
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Opsgenie == nil {
 			notification.Opsgenie = &OpsgenieNotification{}
 		}
@@ -268,7 +269,7 @@ func (s *opsgenieService) Send(notification Notification, dest Destination) (err
 
 	if notification.Opsgenie != nil {
 		if notification.Opsgenie.Description == "" {
-			return fmt.Errorf("opsgenie notification description is missing")
+			return errors.New("opsgenie notification description is missing")
 		}
 
 		description = notification.Opsgenie.Description

@@ -46,7 +46,7 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 		return nil, fmt.Errorf("error in '%s' googlechat.threadKey : %w", name, err)
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.GoogleChat == nil {
 			notification.GoogleChat = &GoogleChatNotification{}
 		}
