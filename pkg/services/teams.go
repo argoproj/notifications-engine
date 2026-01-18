@@ -62,7 +62,7 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, fmt.Errorf("error in '%s' teams.potentialAction: %w", name, err)
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Teams == nil {
 			notification.Teams = &TeamsNotification{}
 		}
@@ -166,7 +166,6 @@ func (s teamsService) Send(notification Notification, dest Destination) (err err
 	}
 
 	response, err := client.Post(webhookUrl, "application/json", bytes.NewReader(message))
-
 	if err != nil {
 		return err
 	}
@@ -224,7 +223,7 @@ func teamsNotificationToMessage(n Notification) (*teamsMessage, error) {
 	}
 
 	if n.Teams.Facts != "" {
-		unmarshalledFacts := make([]map[string]interface{}, 2)
+		unmarshalledFacts := make([]map[string]any, 2)
 		err := json.Unmarshal([]byte(n.Teams.Facts), &unmarshalledFacts)
 		if err != nil {
 			return nil, fmt.Errorf("teams facts unmarshalling error %w", err)
@@ -252,13 +251,11 @@ func teamsNotificationToReader(n Notification) ([]byte, error) {
 	}
 
 	message, err := teamsNotificationToMessage(n)
-
 	if err != nil {
 		return nil, err
 	}
 
 	marshal, err := json.Marshal(message)
-
 	if err != nil {
 		return nil, err
 	}
@@ -277,5 +274,7 @@ type teamsMessage struct {
 	Sections        []teamsSection `json:"sections,omitempty"`
 }
 
-type teamsSection = map[string]interface{}
-type teamsAction map[string]interface{}
+type (
+	teamsSection = map[string]any
+	teamsAction  map[string]any
+)

@@ -9,6 +9,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_Teams(t *testing.T) {
@@ -26,7 +27,6 @@ func TestGetTemplater_Teams(t *testing.T) {
 	}
 
 	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
-
 	if err != nil {
 		t.Error(err)
 		return
@@ -34,36 +34,35 @@ func TestGetTemplater_Teams(t *testing.T) {
 
 	notification := Notification{}
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"value": "value",
 	})
-
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	assert.Equal(t, notification.Teams.Template, "template value")
-	assert.Equal(t, notification.Teams.Title, "title value")
-	assert.Equal(t, notification.Teams.Summary, "summary value")
-	assert.Equal(t, notification.Teams.Text, "text value")
-	assert.Equal(t, notification.Teams.Sections, "sections value")
-	assert.Equal(t, notification.Teams.Facts, "facts value")
-	assert.Equal(t, notification.Teams.PotentialAction, "actions value")
-	assert.Equal(t, notification.Teams.ThemeColor, "theme color value")
+	assert.Equal(t, "template value", notification.Teams.Template)
+	assert.Equal(t, "title value", notification.Teams.Title)
+	assert.Equal(t, "summary value", notification.Teams.Summary)
+	assert.Equal(t, "text value", notification.Teams.Text)
+	assert.Equal(t, "sections value", notification.Teams.Sections)
+	assert.Equal(t, "facts value", notification.Teams.Facts)
+	assert.Equal(t, "actions value", notification.Teams.PotentialAction)
+	assert.Equal(t, "theme color value", notification.Teams.ThemeColor)
 }
 
 func TestTeams_DefaultMessage(t *testing.T) {
 	var receivedBody teamsMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		_, err = writer.Write([]byte("1"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -84,7 +83,7 @@ func TestTeams_DefaultMessage(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, receivedBody.Text, notification.Message)
 }
@@ -93,12 +92,12 @@ func TestTeams_TemplateMessage(t *testing.T) {
 	var receivedBody string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		receivedBody = string(data)
 
 		_, err = writer.Write([]byte("1"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -121,7 +120,7 @@ func TestTeams_TemplateMessage(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, receivedBody, notification.Teams.Template)
 }
@@ -130,13 +129,13 @@ func TestTeams_MessageFields(t *testing.T) {
 	var receivedBody teamsMessage
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		data, err := io.ReadAll(request.Body)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		err = json.Unmarshal(data, &receivedBody)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		_, err = writer.Write([]byte("1"))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}))
 	defer server.Close()
 
@@ -166,7 +165,7 @@ func TestTeams_MessageFields(t *testing.T) {
 		},
 	)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Contains(t, receivedBody.Text, notification.Teams.Text)
 	assert.Contains(t, receivedBody.Title, notification.Teams.Title)
@@ -174,10 +173,127 @@ func TestTeams_MessageFields(t *testing.T) {
 	assert.Contains(t, receivedBody.ThemeColor, notification.Teams.ThemeColor)
 	assert.Contains(t, receivedBody.PotentialAction, teamsAction{"actions": true})
 	assert.Contains(t, receivedBody.Sections, teamsSection{"sections": true})
-	assert.EqualValues(t, receivedBody.Sections[len(receivedBody.Sections)-1]["facts"],
-		[]interface{}{
-			map[string]interface{}{
-				"facts": true,
-			},
-		})
+	assert.EqualValues(t, []any{
+		map[string]any{
+			"facts": true,
+		},
+	}, receivedBody.Sections[len(receivedBody.Sections)-1]["facts"])
+}
+
+func TestTeams_Office365Connector_Success(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, err := writer.Write([]byte("1"))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	require.NoError(t, err)
+}
+
+func TestTeams_Office365Connector_Error(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte("error message"))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "teams webhook post error")
+	assert.Contains(t, err.Error(), "error message")
+}
+
+func TestTeams_WorkflowsWebhook_StatusError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusBadRequest)
+		_, err := writer.Write([]byte("1"))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	// Teams service only checks response body, not status code
+	// If body is "1", it succeeds regardless of status code
+	require.NoError(t, err)
+}
+
+func TestTeams_Office365Connector_NonOneResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write([]byte("not one"))
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	service := NewTeamsService(TeamsOptions{
+		RecipientUrls: map[string]string{
+			"test": server.URL,
+		},
+	})
+
+	notification := Notification{
+		Message: "test message",
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams",
+		},
+	)
+
+	// Office365-connector requires "1" response, so this should fail
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "teams webhook post error")
+	assert.Contains(t, err.Error(), "not one")
 }
