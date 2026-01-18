@@ -109,13 +109,13 @@ func NewController(
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 	_, _ = informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+			AddFunc: func(obj any) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err == nil {
 					queue.Add(key)
 				}
 			},
-			UpdateFunc: func(old, new interface{}) {
+			UpdateFunc: func(_, new any) {
 				key, err := cache.MetaNamespaceKeyFunc(new)
 				if err == nil {
 					queue.Add(key)
@@ -361,7 +361,7 @@ func (c *notificationController) processResource(api api.API, resource metav1.Ob
 	}
 
 	if !mapsEqual(resource.GetAnnotations(), annotations) {
-		annotationsPatch := make(map[string]interface{})
+		annotationsPatch := make(map[string]any)
 		for k, v := range annotations {
 			annotationsPatch[k] = v
 		}
@@ -371,7 +371,7 @@ func (c *notificationController) processResource(api api.API, resource metav1.Ob
 			}
 		}
 
-		patchData, err := json.Marshal(map[string]map[string]interface{}{
+		patchData, err := json.Marshal(map[string]map[string]any{
 			"metadata": {"annotations": annotationsPatch},
 		})
 		if err != nil {
