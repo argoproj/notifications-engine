@@ -7,7 +7,7 @@ import (
 	natsserver "github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nkeys"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNatsService_Send(t *testing.T) {
@@ -51,9 +51,9 @@ func TestNatsService_Send(t *testing.T) {
 			t.Error("Failed to receive sent message:", err)
 		}
 
-		assert.NotNil(t, receivedMsg)
-		assert.Equal(t, "message", string(receivedMsg.Data), "Received message does not match sent message")
-		assert.Equal(t, "bar", receivedMsg.Header.Get("foo"), "Received message header does not match expected value")
+		require.NotNil(t, receivedMsg)
+		require.Equal(t, "message", string(receivedMsg.Data), "Received message does not match sent message")
+		require.Equal(t, "bar", receivedMsg.Header.Get("foo"), "Received message header does not match expected value")
 	})
 
 	t.Run("basic successful send with username and password", func(t *testing.T) {
@@ -104,22 +104,22 @@ func TestNatsService_Send(t *testing.T) {
 			t.Error("Failed to receive sent message:", err)
 		}
 
-		assert.NotNil(t, receivedMsg)
-		assert.Equal(t, "message", string(receivedMsg.Data), "Received message does not match sent message")
-		assert.Equal(t, "bar", receivedMsg.Header.Get("foo"), "Received message header does not match expected value")
+		require.NotNil(t, receivedMsg)
+		require.Equal(t, "message", string(receivedMsg.Data), "Received message does not match sent message")
+		require.Equal(t, "bar", receivedMsg.Header.Get("foo"), "Received message header does not match expected value")
 	})
 
 	t.Run("basic successful send with nkey authentication", func(t *testing.T) {
 		// Generate NKey pair
 		kp, err := nkeys.CreatePair(nkeys.PrefixByteUser)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		defer kp.Wipe()
 
 		publicKey, err := kp.PublicKey()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		seed, err := kp.Seed()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Start NATS server with NKey-based authorization
 		server, err := natsserver.NewServer(&natsserver.Options{
@@ -129,11 +129,11 @@ func TestNatsService_Send(t *testing.T) {
 				Nkey: publicKey,
 			}},
 		})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		defer server.Shutdown()
 
 		server.Start()
-		assert.True(t, server.ReadyForConnections(5*time.Second), "NATS server not ready")
+		require.True(t, server.ReadyForConnections(5*time.Second), "NATS server not ready")
 
 		// Connect and subscribe using NKey auth
 		nc, err := nats.Connect(server.ClientURL(),
@@ -142,10 +142,10 @@ func TestNatsService_Send(t *testing.T) {
 				return kp.Sign(nonce)
 			}),
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		sub, err := nc.SubscribeSync("test-topic")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Use service with seed
 		natsService := NewNatsService(NatsOptions{
@@ -155,13 +155,13 @@ func TestNatsService_Send(t *testing.T) {
 		}, nats.InProcessServer(server))
 
 		err = natsService.Send(Notification{Message: "message"}, Destination{Service: "nats", Recipient: "test-topic"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		receivedMsg, err := sub.NextMsg(time.Second)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
-		assert.NotNil(t, receivedMsg)
-		assert.Equal(t, "message", string(receivedMsg.Data))
-		assert.Equal(t, "bar", receivedMsg.Header.Get("foo"))
+		require.NotNil(t, receivedMsg)
+		require.Equal(t, "message", string(receivedMsg.Data))
+		require.Equal(t, "bar", receivedMsg.Header.Get("foo"))
 	})
 }
