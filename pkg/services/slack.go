@@ -54,7 +54,7 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Slack == nil {
 			notification.Slack = &SlackNotification{}
 		}

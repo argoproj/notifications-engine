@@ -3,6 +3,7 @@ package triggers
 import (
 	"crypto/sha1"
 	"encoding/base64"
+	"errors"
 	"fmt"
 
 	"github.com/argoproj/notifications-engine/pkg/util/text"
@@ -29,7 +30,7 @@ type ConditionResult struct {
 
 type Service interface {
 	// Executes given trigger name and return result of each condition
-	Run(triggerName string, vars map[string]interface{}) ([]ConditionResult, error)
+	Run(triggerName string, vars map[string]any) ([]ConditionResult, error)
 }
 
 type service struct {
@@ -70,7 +71,7 @@ func hash(input string) string {
 	return base64.RawURLEncoding.EncodeToString(h.Sum(nil))
 }
 
-func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]ConditionResult, error) {
+func (svc *service) Run(triggerName string, vars map[string]any) ([]ConditionResult, error) {
 	t, ok := svc.triggers[triggerName]
 	if !ok {
 		return nil, fmt.Errorf("trigger '%s' is not configured", triggerName)
@@ -83,7 +84,7 @@ func (svc *service) Run(triggerName string, vars map[string]interface{}) ([]Cond
 		}
 		var whenResult bool
 		if prog, ok := svc.compiledConditions[condition.When]; !ok {
-			return nil, fmt.Errorf("trigger configuration has changed after initialization")
+			return nil, errors.New("trigger configuration has changed after initialization")
 		} else if val, err := expr.Run(prog, vars); err == nil {
 			boolRes, ok := val.(bool)
 			conditionResult.Triggered = ok && boolRes
