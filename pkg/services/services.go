@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	texttemplate "text/template"
@@ -120,13 +121,12 @@ type NotificationService interface {
 
 // HandleSendError inspects the error and signals the caller if the Send operation should be retried.
 func HandleSendError(err error, logEntry *logrus.Entry) (retry bool) {
-	switch e := err.(type) {
-	case *TooManyGitHubCommitStatusesError:
-		logEntry.Warn(e)
+	var tooManyErr *TooManyGitHubCommitStatusesError
+	if errors.As(err, &tooManyErr) {
+		logEntry.Warn(tooManyErr)
 		return false
-	default:
-		return true
 	}
+	return true
 }
 
 func NewService(serviceType string, optsData []byte) (NotificationService, error) {

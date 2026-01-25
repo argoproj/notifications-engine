@@ -218,7 +218,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 	// as a result of hitting the ToomanyCommitStatusesError error.
 	annotations1, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Persist the notification state in the annotations.
 	setAnnotations(annotations1[notifiedAnnotationKey])(app)
@@ -227,7 +227,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 	// and the value of the notification annotation should not change. In the second attempt api.Send is not called.
 	annotations2, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, annotations1[notifiedAnnotationKey], annotations2[notifiedAnnotationKey])
 }
 
@@ -246,7 +246,7 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, false)
 	app := newResource("test", setAnnotations(mustToJson(state)))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
@@ -255,13 +255,13 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 	// First attempt. The returned annotations should not contain the notification state due to the error.
 	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, annotations[notifiedAnnotationKey])
 
 	// Second attempt. The returned annotations should not contain the notification state due to the error.
 	annotations, err = ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, annotations[notifiedAnnotationKey])
 }
 

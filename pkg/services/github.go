@@ -563,7 +563,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		)
 
 		var ghErr *github.ErrorResponse
-		if ok := errors.As(err, &ghErr); ok && ghErr.Response.StatusCode == 422 {
+		if ok := errors.As(err, &ghErr); ok && ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
 			return &TooManyGitHubCommitStatusesError{Sha: notification.GitHub.revision, Context: notification.GitHub.Status.Label}
 		} else if err != nil {
 			return err

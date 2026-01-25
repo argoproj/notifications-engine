@@ -240,9 +240,8 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 						if retry {
 							notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
 							c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
-							eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %v using the configuration in namespace %s", trigger, to, err, apiNamespace))
+							eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s", trigger, to, err, apiNamespace))
 						}
-
 					} else {
 						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
