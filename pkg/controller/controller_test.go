@@ -207,7 +207,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, false)
 	app := newResource("test", setAnnotations(mustToJson(state)))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
