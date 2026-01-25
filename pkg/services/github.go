@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -15,22 +16,21 @@ import (
 	"github.com/bradleyfalzon/ghinstallation/v2"
 	giturls "github.com/chainguard-dev/git-urls"
 	"github.com/google/go-github/v69/github"
-	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cast"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
-var (
-	gitSuffix = regexp.MustCompile(`\.git$`)
-)
+var gitSuffix = regexp.MustCompile(`\.git$`)
 
 type GitHubOptions struct {
-	AppID             interface{} `json:"appID"`
-	InstallationID    interface{} `json:"installationID"`
-	PrivateKey        string      `json:"privateKey"`
-	EnterpriseBaseURL string      `json:"enterpriseBaseURL"`
+	AppID              any    `json:"appID"`
+	InstallationID     any    `json:"installationID"`
+	PrivateKey         string `json:"privateKey"`
+	EnterpriseBaseURL  string `json:"enterpriseBaseURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type GitHubNotification struct {
@@ -222,8 +222,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			return nil, err
 		}
 	}
-
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.GitHub == nil {
 			notification.GitHub = &GitHubNotification{
 				RepoURLPath:  g.RepoURLPath,
@@ -428,26 +427,28 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 		return nil, err
 	}
 
-	tr := httputil.NewLoggingRoundTripper(
-		httputil.NewTransport(url, false), log.WithField("service", "github"))
-	itr, err := ghinstallation.New(tr, appID, installationID, []byte(opts.PrivateKey))
+	client, err := httputil.NewServiceHTTPClient(opts.TransportOptions, opts.InsecureSkipVerify, url, "github")
+	if err != nil {
+		return nil, err
+	}
+	itr, err := ghinstallation.New(client.Transport, appID, installationID, []byte(opts.PrivateKey))
 	if err != nil {
 		return nil, err
 	}
 
-	var client *github.Client
+	var ghclient *github.Client
 	if opts.EnterpriseBaseURL == "" {
-		client = github.NewClient(&http.Client{Transport: itr})
+		ghclient = github.NewClient(&http.Client{Transport: itr})
 	} else {
 		itr.BaseURL = opts.EnterpriseBaseURL
-		client, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
+		ghclient, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	return &gitHubService{
-		client: &githubClientAdapter{client: client},
+		client: &githubClientAdapter{client: ghclient},
 	}, nil
 }
 
@@ -470,7 +471,7 @@ type issuesService interface {
 }
 
 type pullRequestsService interface {
-	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.ListOptions) ([]*github.PullRequest, *github.Response, error)
 }
 
 type repositoriesService interface {
@@ -495,7 +496,7 @@ func (g *githubClientAdapter) GetIssues() issuesService {
 }
 
 func (g *githubClientAdapter) GetPullRequests() pullRequestsService {
-	return &pullRequestsServiceAdapter{service: g.client.PullRequests}
+	return g.client.PullRequests
 }
 
 func (g *githubClientAdapter) GetRepositories() repositoriesService {
@@ -529,7 +530,7 @@ func fullNameByRepoURL(rawURL string) string {
 
 func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub == nil {
-		return fmt.Errorf("config is empty")
+		return errors.New("config is empty")
 	}
 
 	u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
@@ -726,7 +727,6 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				Output:      checkRunOutput,
 			},
 		)
-
 		if err != nil {
 			return err
 		}
@@ -750,18 +750,4 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	return nil
-}
-
-// PullRequestsServiceAdapter adapts GitHub's PullRequestsService to our interface
-type pullRequestsServiceAdapter struct {
-	service *github.PullRequestsService
-}
-
-func (a *pullRequestsServiceAdapter) ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
-	// Convert PullRequestListOptions to ListOptions
-	listOpts := &github.ListOptions{
-		Page:    opts.Page,
-		PerPage: opts.PerPage,
-	}
-	return a.service.ListPullRequestsWithCommit(ctx, owner, repo, sha, listOpts)
 }

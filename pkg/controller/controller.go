@@ -8,6 +8,8 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/argoproj/notifications-engine/pkg/triggers"
+
 	log "github.com/sirupsen/logrus"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -107,13 +109,13 @@ func NewController(
 	queue := workqueue.NewTypedRateLimitingQueue(workqueue.DefaultTypedControllerRateLimiter[string]())
 	_, _ = informer.AddEventHandler(
 		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
+			AddFunc: func(obj any) {
 				key, err := cache.MetaNamespaceKeyFunc(obj)
 				if err == nil {
 					queue.Add(key)
 				}
 			},
-			UpdateFunc: func(old, new interface{}) {
+			UpdateFunc: func(_, new any) {
 				key, err := cache.MetaNamespaceKeyFunc(new)
 				if err == nil {
 					queue.Add(key)
@@ -204,10 +206,10 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 	for trigger, destinations := range destinations {
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
-			logEntry.Errorf("Failed to execute condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
-			eventSequence.addWarning(fmt.Errorf("failed to execute condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
+			logEntry.Errorf("Failed to evaluate condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
+			eventSequence.addWarning(fmt.Errorf("failed to evaluate condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
 		}
-		logEntry.Infof("Trigger %s result: %v", trigger, res)
+		logTriggerResults(logEntry, trigger, res)
 
 		for _, cr := range res {
 			c.metricsRegistry.IncTriggerEvaluationsCounter(trigger, cr.Triggered)
@@ -359,7 +361,7 @@ func (c *notificationController) processResource(api api.API, resource metav1.Ob
 	}
 
 	if !mapsEqual(resource.GetAnnotations(), annotations) {
-		annotationsPatch := make(map[string]interface{})
+		annotationsPatch := make(map[string]any)
 		for k, v := range annotations {
 			annotationsPatch[k] = v
 		}
@@ -369,7 +371,7 @@ func (c *notificationController) processResource(api api.API, resource metav1.Ob
 			}
 		}
 
-		patchData, err := json.Marshal(map[string]map[string]interface{}{
+		patchData, err := json.Marshal(map[string]map[string]any{
 			"metadata": {"annotations": annotationsPatch},
 		})
 		if err != nil {
@@ -401,4 +403,21 @@ func mapsEqual(first, second map[string]string) bool {
 	}
 
 	return reflect.DeepEqual(first, second)
+}
+
+func logTriggerResults(logEntry *log.Entry, trigger string, results []triggers.ConditionResult) {
+	for _, cr := range results {
+		revision := cr.OncePer
+		if len(revision) > 8 {
+			revision = revision[:8]
+		}
+
+		status := "FAILED"
+		if cr.Triggered {
+			status = "TRIGGERED"
+		}
+
+		logEntry.Infof("Trigger '%s' %s | revision: %s | templates: %v",
+			trigger, status, revision, cr.Templates)
+	}
 }
