@@ -16,6 +16,7 @@ import (
 type Notification struct {
 	Message        string                      `json:"message,omitempty"`
 	AwsSqs         *AwsSqsNotification         `json:"awssqs,omitempty"`
+	GcpPubsub      *GcpPubsubNotification      `json:"gcppubsub,omitempty"`
 	Email          *EmailNotification          `json:"email,omitempty"`
 	Slack          *SlackNotification          `json:"slack,omitempty"`
 	Mattermost     *MattermostNotification     `json:"mattermost,omitempty"`
