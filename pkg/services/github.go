@@ -84,6 +84,15 @@ type GitHubPullRequestComment struct {
 	CommentTag string `json:"commentTag,omitempty"`
 }
 
+type TooManyGitHubCommitStatusesError struct {
+	Sha     string
+	Context string
+}
+
+func (e *TooManyGitHubCommitStatusesError) Error() string {
+	return fmt.Sprintf("too many commit statuses for sha %s and context %s", e.Sha, e.Context)
+}
+
 type GitHubRepositoryDispatch struct {
 	EventType     string `json:"event_type,omitempty"`
 	ClientPayload string `json:"client_payload,omitempty"`
@@ -552,7 +561,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				TargetURL:   &notification.GitHub.Status.TargetURL,
 			},
 		)
-		if err != nil {
+
+		var ghErr *github.ErrorResponse
+		if ok := errors.As(err, &ghErr); ok && ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
+			return &TooManyGitHubCommitStatusesError{Sha: notification.GitHub.revision, Context: notification.GitHub.Status.Label}
+		} else if err != nil {
 			return err
 		}
 	}

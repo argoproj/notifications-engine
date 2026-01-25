@@ -234,9 +234,14 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 					if err := api.Send(un.Object, cr.Templates, to); err != nil {
 						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
 							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
-						notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
-						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
-						eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s", trigger, to, err, apiNamespace))
+
+						retry := services.HandleSendError(err, logEntry)
+
+						if retry {
+							notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
+							c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
+							eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s", trigger, to, err, apiNamespace))
+						}
 					} else {
 						logEntry.Debugf("Notification %s was sent using the configuration in namespace %s", to.Recipient, apiNamespace)
 						c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, true)
