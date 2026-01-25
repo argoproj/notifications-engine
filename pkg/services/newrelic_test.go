@@ -12,44 +12,86 @@ import (
 )
 
 func TestGetTemplater_Newrelic(t *testing.T) {
-	n := Notification{
-		Newrelic: &NewrelicNotification{
-			Changelog:   "Added: /v2/deployments.rb",
-			Description: "Deployment finished for {{.app.metadata.name}}. Visit: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
-			User:        "{{.context.user}}",
-		},
-	}
-
-	templater, err := n.GetTemplater("newrelic", template.FuncMap{})
-	require.NoError(t, err)
-
-	var notification Notification
-
-	err = templater(&notification, map[string]any{
-		"context": map[string]any{
-			"argocdUrl": "https://example.com",
-			"user":      "somebot",
-		},
-		"app": map[string]any{
-			"metadata": map[string]any{
-				"name": "argocd-notifications",
+	t.Run("default revision template", func(t *testing.T) {
+		n := Notification{
+			Newrelic: &NewrelicNotification{
+				Changelog:   "Added: /v2/deployments.rb",
+				Description: "Deployment finished for {{.app.metadata.name}}. Visit: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+				User:        "{{.context.user}}",
 			},
-			"status": map[string]any{
-				"operationState": map[string]any{
-					"syncResult": map[string]any{
-						"revision": "0123456789",
+		}
+
+		templater, err := n.GetTemplater("newrelic", template.FuncMap{})
+		require.NoError(t, err)
+
+		var notification Notification
+
+		err = templater(&notification, map[string]any{
+			"context": map[string]any{
+				"argocdUrl": "https://example.com",
+				"user":      "somebot",
+			},
+			"app": map[string]any{
+				"metadata": map[string]any{
+					"name": "argocd-notifications",
+				},
+				"status": map[string]any{
+					"operationState": map[string]any{
+						"syncResult": map[string]any{
+							"revision": "0123456789",
+						},
 					},
 				},
 			},
-		},
+		})
+
+		require.NoError(t, err)
+
+		assert.Equal(t, "0123456789", notification.Newrelic.Revision)
+		assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
+		assert.Equal(t, "Deployment finished for argocd-notifications. Visit: https://example.com/applications/argocd-notifications", notification.Newrelic.Description)
+		assert.Equal(t, "somebot", notification.Newrelic.User)
 	})
 
-	require.NoError(t, err)
+	t.Run("custom revision template", func(t *testing.T) {
+		n := Notification{
+			Newrelic: &NewrelicNotification{
+				Revision:    "{{.app.status.custom.revision}}",
+				Changelog:   "Added: /v2/deployments.rb",
+				Description: "Deployment finished for {{.app.metadata.name}}. Visit: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}",
+				User:        "{{.context.user}}",
+			},
+		}
 
-	assert.Equal(t, "0123456789", notification.Newrelic.Revision)
-	assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
-	assert.Equal(t, "Deployment finished for argocd-notifications. Visit: https://example.com/applications/argocd-notifications", notification.Newrelic.Description)
-	assert.Equal(t, "somebot", notification.Newrelic.User)
+		templater, err := n.GetTemplater("newrelic", template.FuncMap{})
+		require.NoError(t, err)
+
+		var notification Notification
+
+		err = templater(&notification, map[string]any{
+			"context": map[string]any{
+				"argocdUrl": "https://example.com",
+				"user":      "somebot",
+			},
+			"app": map[string]any{
+				"metadata": map[string]any{
+					"name": "argocd-notifications",
+				},
+				"status": map[string]any{
+					"custom": map[string]any{
+						"revision": "custom-revision-123",
+					},
+				},
+			},
+		})
+
+		require.NoError(t, err)
+
+		assert.Equal(t, "custom-revision-123", notification.Newrelic.Revision)
+		assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
+		assert.Equal(t, "Deployment finished for argocd-notifications. Visit: https://example.com/applications/argocd-notifications", notification.Newrelic.Description)
+		assert.Equal(t, "somebot", notification.Newrelic.User)
+	})
 }
 
 func TestSend_Newrelic(t *testing.T) {
