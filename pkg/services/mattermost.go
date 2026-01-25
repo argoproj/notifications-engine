@@ -8,8 +8,6 @@ import (
 	"net/http"
 	texttemplate "text/template"
 
-	log "github.com/sirupsen/logrus"
-
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
@@ -22,7 +20,7 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 	if err != nil {
 		return nil, err
 	}
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Mattermost == nil {
 			notification.Mattermost = &MattermostNotification{}
 		}
@@ -40,6 +38,7 @@ type MattermostOptions struct {
 	ApiURL             string `json:"apiURL"`
 	Token              string `json:"token"`
 	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type mattermostService struct {
@@ -50,25 +49,25 @@ func NewMattermostService(opts MattermostOptions) NotificationService {
 	return &mattermostService{opts: opts}
 }
 
-func (m *mattermostService) Send(notification Notification, dest Destination) error {
-	transport := httputil.NewTransport(m.opts.ApiURL, m.opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "mattermost")),
+func (m *mattermostService) Send(notification Notification, dest Destination) (err error) {
+	client, err := httputil.NewServiceHTTPClient(m.opts.TransportOptions, m.opts.InsecureSkipVerify, m.opts.ApiURL, "mattermost")
+	if err != nil {
+		return err
 	}
 
-	attachments := []interface{}{}
+	attachments := []any{}
 	if notification.Mattermost != nil {
 		if notification.Mattermost.Attachments != "" {
 			if err := json.Unmarshal([]byte(notification.Mattermost.Attachments), &attachments); err != nil {
-				return fmt.Errorf("failed to unmarshal attachments '%s' : %v", notification.Mattermost.Attachments, err)
+				return fmt.Errorf("failed to unmarshal attachments '%s' : %w", notification.Mattermost.Attachments, err)
 			}
 		}
 	}
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"channel_id": dest.Recipient,
 		"message":    notification.Message,
-		"props": map[string]interface{}{
+		"props": map[string]any{
 			"attachments": attachments,
 		},
 	}
@@ -76,20 +75,20 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 
 	req, err := http.NewRequest(http.MethodPost, m.opts.ApiURL+"/api/v4/posts", bytes.NewReader(b))
 	if err != nil {
-		return fmt.Errorf("failed to create request: %v", err)
+		return fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", m.opts.Token))
+	req.Header.Set("Authorization", "Bearer "+m.opts.Token)
 
 	res, err := client.Do(req)
 	if err != nil {
-		return fmt.Errorf("failed to request: %v", err)
+		return fmt.Errorf("failed to request: %w", err)
 	}
 	defer res.Body.Close()
 
 	data, err := io.ReadAll(res.Body)
 	if err != nil {
-		return fmt.Errorf("failed to read body: %v", err)
+		return fmt.Errorf("failed to read body: %w", err)
 	}
 
 	if res.StatusCode/100 != 2 {

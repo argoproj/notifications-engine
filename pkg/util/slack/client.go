@@ -3,6 +3,7 @@ package slack
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 
 	sl "github.com/slack-go/slack"
@@ -59,8 +60,10 @@ type SlackClient interface {
 	SendMessageContext(ctx context.Context, channelID string, options ...sl.MsgOption) (string, string, string, error)
 }
 
-type timestampMap map[string]map[string]string
-type channelMap map[string]string
+type (
+	timestampMap map[string]map[string]string
+	channelMap   map[string]string
+)
 
 type state struct {
 	lock sync.Mutex
@@ -128,8 +131,8 @@ func (c *threadedClient) SendMessage(ctx context.Context, recipient string, grou
 
 	if ts == "" || policy == Post || policy == PostAndUpdate {
 		newTs, channelID, err := SendMessageRateLimited(
-			c.Client,
 			ctx,
+			c.Client,
 			c.Limiter,
 			recipient,
 			sl.MsgOptionPost(),
@@ -149,8 +152,8 @@ func (c *threadedClient) SendMessage(ctx context.Context, recipient string, grou
 
 	if ts != "" && (policy == Update || policy == PostAndUpdate) {
 		_, _, err := SendMessageRateLimited(
-			c.Client,
 			ctx,
+			c.Client,
 			c.Limiter,
 			c.getChannelID(recipient),
 			sl.MsgOptionUpdate(ts),
@@ -173,7 +176,7 @@ func buildPostOptions(broadcast bool, options []sl.MsgOption) sl.MsgOption {
 	return opt
 }
 
-func SendMessageRateLimited(client SlackClient, ctx context.Context, limiter *rate.Limiter, recipient string, options ...sl.MsgOption) (ts, channelID string, err error) {
+func SendMessageRateLimited(ctx context.Context, client SlackClient, limiter *rate.Limiter, recipient string, options ...sl.MsgOption) (ts, channelID string, err error) {
 	for {
 		err = limiter.Wait(ctx)
 		if err != nil {
@@ -187,7 +190,8 @@ func SendMessageRateLimited(client SlackClient, ctx context.Context, limiter *ra
 		)
 
 		if err != nil {
-			if rateLimitedError, ok := err.(*sl.RateLimitedError); ok {
+			var rateLimitedError *sl.RateLimitedError
+			if errors.As(err, &rateLimitedError) {
 				limiter.SetLimit(rate.Every(rateLimitedError.RetryAfter))
 			} else {
 				break

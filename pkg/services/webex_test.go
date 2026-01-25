@@ -7,26 +7,25 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestValidEmail(t *testing.T) {
-	assert.Equal(t, true, validEmail.MatchString("test@test.com"))
-	assert.Equal(t, true, validEmail.MatchString("test.test@test.com"))
-	assert.Equal(t, false, validEmail.MatchString("notAnEmail"))
-	assert.Equal(t, false, validEmail.MatchString("notAnEmail@"))
+	assert.True(t, validEmail.MatchString("test@test.com"))
+	assert.True(t, validEmail.MatchString("test.test@test.com"))
+	assert.False(t, validEmail.MatchString("notAnEmail"))
+	assert.False(t, validEmail.MatchString("notAnEmail@"))
 }
 
 func TestSend_Webex(t *testing.T) {
 	t.Run("successful attempt - email", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			b, err := io.ReadAll(r.Body)
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
+			require.NoError(t, err)
 
-			assert.Equal(t, r.URL.Path, "/v1/messages")
-			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["Authorization"], []string{"Bearer NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, "/v1/messages", r.URL.Path)
+			assert.Equal(t, []string{"application/json"}, r.Header["Content-Type"])
+			assert.Equal(t, []string{"Bearer NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"}, r.Header["Authorization"])
 
 			assert.JSONEq(t, `{
 				"toPersonEmail": "test@test.com",
@@ -46,21 +45,17 @@ func TestSend_Webex(t *testing.T) {
 			Recipient: "test@test.com",
 		})
 
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("successful attempt - room", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			b, err := io.ReadAll(r.Body)
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
+			require.NoError(t, err)
 
-			assert.Equal(t, r.URL.Path, "/v1/messages")
-			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["Authorization"], []string{"Bearer NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, "/v1/messages", r.URL.Path)
+			assert.Equal(t, []string{"application/json"}, r.Header["Content-Type"])
+			assert.Equal(t, []string{"Bearer NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"}, r.Header["Authorization"])
 
 			assert.JSONEq(t, `{
 				"roomId": "roomId123",
@@ -80,22 +75,18 @@ func TestSend_Webex(t *testing.T) {
 			Recipient: "roomId123",
 		})
 
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("auth error", func(t *testing.T) {
 		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(401)
+			w.WriteHeader(http.StatusUnauthorized)
 			b, err := io.ReadAll(r.Body)
-			if !assert.NoError(t, err) {
-				t.FailNow()
-			}
+			require.NoError(t, err)
 
-			assert.Equal(t, r.URL.Path, "/v1/messages")
-			assert.Equal(t, r.Header["Content-Type"], []string{"application/json"})
-			assert.Equal(t, r.Header["Authorization"], []string{"Bearer NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"})
+			assert.Equal(t, "/v1/messages", r.URL.Path)
+			assert.Equal(t, []string{"application/json"}, r.Header["Content-Type"])
+			assert.Equal(t, []string{"Bearer NRAK-5F2FIVA5UTA4FFDD11XCXVA7WPJ"}, r.Header["Authorization"])
 
 			assert.JSONEq(t, `{
 				"toPersonEmail": "test@test.com",
@@ -115,9 +106,6 @@ func TestSend_Webex(t *testing.T) {
 			Recipient: "test@test.com",
 		})
 
-		if !assert.Error(t, err) {
-			t.FailNow()
-		}
+		require.Error(t, err)
 	})
-
 }

@@ -11,8 +11,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	yaml3 "gopkg.in/yaml.v3"
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/fields"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/yaml"
 )
 
@@ -34,7 +34,7 @@ type Config struct {
 }
 
 // Returns list of destinations for the specified trigger
-func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Destinations {
+func (cfg Config) GetGlobalDestinations(resourceLabels map[string]string) services.Destinations {
 	dests := services.Destinations{}
 	for _, s := range cfg.Subscriptions {
 		triggers := s.Triggers
@@ -42,7 +42,7 @@ func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Desti
 			triggers = cfg.DefaultTriggers
 		}
 		for _, trigger := range triggers {
-			if s.MatchesTrigger(trigger) && s.Selector.Matches(fields.Set(labels)) {
+			if s.MatchesTrigger(trigger) && s.Selector.Matches(labels.Set(resourceLabels)) {
 				for _, recipient := range s.Recipients {
 					parts := strings.Split(recipient, ":")
 					dest := services.Destination{Service: parts[0]}
@@ -57,7 +57,7 @@ func (cfg Config) GetGlobalDestinations(labels map[string]string) services.Desti
 	return dests
 }
 
-var keyPattern = regexp.MustCompile(`[$][\w-_]+`)
+var keyPattern = regexp.MustCompile(`[$][\w-]+`)
 
 // replaceStringSecret checks if given string is a secret key reference ( starts with $ ) and returns corresponding value from provided map
 func replaceStringSecret(val string, secretValues map[string][]byte) string {
@@ -72,7 +72,7 @@ func replaceStringSecret(val string, secretValues map[string][]byte) string {
 }
 
 // ParseConfig retrieves Config from given ConfigMap and Secret
-func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
+func ParseConfig(configMap *corev1.ConfigMap, secret *corev1.Secret) (*Config, error) {
 	cfg := Config{
 		Services:               map[string]ServiceFactory{},
 		Triggers:               map[string][]triggers.Condition{},
@@ -99,24 +99,25 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 			name := strings.Join(parts[1:], ".")
 			template := services.Notification{}
 			if err := yaml.Unmarshal([]byte(v), &template); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal template %s: %v", name, err)
+				return nil, fmt.Errorf("failed to unmarshal template %s: %w", name, err)
 			}
 			cfg.Templates[name] = template
 		case strings.HasPrefix(k, "service."):
 			name := ""
 			serviceType := ""
 			parts := strings.Split(k, ".")
-			if len(parts) == 3 {
+			switch len(parts) {
+			case 3:
 				serviceType, name = parts[1], parts[2]
-			} else if len(parts) == 2 {
+			case 2:
 				serviceType, name = parts[1], parts[1]
-			} else {
+			default:
 				return nil, fmt.Errorf("invalid service key; expected 'service.<type>(.<name>)' but got '%s'", k)
 			}
 
 			optsData, err := replaceServiceConfigSecrets(v, secret)
 			if err != nil {
-				return nil, fmt.Errorf("failed to render service configuration %s: %v", serviceType, err)
+				return nil, fmt.Errorf("failed to render service configuration %s: %w", serviceType, err)
 			}
 
 			cfg.Services[name] = func() (services.NotificationService, error) {
@@ -126,14 +127,14 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 			name := strings.Join(parts[1:], ".")
 			var trigger []triggers.Condition
 			if err := yaml.Unmarshal([]byte(v), &trigger); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal trigger %s: %v", name, err)
+				return nil, fmt.Errorf("failed to unmarshal trigger %s: %w", name, err)
 			}
 			cfg.Triggers[name] = trigger
 		case strings.HasPrefix(k, "defaultTriggers."):
 			name := strings.Join(parts[1:], ".")
 			var defaultTriggers []string
 			if err := yaml.Unmarshal([]byte(v), &defaultTriggers); err != nil {
-				return nil, fmt.Errorf("failed to unmarshal default trigger %s: %v", name, err)
+				return nil, fmt.Errorf("failed to unmarshal default trigger %s: %w", name, err)
 			}
 			cfg.ServiceDefaultTriggers[name] = defaultTriggers
 		}
@@ -141,7 +142,7 @@ func ParseConfig(configMap *v1.ConfigMap, secret *v1.Secret) (*Config, error) {
 	return &cfg, nil
 }
 
-func replaceServiceConfigSecrets(inputYaml string, secret *v1.Secret) ([]byte, error) {
+func replaceServiceConfigSecrets(inputYaml string, secret *corev1.Secret) ([]byte, error) {
 	var node yaml3.Node
 	err := yaml3.Unmarshal([]byte(inputYaml), &node)
 	if err != nil {

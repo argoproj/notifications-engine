@@ -15,8 +15,10 @@ import (
 )
 
 type NewrelicOptions struct {
-	ApiKey string `json:"apiKey"`
-	ApiURL string `json:"apiURL"`
+	ApiKey             string `json:"apiKey"`
+	ApiURL             string `json:"apiURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type NewrelicNotification struct {
@@ -66,7 +68,7 @@ func (n *NewrelicNotification) GetTemplater(name string, f texttemplate.FuncMap)
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Newrelic == nil {
 			notification.Newrelic = &NewrelicNotification{}
 		}
@@ -115,7 +117,7 @@ type newrelicDeploymentMarkerRequest struct {
 	Deployment NewrelicNotification `json:"deployment"`
 }
 
-func (s newrelicService) Send(notification Notification, dest Destination) error {
+func (s newrelicService) Send(notification Notification, dest Destination) (err error) {
 	if s.opts.ApiKey == "" {
 		return ErrMissingApiKey
 	}
@@ -137,9 +139,9 @@ func (s newrelicService) Send(notification Notification, dest Destination) error
 		},
 	}
 
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiURL, false), log.WithField("service", dest.Service)),
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, s.opts.ApiURL, "newrelic")
+	if err != nil {
+		return err
 	}
 
 	jsonValue, err := json.Marshal(deploymentMarker)

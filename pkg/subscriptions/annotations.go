@@ -10,9 +10,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 )
 
-var (
-	annotationPrefix = "notifications.argoproj.io"
-)
+var annotationPrefix = "notifications.argoproj.io"
 
 // SetAnnotationPrefix sets the annotationPrefix to the provided string.
 // defaults to "notifications.argoproj.io"
@@ -21,7 +19,7 @@ func SetAnnotationPrefix(prefix string) {
 }
 
 func NotifiedAnnotationKey() string {
-	return fmt.Sprintf("notified.%s", annotationPrefix)
+	return "notified." + annotationPrefix
 }
 
 func parseRecipients(v string) []string {
@@ -99,20 +97,21 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 			for _, v := range subscriptions {
 				triggers := v.Trigger
 				destinations := v.Destinations
-				if len(triggers) == 0 && len(destinations) == 0 {
+				switch {
+				case len(triggers) == 0 && len(destinations) == 0:
 					trigger := ""
 					destination := ""
 					recipients = []string{}
 					log.Printf("Notification triggers and destinations are not configured")
 					callback(trigger, destination, recipients, k)
-				} else if len(triggers) == 0 && len(destinations) != 0 {
+				case len(triggers) == 0 && len(destinations) != 0:
 					trigger := ""
 					log.Printf("Notification triggers are not configured")
 					for _, destination := range destinations {
 						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
 						callback(trigger, destination.Service, destination.Recipients, k)
 					}
-				} else if len(triggers) != 0 && len(destinations) == 0 {
+				case len(triggers) != 0 && len(destinations) == 0:
 					service := ""
 					recipients = []string{}
 					log.Printf("Notification destinations are not configured")
@@ -120,7 +119,7 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 						log.Printf("trigger: %v, service: %v, recipient: %v \n", trigger, service, recipients)
 						callback(trigger, service, recipients, k)
 					}
-				} else {
+				default:
 					for _, trigger := range triggers {
 						for _, destination := range destinations {
 							log.Printf("Notification trigger: %v, service: %v, recipient: %v \n", trigger, destination.Service, destination.Recipients)
@@ -172,7 +171,7 @@ func (a Annotations) Unsubscribe(trigger string, service string, recipient strin
 
 func (a Annotations) Has(service string, recipient string) bool {
 	has := false
-	a.iterate(func(t string, s string, r []string, k string) {
+	a.iterate(func(_ string, s string, r []string, _ string) {
 		if s != service {
 			return
 		}
@@ -188,7 +187,7 @@ func (a Annotations) Has(service string, recipient string) bool {
 
 func (a Annotations) GetDestinations(defaultTriggers []string, serviceDefaultTriggers map[string][]string) services.Destinations {
 	dests := services.Destinations{}
-	a.iterate(func(trigger string, service string, recipients []string, v string) {
+	a.iterate(func(trigger string, service string, recipients []string, _ string) {
 		for _, recipient := range recipients {
 			triggers := defaultTriggers
 			if trigger != "" {
