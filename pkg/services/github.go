@@ -743,7 +743,6 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				ClientPayload: &payload,
 			},
 		)
-
 		if err != nil {
 			return err
 		}

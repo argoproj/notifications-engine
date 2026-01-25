@@ -261,37 +261,33 @@ func TestGetTemplater_Github_RepositoryDispatch(t *testing.T) {
 	}
 	templater, err := n.GetTemplater("", template.FuncMap{})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
-	err = templater(&notification, map[string]interface{}{
-		"sync": map[string]interface{}{
-			"metadata": map[string]interface{}{
+	err = templater(&notification, map[string]any{
+		"sync": map[string]any{
+			"metadata": map[string]any{
 				"name": "root-sync-test",
 			},
-			"spec": map[string]interface{}{
-				"git": map[string]interface{}{
+			"spec": map[string]any{
+				"git": map[string]any{
 					"repo": "https://github.com/argoproj-labs/argocd-notifications.git",
 				},
 			},
-			"status": map[string]interface{}{
+			"status": map[string]any{
 				"lastSyncedCommit": "0123456789",
 			},
 		},
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "{{.sync.spec.git.repo}}", notification.GitHub.RepoURLPath)
 	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
 	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
 	assert.Equal(t, "0123456789", notification.GitHub.revision)
 	assert.Equal(t, "sync", notification.GitHub.RepositoryDispatch.EventType)
-	assert.Equal(t, `{ "sha": "0123456789" }`, notification.GitHub.RepositoryDispatch.ClientPayload)
+	assert.JSONEq(t, `{ "sha": "0123456789" }`, notification.GitHub.RepositoryDispatch.ClientPayload)
 }
 
 func TestGetTemplater_Github_PullRequestCommentWithTag(t *testing.T) {
@@ -406,7 +402,7 @@ func (m *mockRepositoriesService) CreateDeploymentStatus(_ context.Context, _, _
 	return &github.DeploymentStatus{}, nil, nil
 }
 
-func (m *mockRepositoriesService) Dispatch(ctx context.Context, owner, repo string, request github.DispatchRequestOptions) (*github.Repository, *github.Response, error) {
+func (m *mockRepositoriesService) Dispatch(_ context.Context, _, _ string, request github.DispatchRequestOptions) (*github.Repository, *github.Response, error) {
 	m.dispatches = append(m.dispatches, request)
 	return &github.Repository{}, nil, nil
 }
@@ -459,13 +455,13 @@ func TestGitHubService_Send_RepositoryDispatch(t *testing.T) {
 		},
 	}, Destination{})
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Len(t, repos.dispatches, 1)
-	assert.Equal(t, repos.dispatches[0].EventType, "sync")
+	assert.Equal(t, "sync", repos.dispatches[0].EventType)
 
 	payload, err := repos.dispatches[0].ClientPayload.MarshalJSON()
-	assert.NoError(t, err)
-	assert.Equal(t, string(payload), `{ "sha": "12345678" }`)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{ "sha": "12345678" }`, string(payload))
 }
 
 func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
