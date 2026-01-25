@@ -248,6 +248,48 @@ func TestGetTemplater_Github_PullRequestComment(t *testing.T) {
 	assert.Equal(t, "This is a comment", notification.GitHub.PullRequestComment.Content)
 }
 
+func TestGetTemplater_Github_RepositoryDispatch(t *testing.T) {
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			RepositoryDispatch: &GitHubRepositoryDispatch{
+				EventType:     "sync",
+				ClientPayload: `{ "sha": "{{.sync.status.lastSyncedCommit}}" }`,
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+
+	require.NoError(t, err)
+
+	var notification Notification
+	err = templater(&notification, map[string]any{
+		"sync": map[string]any{
+			"metadata": map[string]any{
+				"name": "root-sync-test",
+			},
+			"spec": map[string]any{
+				"git": map[string]any{
+					"repo": "https://github.com/argoproj-labs/argocd-notifications.git",
+				},
+			},
+			"status": map[string]any{
+				"lastSyncedCommit": "0123456789",
+			},
+		},
+	})
+
+	require.NoError(t, err)
+
+	assert.Equal(t, "{{.sync.spec.git.repo}}", notification.GitHub.RepoURLPath)
+	assert.Equal(t, "{{.sync.status.lastSyncedCommit}}", notification.GitHub.RevisionPath)
+	assert.Equal(t, "https://github.com/argoproj-labs/argocd-notifications.git", notification.GitHub.repoURL)
+	assert.Equal(t, "0123456789", notification.GitHub.revision)
+	assert.Equal(t, "sync", notification.GitHub.RepositoryDispatch.EventType)
+	assert.JSONEq(t, `{ "sha": "0123456789" }`, notification.GitHub.RepositoryDispatch.ClientPayload)
+}
+
 func TestGetTemplater_Github_PullRequestCommentWithTag(t *testing.T) {
 	n := Notification{
 		GitHub: &GitHubNotification{
@@ -340,7 +382,9 @@ type mockPullRequestsService struct {
 	prs []*github.PullRequest
 }
 
-type mockRepositoriesService struct{}
+type mockRepositoriesService struct {
+	dispatches []github.DispatchRequestOptions
+}
 
 func (m *mockRepositoriesService) CreateStatus(_ context.Context, _, _, _ string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
 	return status, nil, nil
@@ -356,6 +400,11 @@ func (m *mockRepositoriesService) CreateDeployment(_ context.Context, _, _ strin
 
 func (m *mockRepositoriesService) CreateDeploymentStatus(_ context.Context, _, _ string, _ int64, _ *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error) {
 	return &github.DeploymentStatus{}, nil, nil
+}
+
+func (m *mockRepositoriesService) Dispatch(_ context.Context, _, _ string, request github.DispatchRequestOptions) (*github.Repository, *github.Response, error) {
+	m.dispatches = append(m.dispatches, request)
+	return &github.Repository{}, nil, nil
 }
 
 type mockChecksService struct{}
@@ -377,20 +426,46 @@ func (m *mockGitHubClientImpl) GetPullRequests() pullRequestsService { return m.
 func (m *mockGitHubClientImpl) GetRepositories() repositoriesService { return m.repos }
 func (m *mockGitHubClientImpl) GetChecks() checksService             { return m.checks }
 
-func setupMockServices() (*mockIssuesService, *mockPullRequestsService, githubClient) {
+func setupMockServices() (*mockIssuesService, *mockPullRequestsService, *mockRepositoriesService, githubClient) {
 	issues := &mockIssuesService{comments: []*github.IssueComment{}}
 	pulls := &mockPullRequestsService{prs: []*github.PullRequest{{Number: github.Ptr(1)}}}
+	repos := &mockRepositoriesService{}
 	client := &mockGitHubClientImpl{
 		issues: issues,
 		prs:    pulls,
-		repos:  &mockRepositoriesService{},
+		repos:  repos,
 		checks: &mockChecksService{},
 	}
-	return issues, pulls, client
+	return issues, pulls, repos, client
+}
+
+func TestGitHubService_Send_RepositoryDispatch(t *testing.T) {
+	_, _, repos, client := setupMockServices()
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			RepositoryDispatch: &GitHubRepositoryDispatch{
+				EventType:     "sync",
+				ClientPayload: `{ "sha": "12345678" }`,
+			},
+		},
+	}, Destination{})
+
+	require.NoError(t, err)
+	assert.Len(t, repos.dispatches, 1)
+	assert.Equal(t, "sync", repos.dispatches[0].EventType)
+
+	payload, err := repos.dispatches[0].ClientPayload.MarshalJSON()
+	require.NoError(t, err)
+	assert.JSONEq(t, `{ "sha": "12345678" }`, string(payload))
 }
 
 func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
-	issues, _, client := setupMockServices()
+	issues, _, _, client := setupMockServices()
 
 	service := &gitHubService{client: client}
 

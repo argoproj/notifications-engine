@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -41,6 +42,7 @@ type GitHubNotification struct {
 	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
 	RevisionPath       string                    `json:"revisionPath,omitempty"`
 	CheckRun           *GitHubCheckRun           `json:"checkRun,omitempty"`
+	RepositoryDispatch *GitHubRepositoryDispatch `json:"repositoryDispatch,omitempty"`
 }
 
 type GitHubStatus struct {
@@ -80,6 +82,11 @@ type GitHubDeployment struct {
 type GitHubPullRequestComment struct {
 	Content    string `json:"content,omitempty"`
 	CommentTag string `json:"commentTag,omitempty"`
+}
+
+type GitHubRepositoryDispatch struct {
+	EventType     string `json:"event_type,omitempty"`
+	ClientPayload string `json:"client_payload,omitempty"`
 }
 
 const (
@@ -204,6 +211,17 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
+	var repoDispatchEventType, repoDispatchClientPayload *texttemplate.Template
+	if g.RepositoryDispatch != nil {
+		repoDispatchEventType, err = texttemplate.New(name).Funcs(f).Parse(g.RepositoryDispatch.EventType)
+		if err != nil {
+			return nil, err
+		}
+		repoDispatchClientPayload, err = texttemplate.New(name).Funcs(f).Parse(g.RepositoryDispatch.ClientPayload)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return func(notification *Notification, vars map[string]any) error {
 		if notification.GitHub == nil {
 			notification.GitHub = &GitHubNotification{
@@ -375,6 +393,20 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.CheckRun.Output.Text = textData.String()
 		}
 
+		if g.RepositoryDispatch != nil {
+			notification.GitHub.RepositoryDispatch = &GitHubRepositoryDispatch{}
+			var eventTypeData bytes.Buffer
+			if err := repoDispatchEventType.Execute(&eventTypeData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.RepositoryDispatch.EventType = eventTypeData.String()
+			var clientPayloadData bytes.Buffer
+			if err := repoDispatchClientPayload.Execute(&clientPayloadData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.RepositoryDispatch.ClientPayload = clientPayloadData.String()
+		}
+
 		return nil
 	}, nil
 }
@@ -447,6 +479,7 @@ type repositoriesService interface {
 	ListDeployments(ctx context.Context, owner, repo string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error)
 	CreateDeployment(ctx context.Context, owner, repo string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error)
 	CreateDeploymentStatus(ctx context.Context, owner, repo string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error)
+	Dispatch(ctx context.Context, owner, repo string, opts github.DispatchRequestOptions) (*github.Repository, *github.Response, error)
 }
 
 type checksService interface {
@@ -692,6 +725,22 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				StartedAt:   &github.Timestamp{Time: startedTime},
 				CompletedAt: &github.Timestamp{Time: completedTime},
 				Output:      checkRunOutput,
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if notification.GitHub.RepositoryDispatch != nil {
+		payload := json.RawMessage(notification.GitHub.RepositoryDispatch.ClientPayload)
+		_, _, err := g.client.GetRepositories().Dispatch(
+			context.Background(),
+			u[0],
+			u[1],
+			github.DispatchRequestOptions{
+				EventType:     notification.GitHub.RepositoryDispatch.EventType,
+				ClientPayload: &payload,
 			},
 		)
 		if err != nil {
