@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -38,8 +39,9 @@ type AlertmanagerOptions struct {
 	APIPath            string     `json:"apiPath"`
 	BasicAuth          *BasicAuth `json:"basicAuth"`
 	BearerToken        string     `json:"bearerToken"`
-	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
 	Timeout            int        `json:"timeout"`
+	InsecureSkipVerify bool       `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 // NewAlertmanagerService new service
@@ -67,7 +69,7 @@ type alertmanagerService struct {
 
 // GetTemplater parse text template
 func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Alertmanager == nil {
 			notification.Alertmanager = &AlertmanagerNotification{}
 		}
@@ -97,7 +99,7 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 		}
 
 		if len(n.Labels) == 0 {
-			return fmt.Errorf("at least one label pair required")
+			return errors.New("at least one label pair required")
 		}
 
 		notification.Alertmanager.Labels = n.Labels
@@ -115,7 +117,7 @@ func (n AlertmanagerNotification) GetTemplater(name string, f texttemplate.FuncM
 	}, nil
 }
 
-func (n *AlertmanagerNotification) parseAnnotations(name string, f texttemplate.FuncMap, vars map[string]interface{}) error {
+func (n *AlertmanagerNotification) parseAnnotations(name string, f texttemplate.FuncMap, vars map[string]any) error {
 	for k, v := range n.Annotations {
 		var tempData bytes.Buffer
 		tmpl, err := texttemplate.New(name).Funcs(f).Parse(v)
@@ -133,7 +135,7 @@ func (n *AlertmanagerNotification) parseAnnotations(name string, f texttemplate.
 	return nil
 }
 
-func (n *AlertmanagerNotification) parseLabels(name string, f texttemplate.FuncMap, vars map[string]interface{}) error {
+func (n *AlertmanagerNotification) parseLabels(name string, f texttemplate.FuncMap, vars map[string]any) error {
 	foundAlertname := false
 
 	for k, v := range n.Labels {
@@ -162,12 +164,12 @@ func (n *AlertmanagerNotification) parseLabels(name string, f texttemplate.FuncM
 }
 
 // Send using create alertmanager events
-func (s alertmanagerService) Send(notification Notification, dest Destination) error {
+func (s alertmanagerService) Send(notification Notification, _ Destination) error {
 	if notification.Alertmanager == nil {
-		return fmt.Errorf("notification alertmanager no config")
+		return errors.New("notification alertmanager no config")
 	}
 	if len(notification.Alertmanager.Labels) == 0 {
-		return fmt.Errorf("alertmanager at least one label pair required")
+		return errors.New("alertmanager at least one label pair required")
 	}
 
 	rawBody, err := json.Marshal([]*AlertmanagerNotification{notification.Alertmanager})
@@ -198,20 +200,19 @@ func (s alertmanagerService) Send(notification Notification, dest Destination) e
 	wg.Wait()
 
 	if numSuccess == 0 {
-		return fmt.Errorf("no events were successfully received by alertmanager")
+		return errors.New("no events were successfully received by alertmanager")
 	}
 
 	return nil
 }
 
-func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) error {
+func (s alertmanagerService) sendOneTarget(ctx context.Context, target string, rawBody []byte) (err error) {
 	rawURL := fmt.Sprintf("%v://%v%v", s.opts.Scheme, target, s.opts.APIPath)
 
-	transport := httputil.NewTransport(rawURL, s.opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, s.entry),
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, rawURL, "alertmanager")
+	if err != nil {
+		return err
 	}
-
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, rawURL, bytes.NewReader(rawBody))
 	if err != nil {
 		return err

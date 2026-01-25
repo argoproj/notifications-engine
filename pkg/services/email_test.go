@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gomodules.xyz/notify"
 	"k8s.io/utils/strings/slices"
 )
@@ -17,20 +18,16 @@ func TestGetTemplater_Email(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"foo": "hello",
 		"bar": "world",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.Email.Subject)
 	assert.Equal(t, "world", notification.Email.Body)
@@ -84,7 +81,7 @@ func TestSend_MultipleRecepient(t *testing.T) {
 
 func TestNewEmailService(t *testing.T) {
 	es := NewEmailService(EmailOptions{Html: true})
-	if es.html != true {
+	if !es.html {
 		t.Error("Html set incorrectly")
 	}
 }

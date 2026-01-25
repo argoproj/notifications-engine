@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"regexp"
 	texttemplate "text/template"
@@ -55,7 +54,7 @@ func (n *SlackNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Slack == nil {
 			notification.Slack = &SlackNotification{}
 		}
@@ -101,9 +100,10 @@ type SlackOptions struct {
 	Token              string   `json:"token"`
 	SigningSecret      string   `json:"signingSecret"`
 	Channels           []string `json:"channels"`
-	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
 	ApiURL             string   `json:"apiURL"`
 	DisableUnfurl      bool     `json:"disableUnfurl"`
+	InsecureSkipVerify bool     `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type slackService struct {
@@ -174,8 +174,12 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 	if err != nil {
 		return err
 	}
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		return err
+	}
 	return slackutil.NewThreadedClient(
-		newSlackClient(s.opts),
+		client,
 		slackState,
 	).SendMessage(
 		context.TODO(),
@@ -192,16 +196,17 @@ func (s *slackService) GetSigningSecret() string {
 	return s.opts.SigningSecret
 }
 
-func newSlackClient(opts SlackOptions) *slack.Client {
+func newSlackClient(opts SlackOptions) (slackclient *slack.Client, err error) {
 	apiURL := slack.APIURL
 	if opts.ApiURL != "" {
 		apiURL = opts.ApiURL
 	}
-	transport := httputil.NewTransport(apiURL, opts.InsecureSkipVerify)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "slack")),
+
+	client, err := httputil.NewServiceHTTPClient(opts.TransportOptions, opts.InsecureSkipVerify, apiURL, "slack")
+	if err != nil {
+		return nil, err
 	}
-	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL))
+	return slack.New(opts.Token, slack.OptionHTTPClient(client), slack.OptionAPIURL(apiURL)), nil
 }
 
 func isValidIconURL(iconURL string) bool {
