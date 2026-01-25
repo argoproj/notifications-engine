@@ -77,8 +77,8 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 				"metadata": map[string]any{
 					"name": "argocd-notifications",
 				},
-				"status": map[string]interface{}{
-					"custom": map[string]interface{}{
+				"status": map[string]any{
+					"custom": map[string]any{
 						"revision": "custom-revision-123",
 					},
 				},
