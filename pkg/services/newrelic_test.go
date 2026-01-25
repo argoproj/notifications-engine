@@ -22,24 +22,22 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("newrelic", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
-			"context": map[string]interface{}{
+		err = templater(&notification, map[string]any{
+			"context": map[string]any{
 				"argocdUrl": "https://example.com",
 				"user":      "somebot",
 			},
-			"app": map[string]interface{}{
-				"metadata": map[string]interface{}{
+			"app": map[string]any{
+				"metadata": map[string]any{
 					"name": "argocd-notifications",
 				},
-				"status": map[string]interface{}{
-					"operationState": map[string]interface{}{
-						"syncResult": map[string]interface{}{
+				"status": map[string]any{
+					"operationState": map[string]any{
+						"syncResult": map[string]any{
 							"revision": "0123456789",
 						},
 					},
@@ -47,9 +45,7 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 			},
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "0123456789", notification.Newrelic.Revision)
 		assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
@@ -68,19 +64,17 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 		}
 
 		templater, err := n.GetTemplater("newrelic", template.FuncMap{})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		var notification Notification
 
-		err = templater(&notification, map[string]interface{}{
-			"context": map[string]interface{}{
+		err = templater(&notification, map[string]any{
+			"context": map[string]any{
 				"argocdUrl": "https://example.com",
 				"user":      "somebot",
 			},
-			"app": map[string]interface{}{
-				"metadata": map[string]interface{}{
+			"app": map[string]any{
+				"metadata": map[string]any{
 					"name": "argocd-notifications",
 				},
 				"status": map[string]interface{}{
@@ -91,9 +85,7 @@ func TestGetTemplater_Newrelic(t *testing.T) {
 			},
 		})
 
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "custom-revision-123", notification.Newrelic.Revision)
 		assert.Equal(t, "Added: /v2/deployments.rb", notification.Newrelic.Changelog)
