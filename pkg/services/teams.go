@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"net/http"
 	texttemplate "text/template"
-
-	log "github.com/sirupsen/logrus"
 
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
@@ -65,7 +62,7 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 		return nil, fmt.Errorf("error in '%s' teams.potentialAction: %w", name, err)
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.Teams == nil {
 			notification.Teams = &TeamsNotification{}
 		}
@@ -139,7 +136,9 @@ func (n *TeamsNotification) GetTemplater(name string, f texttemplate.FuncMap) (T
 }
 
 type TeamsOptions struct {
-	RecipientUrls map[string]string `json:"recipientUrls"`
+	RecipientUrls      map[string]string `json:"recipientUrls"`
+	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type teamsService struct {
@@ -150,14 +149,15 @@ func NewTeamsService(opts TeamsOptions) NotificationService {
 	return &teamsService{opts: opts}
 }
 
-func (s teamsService) Send(notification Notification, dest Destination) error {
+func (s teamsService) Send(notification Notification, dest Destination) (err error) {
 	webhookUrl, ok := s.opts.RecipientUrls[dest.Recipient]
 	if !ok {
 		return fmt.Errorf("no teams webhook configured for recipient %s", dest.Recipient)
 	}
-	transport := httputil.NewTransport(webhookUrl, false)
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(transport, log.WithField("service", "teams")),
+
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, webhookUrl, "teams")
+	if err != nil {
+		return err
 	}
 
 	message, err := teamsNotificationToReader(notification)
@@ -166,7 +166,6 @@ func (s teamsService) Send(notification Notification, dest Destination) error {
 	}
 
 	response, err := client.Post(webhookUrl, "application/json", bytes.NewReader(message))
-
 	if err != nil {
 		return err
 	}
@@ -224,7 +223,7 @@ func teamsNotificationToMessage(n Notification) (*teamsMessage, error) {
 	}
 
 	if n.Teams.Facts != "" {
-		unmarshalledFacts := make([]map[string]interface{}, 2)
+		unmarshalledFacts := make([]map[string]any, 2)
 		err := json.Unmarshal([]byte(n.Teams.Facts), &unmarshalledFacts)
 		if err != nil {
 			return nil, fmt.Errorf("teams facts unmarshalling error %w", err)
@@ -252,13 +251,11 @@ func teamsNotificationToReader(n Notification) ([]byte, error) {
 	}
 
 	message, err := teamsNotificationToMessage(n)
-
 	if err != nil {
 		return nil, err
 	}
 
 	marshal, err := json.Marshal(message)
-
 	if err != nil {
 		return nil, err
 	}
@@ -277,5 +274,7 @@ type teamsMessage struct {
 	Sections        []teamsSection `json:"sections,omitempty"`
 }
 
-type teamsSection = map[string]interface{}
-type teamsAction map[string]interface{}
+type (
+	teamsSection = map[string]any
+	teamsAction  map[string]any
+)

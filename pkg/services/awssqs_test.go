@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"text/template"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_AwsSqs(t *testing.T) {
@@ -25,21 +25,17 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"message":               "abcdef",
 		"messageAttributeValue": "123456",
 		"messageGroupId":        "a1b2c3",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	assert.Equal(t, "abcdef", notification.Message)
 	assert.Equal(t, map[string]string{
 		"attributeKey": "123456",
@@ -48,7 +44,6 @@ func TestGetTemplater_AwsSqs(t *testing.T) {
 }
 
 func TestSend_AwsSqs(t *testing.T) {
-
 	// Overriding methods inside, so service.Send could be called.
 	saveGetQueueURL := GetQueueURL
 	saveSendMsg := SendMsg
@@ -68,7 +63,7 @@ func TestSend_AwsSqs(t *testing.T) {
 	}
 
 	if err := s.Send(notification, destination); err != nil {
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	}
 }
 
@@ -91,10 +86,10 @@ func TestSendFail_AwsSqs(t *testing.T) {
 		AwsSqs:  &AwsSqsNotification{},
 	}
 	queueUrl, err := GetQueueURL(context.TODO(), client, s.getQueueInput(destination))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	if _, err := SendMsg(context.TODO(), client, SendMessageInput(s, queueUrl.QueueUrl, notification)); err != nil {
-		assert.Error(t, err)
+		require.Error(t, err)
 	}
 }
 
@@ -112,29 +107,29 @@ func TestGetConfigOptions_AwsSqs(t *testing.T) {
 	optionsF := GetConfigOptions(s)
 
 	for _, f := range optionsF {
-		assert.NoError(t, f(options))
+		require.NoError(t, f(options))
 	}
 	// Verify region properly set
 	assert.Equal(t, "us-east-1", options.Region)
 	// Get and Verify credentials from Provider
 	creds, _ := options.Credentials.Retrieve(context.TODO())
-	assert.Equal(t, s.opts.AwsAccess.Key, creds.AccessKeyID)
-	assert.Equal(t, s.opts.AwsAccess.Secret, creds.SecretAccessKey)
+	assert.Equal(t, s.opts.Key, creds.AccessKeyID)
+	assert.Equal(t, s.opts.Secret, creds.SecretAccessKey)
 }
 
 func TestGetConfigOptionsFromEnv_AwsSqs(t *testing.T) {
 	// Applying override via parameters instead of the ENV Variables
 	finalKey, finalSecret, finalRegion := "key", "secret", "us-east-1"
 
-	os.Setenv("AWS_ACCESS_KEY_ID", finalKey)
-	os.Setenv("AWS_SECRET_ACCESS_KEY", finalSecret)
-	os.Setenv("AWS_DEFAULT_REGION", finalRegion)
+	t.Setenv("AWS_ACCESS_KEY_ID", finalKey)
+	t.Setenv("AWS_SECRET_ACCESS_KEY", finalSecret)
+	t.Setenv("AWS_DEFAULT_REGION", finalRegion)
 
 	s := NewTypedAwsSqsService(AwsSqsOptions{})
 
 	options := GetConfigOptions(s)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	creds, _ := cfg.Credentials.Retrieve(context.TODO())
 
@@ -144,9 +139,9 @@ func TestGetConfigOptionsFromEnv_AwsSqs(t *testing.T) {
 }
 
 func TestGetConfigOptionsOverrideCredentials_AwsSqs(t *testing.T) {
-	os.Setenv("AWS_ACCESS_KEY_ID", "env_key")
-	os.Setenv("AWS_SECRET_ACCESS_KEY", "env_secret")
-	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
+	t.Setenv("AWS_ACCESS_KEY_ID", "env_key")
+	t.Setenv("AWS_SECRET_ACCESS_KEY", "env_secret")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	// Applying override via parameters instead of the ENV Variables
 	finalKey, finalSecret, finalRegion := "key", "secret", "us-east-1"
@@ -161,7 +156,7 @@ func TestGetConfigOptionsOverrideCredentials_AwsSqs(t *testing.T) {
 
 	options := GetConfigOptions(s)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	creds, _ := cfg.Credentials.Retrieve(context.TODO())
 
@@ -172,7 +167,7 @@ func TestGetConfigOptionsOverrideCredentials_AwsSqs(t *testing.T) {
 
 func TestGetConfigOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	// Will be overridden
-	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
 
@@ -187,7 +182,7 @@ func TestGetConfigOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 
 	options := GetConfigOptions(s)
 	cfg, err := config.LoadDefaultConfig(context.TODO(), options...)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	creds, _ := cfg.Credentials.Retrieve(context.TODO())
 
@@ -198,7 +193,7 @@ func TestGetConfigOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 
 func TestGetClientOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	// Will be overridden
-	os.Setenv("AWS_DEFAULT_REGION", "us-east-2")
+	t.Setenv("AWS_DEFAULT_REGION", "us-east-2")
 
 	finalKey, finalSecret, finalRegion, finalEndpoint := "key", "secret", "us-east-1", "localhost"
 
@@ -212,13 +207,96 @@ func TestGetClientOptionsCustomEndpointUrl_AwsSqs(t *testing.T) {
 	})
 
 	options := GetClientOptions(s)
-	assert.Equal(t, 2, len(options))
+	assert.Len(t, options, 2)
+}
+
+func TestGetConfigOptions_StaticCredentials_EmptySessionToken(t *testing.T) {
+	s := awsSqsService{opts: AwsSqsOptions{
+		AwsAccess: AwsAccess{
+			Key:    "test-key",
+			Secret: "test-secret",
+		},
+		Region: "us-east-1",
+	}}
+
+	var opts config.LoadOptions
+	for _, f := range s.getConfigOptions() {
+		require.NoError(t, f(&opts), "applying config option failed")
+	}
+
+	// Ensure Credentials provider is present
+	require.NotNil(t, opts.Credentials, "expected Credentials provider to be set in LoadOptions")
+
+	creds, err := opts.Credentials.Retrieve(context.TODO())
+	require.NoError(t, err, "failed to retrieve credentials")
+
+	assert.Equal(t, s.opts.Key, creds.AccessKeyID)
+	assert.Equal(t, s.opts.Secret, creds.SecretAccessKey)
+	// a session token must be empty when no session/token provided
+	assert.Empty(t, creds.SessionToken)
+}
+
+func TestSendMessageInput_WithMessageGroupId_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue.fifo"
+
+	notification := Notification{
+		Message: "Hello",
+		AwsSqs: &AwsSqsNotification{
+			MessageGroupId: "test-group-id",
+		},
+	}
+
+	input := SendMessageInput(s, &queueUrl, notification)
+
+	assert.Equal(t, &queueUrl, input.QueueUrl)
+	assert.Equal(t, "Hello", *input.MessageBody)
+	assert.Equal(t, int32(10), input.DelaySeconds)
+	assert.Equal(t, "test-group-id", *input.MessageGroupId)
+}
+
+func TestSendMessageInput_WithoutMessageGroupId_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+
+	notification := Notification{
+		Message: "Hello",
+		AwsSqs: &AwsSqsNotification{
+			MessageGroupId: "", // Empty string
+		},
+	}
+
+	input := SendMessageInput(s, &queueUrl, notification)
+
+	assert.Equal(t, &queueUrl, input.QueueUrl)
+	assert.Equal(t, "Hello", *input.MessageBody)
+	assert.Equal(t, int32(10), input.DelaySeconds)
+	assert.Nil(t, input.MessageGroupId) // Should not be set
+}
+
+func TestSendMessageInput_WithoutAwsSqsNotification_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+	queueUrl := "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue"
+
+	notification := Notification{
+		Message: "Hello",
+		AwsSqs:  nil, // No AWS SQS notification
+	}
+
+	input := SendMessageInput(s, &queueUrl, notification)
+
+	assert.Equal(t, &queueUrl, input.QueueUrl)
+	assert.Equal(t, "Hello", *input.MessageBody)
+	assert.Equal(t, int32(10), input.DelaySeconds)
+	assert.Nil(t, input.MessageGroupId) // Should not be set
 }
 
 // Helpers
-var GetConfigOptions = (*awsSqsService).getConfigOptions
-var GetClientOptions = (*awsSqsService).getClientOptions
-var SendMessageInput = (*awsSqsService).sendMessageInput
+var (
+	GetConfigOptions = (*awsSqsService).getConfigOptions
+	GetClientOptions = (*awsSqsService).getClientOptions
+	SendMessageInput = (*awsSqsService).sendMessageInput
+)
 
 var NewTypedAwsSqsService = func(opts AwsSqsOptions) *awsSqsService {
 	return &awsSqsService{opts: opts}
@@ -229,13 +307,13 @@ type fakeApi struct {
 	MessageId string
 }
 
-func (a fakeApi) SendMessage(ctx context.Context, params *sqs.SendMessageInput, optFns ...func(*sqs.Options)) (*sqs.SendMessageOutput, error) {
+func (a fakeApi) SendMessage(_ context.Context, _ *sqs.SendMessageInput, _ ...func(*sqs.Options)) (*sqs.SendMessageOutput, error) {
 	return &sqs.SendMessageOutput{
 		MessageId: aws.String(a.MessageId),
 	}, fmt.Errorf("%s", "fail scenario")
 }
 
-func (a fakeApi) GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, optFns ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error) {
+func (a fakeApi) GetQueueUrl(_ context.Context, _ *sqs.GetQueueUrlInput, _ ...func(*sqs.Options)) (*sqs.GetQueueUrlOutput, error) {
 	var err error
 
 	return &sqs.GetQueueUrlOutput{
@@ -243,8 +321,8 @@ func (a fakeApi) GetQueueUrl(ctx context.Context, params *sqs.GetQueueUrlInput, 
 	}, err
 }
 
-func mockSendMsg(messageId string, errorMsg string) func(c context.Context, api SQSSendMessageAPI, input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
-	return func(c context.Context, api SQSSendMessageAPI, input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
+func mockSendMsg(messageId string, errorMsg string) func(_ context.Context, api SQSSendMessageAPI, _ *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
+	return func(_ context.Context, _ SQSSendMessageAPI, _ *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
 		var err error
 		if errorMsg != "" {
 			err = fmt.Errorf("%s", errorMsg)
@@ -255,8 +333,8 @@ func mockSendMsg(messageId string, errorMsg string) func(c context.Context, api 
 	}
 }
 
-func mockGetQueueURL(queueUrl string, errorMsg string) func(c context.Context, api SQSSendMessageAPI, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
-	return func(c context.Context, api SQSSendMessageAPI, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+func mockGetQueueURL(queueUrl string, errorMsg string) func(_ context.Context, api SQSSendMessageAPI, _ *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+	return func(_ context.Context, _ SQSSendMessageAPI, _ *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
 		var err error
 		if errorMsg != "" {
 			err = fmt.Errorf("%s", errorMsg)

@@ -3,6 +3,7 @@ package services
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	texttemplate "text/template"
 
@@ -18,6 +19,7 @@ type PagerDutyV2Notification struct {
 	Group     string `json:"group,omitempty"`
 	Class     string `json:"class,omitempty"`
 	URL       string `json:"url"`
+	DedupKey  string `json:"dedupKey,omitempty"`
 }
 
 type PagerdutyV2Options struct {
@@ -53,8 +55,12 @@ func (p *PagerDutyV2Notification) GetTemplater(name string, f texttemplate.FuncM
 	if err != nil {
 		return nil, err
 	}
+	dedupKey, err := texttemplate.New(name).Funcs(f).Parse(p.DedupKey)
+	if err != nil {
+		return nil, err
+	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.PagerdutyV2 == nil {
 			notification.PagerdutyV2 = &PagerDutyV2Notification{}
 		}
@@ -100,6 +106,12 @@ func (p *PagerDutyV2Notification) GetTemplater(name string, f texttemplate.FuncM
 		}
 		notification.PagerdutyV2.URL = urlData.String()
 
+		var dedupKeyData bytes.Buffer
+		if err := dedupKey.Execute(&dedupKeyData, vars); err != nil {
+			return err
+		}
+		notification.PagerdutyV2.DedupKey = dedupKeyData.String()
+
 		return nil
 	}, nil
 }
@@ -119,7 +131,7 @@ func (p pagerdutyV2Service) Send(notification Notification, dest Destination) er
 	}
 
 	if notification.PagerdutyV2 == nil {
-		return fmt.Errorf("no config found for pagerdutyv2")
+		return errors.New("no config found for pagerdutyv2")
 	}
 
 	event := buildEvent(routingKey, notification)
@@ -140,13 +152,13 @@ func buildEvent(routingKey string, notification Notification) pagerduty.V2Event 
 		Source:   notification.PagerdutyV2.Source,
 	}
 
-	if len(notification.PagerdutyV2.Component) > 0 {
+	if notification.PagerdutyV2.Component != "" {
 		payload.Component = notification.PagerdutyV2.Component
 	}
-	if len(notification.PagerdutyV2.Group) > 0 {
+	if notification.PagerdutyV2.Group != "" {
 		payload.Group = notification.PagerdutyV2.Group
 	}
-	if len(notification.PagerdutyV2.Class) > 0 {
+	if notification.PagerdutyV2.Class != "" {
 		payload.Class = notification.PagerdutyV2.Class
 	}
 
@@ -157,7 +169,11 @@ func buildEvent(routingKey string, notification Notification) pagerduty.V2Event 
 		Client:     "ArgoCD",
 	}
 
-	if len(notification.PagerdutyV2.URL) > 0 {
+	if notification.PagerdutyV2.DedupKey != "" {
+		event.DedupKey = notification.PagerdutyV2.DedupKey
+	}
+
+	if notification.PagerdutyV2.URL != "" {
 		event.ClientURL = notification.PagerdutyV2.URL
 	}
 

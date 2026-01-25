@@ -20,6 +20,7 @@ type GrafanaOptions struct {
 	ApiUrl             string `json:"apiUrl"`
 	ApiKey             string `json:"apiKey"`
 	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type grafanaService struct {
@@ -37,7 +38,7 @@ type GrafanaAnnotation struct {
 	Text     string   `json:"text"`
 }
 
-func (s *grafanaService) Send(notification Notification, dest Destination) error {
+func (s *grafanaService) Send(notification Notification, dest Destination) (err error) {
 	ga := GrafanaAnnotation{
 		Time:     time.Now().Unix() * 1000, // unix ts in ms
 		IsRegion: false,
@@ -49,27 +50,26 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 		log.Warnf("Message is an empty string or not provided in the notifications template")
 	}
 
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(s.opts.ApiUrl, s.opts.InsecureSkipVerify), log.WithField("service", "grafana")),
+	client, err := httputil.NewServiceHTTPClient(s.opts.TransportOptions, s.opts.InsecureSkipVerify, s.opts.ApiUrl, "grafana")
+	if err != nil {
+		return err
 	}
 
 	jsonValue, _ := json.Marshal(ga)
 	apiUrl, err := url.Parse(s.opts.ApiUrl)
-
 	if err != nil {
 		return err
 	}
 	annotationApi := *apiUrl
 	annotationApi.Path = path.Join(apiUrl.Path, "annotations")
-	req, err := http.NewRequest("POST", annotationApi.String(), bytes.NewBuffer(jsonValue))
+	req, err := http.NewRequest(http.MethodPost, annotationApi.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		log.Errorf("Failed to create grafana annotation request: %s", err)
 		return err
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", s.opts.ApiKey))
+	req.Header.Set("Authorization", "Bearer "+s.opts.ApiKey)
 
 	response, err := client.Do(req)
 	if err != nil {
@@ -81,7 +81,7 @@ func (s *grafanaService) Send(notification Notification, dest Destination) error
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("unable to read response data: %v", err)
+		return fmt.Errorf("unable to read response data: %w", err)
 	}
 
 	if response.StatusCode != http.StatusOK {

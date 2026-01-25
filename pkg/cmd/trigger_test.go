@@ -11,7 +11,8 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
+	"github.com/stretchr/testify/require"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -30,7 +31,7 @@ func newTestResource(name string) *unstructured.Unstructured {
 }
 
 func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, resources ...runtime.Object) (*commandContext, func(), error) {
-	cm := v1.ConfigMap{
+	cm := corev1.ConfigMap{
 		TypeMeta: metav1.TypeMeta{APIVersion: "v1", Kind: "ConfigMap"},
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "my-config-map",
@@ -61,8 +62,8 @@ func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, 
 		configMapPath: tmpFile.Name(),
 		resource:      schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"},
 		dynamicClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
-			schema.GroupVersionResource{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"}: "List",
-			schema.GroupVersionResource{Group: "argoproj.io", Resource: "appprojects", Version: "v1alpha1"}:  "List",
+			{Group: "argoproj.io", Resource: "applications", Version: "v1alpha1"}: "List",
+			{Group: "argoproj.io", Resource: "appprojects", Version: "v1alpha1"}:  "List",
 		}, resources...),
 		k8sClient: fake.NewSimpleClientset(),
 		namespace: "default",
@@ -70,9 +71,9 @@ func newTestContext(stdout io.Writer, stderr io.Writer, data map[string]string, 
 		Settings: api.Settings{
 			ConfigMapName: "my-config-map",
 			SecretName:    "my-secret",
-			InitGetVars: func(cfg *api.Config, configMap *v1.ConfigMap, secret *v1.Secret) (api.GetVars, error) {
-				return func(obj map[string]interface{}, _ services.Destination) map[string]interface{} {
-					return map[string]interface{}{"app": obj}
+			InitGetVars: func(_ *api.Config, _ *corev1.ConfigMap, _ *corev1.Secret) (api.GetVars, error) {
+				return func(obj map[string]any, _ services.Destination) map[string]any {
+					return map[string]any{"app": obj}
 				}, nil
 			},
 		},
@@ -94,14 +95,12 @@ message: hello {{.app.metadata.name}}`,
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	ctx, closer, err := newTestContext(&stdout, &stderr, cmData, newTestResource("guestbook"))
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	defer closer()
 
 	command := newTriggerRunCommand(ctx)
 	err = command.RunE(command, []string{"my-trigger", "guestbook"})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, stderr.String())
 	assert.Contains(t, stdout.String(), "true")
 }
@@ -121,14 +120,12 @@ message: hello {{.app.metadata.name}}`,
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	ctx, closer, err := newTestContext(&stdout, &stderr, cmData)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	defer closer()
 
 	command := newTriggerGetCommand(ctx)
 	err = command.RunE(command, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Empty(t, stderr.String())
 	assert.Contains(t, stdout.String(), "my-trigger1")
 	assert.Contains(t, stdout.String(), "my-trigger2")

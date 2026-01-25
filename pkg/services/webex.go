@@ -9,14 +9,14 @@ import (
 	"regexp"
 	"strings"
 
-	log "github.com/sirupsen/logrus"
-
 	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 type WebexOptions struct {
-	Token  string `json:"token"`
-	ApiURL string `json:"apiURL"`
+	Token              string `json:"token"`
+	ApiURL             string `json:"apiURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
+	httputil.TransportOptions
 }
 
 type webexService struct {
@@ -40,12 +40,12 @@ func NewWebexService(opts WebexOptions) NotificationService {
 
 var validEmail = regexp.MustCompile(`^\S+@\S+\.\S+$`)
 
-func (w webexService) Send(notification Notification, dest Destination) error {
-	requestURL := fmt.Sprintf("%s/v1/messages", w.opts.ApiURL)
+func (w webexService) Send(notification Notification, dest Destination) (err error) {
+	requestURL := w.opts.ApiURL + "/v1/messages"
 
-	client := &http.Client{
-		Transport: httputil.NewLoggingRoundTripper(
-			httputil.NewTransport(requestURL, false), log.WithField("service", dest.Service)),
+	client, err := httputil.NewServiceHTTPClient(w.opts.TransportOptions, w.opts.InsecureSkipVerify, requestURL, "webex")
+	if err != nil {
+		return err
 	}
 
 	message := webexMessage{
@@ -69,7 +69,7 @@ func (w webexService) Send(notification Notification, dest Destination) error {
 		return err
 	}
 
-	apiToken := fmt.Sprintf("Bearer %s", w.opts.Token)
+	apiToken := "Bearer " + w.opts.Token
 
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", apiToken)
@@ -85,7 +85,7 @@ func (w webexService) Send(notification Notification, dest Destination) error {
 
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("unable to read response data: %v", err)
+		return fmt.Errorf("unable to read response data: %w", err)
 	}
 
 	if response.StatusCode != http.StatusOK {

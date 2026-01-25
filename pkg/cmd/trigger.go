@@ -13,10 +13,10 @@ import (
 )
 
 func newTriggerCommand(cmdContext *commandContext) *cobra.Command {
-	var command = cobra.Command{
+	command := cobra.Command{
 		Use:   "trigger",
 		Short: "Notification triggers related commands",
-		RunE: func(c *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			return errors.New("select child command")
 		},
 	}
@@ -27,7 +27,7 @@ func newTriggerCommand(cmdContext *commandContext) *cobra.Command {
 }
 
 func newTriggerRunCommand(cmdContext *commandContext) *cobra.Command {
-	var command = cobra.Command{
+	command := cobra.Command{
 		Use:   "run NAME RESOURCE_NAME",
 		Short: "Evaluates specified trigger condition and prints the result",
 		Example: fmt.Sprintf(`
@@ -37,7 +37,7 @@ func newTriggerRunCommand(cmdContext *commandContext) *cobra.Command {
 # Execute trigger using my-config-map.yaml instead of '%s' ConfigMap
 %s trigger run on-sync-status-unknown ./sample-app.yaml \
     --config-map ./my-config-map.yaml`, cmdContext.cliName, cmdContext.ConfigMapName, cmdContext.cliName),
-		RunE: func(c *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			if len(args) < 2 {
 				return fmt.Errorf("expected two arguments, got %d", len(args))
 			}
@@ -83,10 +83,8 @@ func newTriggerRunCommand(cmdContext *commandContext) *cobra.Command {
 }
 
 func newTriggerGetCommand(cmdContext *commandContext) *cobra.Command {
-	var (
-		output string
-	)
-	var command = cobra.Command{
+	var output string
+	command := cobra.Command{
 		Use: "get",
 		Example: fmt.Sprintf(`
 # prints all triggers
@@ -95,7 +93,7 @@ func newTriggerGetCommand(cmdContext *commandContext) *cobra.Command {
 %s trigger get on-sync-failed -o=yaml
 `, cmdContext.cliName, cmdContext.cliName),
 		Short: "Prints information about configured triggers",
-		RunE: func(c *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			var name string
 			if len(args) == 1 {
 				name = args[0]

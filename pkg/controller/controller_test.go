@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -12,7 +13,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -36,7 +38,7 @@ var (
 	notifiedAnnotationKey = subscriptions.NotifiedAnnotationKey()
 )
 
-func mustToJson(val interface{}) string {
+func mustToJson(val any) string {
 	res, err := json.Marshal(val)
 	if err != nil {
 		panic(err)
@@ -66,6 +68,7 @@ func newResource(name string, modifiers ...func(app *unstructured.Unstructured))
 }
 
 func newController(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, *mocks.MockAPI, error) {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -75,10 +78,10 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 	resourceClient := client.Resource(testGVR)
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (object runtime.Object, err error) {
+			ListFunc: func(options metav1.ListOptions) (object runtime.Object, err error) {
 				return resourceClient.List(context.Background(), options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return resourceClient.Watch(context.Background(), options)
 			},
 		},
@@ -98,6 +101,7 @@ func newController(t *testing.T, ctx context.Context, client dynamic.Interface, 
 }
 
 func newControllerWithNamespaceSupport(t *testing.T, ctx context.Context, client dynamic.Interface, opts ...Opts) (*notificationController, map[string]notificationApi.API, error) {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	go func() {
 		<-ctx.Done()
@@ -107,10 +111,10 @@ func newControllerWithNamespaceSupport(t *testing.T, ctx context.Context, client
 	resourceClient := client.Resource(testGVR)
 	informer := cache.NewSharedIndexInformer(
 		&cache.ListWatch{
-			ListFunc: func(options v1.ListOptions) (object runtime.Object, err error) {
+			ListFunc: func(options metav1.ListOptions) (object runtime.Object, err error) {
 				return resourceClient.List(context.Background(), options)
 			},
-			WatchFunc: func(options v1.ListOptions) (watch.Interface, error) {
+			WatchFunc: func(options metav1.ListOptions) (watch.Interface, error) {
 				return resourceClient.Watch(context.Background(), options)
 			},
 		},
@@ -144,12 +148,12 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	}))
 
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
-	receivedObj := map[string]interface{}{}
+	receivedObj := map[string]any{}
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]any) bool {
 		receivedObj = obj
 		return true
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
@@ -159,7 +163,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	state := NewState(annotations[notifiedAnnotationKey])
 	assert.NotNil(t, state[StateItemKey(false, "", "mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
@@ -176,7 +180,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 		notifiedAnnotationKey: mustToJson(state),
 	}))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
@@ -185,7 +189,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
 
 func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
@@ -272,7 +276,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 		notifiedAnnotationKey: mustToJson(state),
 	}))
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
@@ -281,7 +285,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	if err != nil {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	state = NewState(annotations[notifiedAnnotationKey])
 	assert.Empty(t, state)
 }
@@ -306,7 +310,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 		return true, nil, nil
 	})
 	ctrl, api, err := newController(t, ctx, client)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
@@ -316,11 +320,11 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	case <-time.After(time.Second * 5):
 		t.Error("application was not patched")
 	case patchData := <-patchCh:
-		patch := map[string]interface{}{}
+		patch := map[string]any{}
 		err = json.Unmarshal(patchData, &patch)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		val, ok, err := unstructured.NestedFieldNoCopy(patch, "metadata", "annotations", notifiedAnnotationKey)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Nil(t, val)
 	}
@@ -413,14 +417,14 @@ func TestWithEventCallback(t *testing.T) {
 			description: "EventCallback should be invoked with non-nil error on send failure",
 			sendErr:     errors.New("this is a send error"),
 			expectedErrors: []error{
-				errors.New("failed to deliver notification my-trigger to {mock recipient}: this is a send error using the configuration in namespace "),
+				fmt.Errorf("failed to deliver notification my-trigger to {mock recipient}: %w using the configuration in namespace ", errors.New("this is a send error")),
 			},
 		},
 		{
 			description: "EventCallback should be invoked with non-nil error on api failure",
 			apiErr:      errors.New("this is an api error"),
 			expectedErrors: []error{
-				fmt.Errorf("this is an api error"),
+				errors.New("this is an api error"),
 			},
 		},
 	}
@@ -440,12 +444,12 @@ func TestWithEventCallback(t *testing.T) {
 			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
 			ctrl.namespaceSupport = false
 			api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			ctrl.apiFactory = &mocks.FakeFactory{Api: api, Err: tc.apiErr}
 
 			if tc.apiErr == nil {
 				api.EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-				api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+				api.EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
 					return true
 				}), []string{"test"}, destination).Return(tc.sendErr)
 			}
@@ -454,7 +458,7 @@ func TestWithEventCallback(t *testing.T) {
 
 			assert.Equal(t, app, actualSequence.Resource)
 
-			assert.Equal(t, len(tc.expectedDeliveries), len(actualSequence.Delivered))
+			assert.Len(t, actualSequence.Delivered, len(tc.expectedDeliveries))
 			for i, event := range actualSequence.Delivered {
 				assert.Equal(t, tc.expectedDeliveries[i].Trigger, event.Trigger)
 				assert.Equal(t, tc.expectedDeliveries[i].Destination, event.Destination)
@@ -475,18 +479,18 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 	}))
 
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	ctrl.namespaceSupport = true
 
 	trigger := "my-trigger"
 	namespace := "my-namespace"
 
-	receivedObj := map[string]interface{}{}
+	receivedObj := map[string]any{}
 
-	//SelfService API: config has IsSelfServiceConfig set to true
+	// SelfService API: config has IsSelfServiceConfig set to true
 	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: namespace}).AnyTimes()
 	api.EXPECT().RunTrigger(trigger, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]any) bool {
 		receivedObj = obj
 		return true
 	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
@@ -496,7 +500,7 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	state := NewState(annotations[notifiedAnnotationKey])
 	assert.NotZero(t, state[StateItemKey(true, namespace, trigger, triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
@@ -520,19 +524,19 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 	}))
 
 	ctrl, apiMap, err := newControllerWithNamespaceSupport(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ctrl.namespaceSupport = true
-	//SelfService API: config has IsSelfServiceConfig set to true
+	// SelfService API: config has IsSelfServiceConfig set to true
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).Times(3)
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
 		return true
 	}), []string{"test"}, destination).Return(nil).AnyTimes()
 
 	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default"}).Times(3)
 	apiMap["default"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	apiMap["default"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(obj map[string]interface{}) bool {
+	apiMap["default"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
 		return true
 	}), []string{"test"}, destination).Return(nil).AnyTimes()
 
@@ -556,5 +560,56 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 		assert.Equal(t, expectedDeliveries[i].Trigger, event.Trigger)
 		assert.Equal(t, expectedDeliveries[i].Destination, event.Destination)
 	}
+}
 
+func TestLogTriggerResults(t *testing.T) {
+	var buf bytes.Buffer
+	logger := logrus.New()
+	logger.SetOutput(&buf)
+	logger.SetFormatter(&logrus.TextFormatter{DisableTimestamp: true, DisableColors: true})
+	logEntry := logrus.NewEntry(logger)
+
+	t.Run("TriggeredResult", func(t *testing.T) {
+		buf.Reset()
+		results := []triggers.ConditionResult{{
+			Key: "app.status == 'Healthy'", OncePer: "abc123", Templates: []string{"template1"}, Triggered: true,
+		}}
+
+		logTriggerResults(logEntry, "test-trigger", results)
+
+		output := buf.String()
+		assert.Contains(t, output, "test-trigger")
+		assert.Contains(t, output, "TRIGGERED")
+		assert.Contains(t, output, "abc123")
+		assert.Contains(t, output, "template1")
+	})
+
+	t.Run("NotTriggeredResult", func(t *testing.T) {
+		buf.Reset()
+		results := []triggers.ConditionResult{{
+			Key: "app.status == 'Failed'", OncePer: "def456", Templates: []string{"template2"}, Triggered: false,
+		}}
+
+		logTriggerResults(logEntry, "fail-trigger", results)
+
+		output := buf.String()
+		assert.Contains(t, output, "fail-trigger")
+		assert.Contains(t, output, "FAILED")
+		assert.Contains(t, output, "def456")
+		assert.Contains(t, output, "template2")
+	})
+
+	t.Run("LongRevisionTruncation", func(t *testing.T) {
+		buf.Reset()
+		longRevision := "1234567890abcdefghijklmnopqrstuvwxyz"
+		results := []triggers.ConditionResult{{
+			Key: "test", OncePer: longRevision, Templates: []string{"tmpl"}, Triggered: true,
+		}}
+
+		logTriggerResults(logEntry, "truncate-test", results)
+
+		output := buf.String()
+		assert.Contains(t, output, "12345678")      // First 8 chars
+		assert.NotContains(t, output, longRevision) // Full revision should not appear
+	})
 }
