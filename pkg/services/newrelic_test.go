@@ -220,9 +220,7 @@ func TestSend_Newrelic(t *testing.T) {
 			Recipient: "myapp",
 		})
 
-		if !assert.NoError(t, err) {
-			t.FailNow()
-		}
+		require.NoError(t, err)
 	})
 
 	t.Run("missing config", func(t *testing.T) {
@@ -280,12 +278,12 @@ func TestGetApplicationId(t *testing.T) {
 			ApiURL: ts.URL,
 		}).(*newrelicService)
 		appId, err := service.getApplicationId(http.DefaultClient, "myapp")
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "123456789", appId)
 	})
 
 	t.Run("application not found", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, err := w.Write([]byte(`{"applications": []}`))
 			if !assert.NoError(t, err) {
 				t.FailNow()
@@ -301,7 +299,7 @@ func TestGetApplicationId(t *testing.T) {
 	})
 
 	t.Run("multiple matches for application name", func(t *testing.T) {
-		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, err := w.Write([]byte(`{
 				"applications": [
 					{"id": "123456789"},

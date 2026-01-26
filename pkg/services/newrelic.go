@@ -137,9 +137,9 @@ func (s newrelicService) getApplicationId(client *http.Client, appName string) (
 	q.Set("filter[name]", appName)
 	u.RawQuery = q.Encode()
 
-	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
+	req, err := http.NewRequest(http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return "", fmt.Errorf("Failed to create filtered application request: %s", err)
+		return "", fmt.Errorf("failed to create filtered application request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -153,7 +153,7 @@ func (s newrelicService) getApplicationId(client *http.Client, appName string) (
 
 	var data newrelicApplicationsResponse
 	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
-		return "", fmt.Errorf("Failed to decode applications response: %s", err)
+		return "", fmt.Errorf("failed to decode applications response: %w", err)
 	}
 
 	if len(data.Applications) == 0 {
@@ -199,7 +199,7 @@ func (s newrelicService) Send(notification Notification, dest Destination) (err 
 		return err
 	}
 
-	var appId = dest.Recipient
+	appId := dest.Recipient
 	if dest.Recipient != "" {
 		_, err := strconv.Atoi(dest.Recipient)
 		if err != nil {
