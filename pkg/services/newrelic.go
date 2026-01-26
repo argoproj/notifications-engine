@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	texttemplate "text/template"
@@ -126,8 +127,17 @@ type newrelicApplicationsResponse struct {
 }
 
 func (s newrelicService) getApplicationId(client *http.Client, appName string) (string, error) {
-	applicationsApi := fmt.Sprintf("%s/v2/applications.json?filter[name]=%s", s.opts.ApiURL, appName)
-	req, err := http.NewRequest(http.MethodGet, applicationsApi, nil)
+	u, err := url.Parse(s.opts.ApiURL)
+	if err != nil {
+		log.Errorf("Failed to parse ApiURL: %s", err)
+		return "", err
+	}
+	u.Path = "/v2/applications.json"
+	q := u.Query()
+	q.Set("filter[name]", appName)
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
 		return "", fmt.Errorf("Failed to create filtered application request: %s", err)
 	}
@@ -204,8 +214,15 @@ func (s newrelicService) Send(notification Notification, dest Destination) (err 
 			}
 		}
 	}
-	markerApi := fmt.Sprintf(s.opts.ApiURL+"/v2/applications/%s/deployments.json", appId)
-	req, err := http.NewRequest(http.MethodPost, markerApi, bytes.NewBuffer(jsonValue))
+
+	u, err := url.Parse(s.opts.ApiURL)
+	if err != nil {
+		log.Errorf("Failed to parse ApiURL: %s", err)
+		return err
+	}
+	u.Path = fmt.Sprintf("/v2/applications/%s/deployments.json", appId)
+
+	req, err := http.NewRequest(http.MethodPost, u.String(), bytes.NewBuffer(jsonValue))
 	if err != nil {
 		log.Errorf("Failed to create deployment marker request: %s", err)
 		return err
