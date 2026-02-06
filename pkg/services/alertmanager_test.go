@@ -164,28 +164,24 @@ func Test_AlertManagerReusableTemplater(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	for i := 0; i < 2; i++ {
 		name := fmt.Sprintf("argocd-notifications-%d", i)
 		var notification Notification
-		err = templater(&notification, map[string]interface{}{
-			"app": map[string]interface{}{
-				"metadata": map[string]interface{}{
+		err = templater(&notification, map[string]any{
+			"app": map[string]any{
+				"metadata": map[string]any{
 					"name": name,
 				},
-				"spec": map[string]interface{}{
-					"source": map[string]interface{}{
+				"spec": map[string]any{
+					"source": map[string]any{
 						"repoURL": "https://github.com/argoproj-labs/argocd-notifications.git",
 					},
 				},
 			},
 		})
-		if !assert.NoError(t, err) {
-			return
-		}
+		require.NoError(t, err)
 
 		assert.Equal(t, "App_Deployed", notification.Alertmanager.Labels["alertname"])
 		assert.Equal(t, name, notification.Alertmanager.Labels["appname"])
