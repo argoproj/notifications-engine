@@ -1,5 +1,6 @@
 formatters:
   enable:
+    - gofumpt
     - goimports
 
   settings:
@@ -21,17 +22,16 @@ linters:
     - govet
     - importas
     - misspell
+    - perfsprint
+    - revive
     - staticcheck
+    - testifylint
     - thelper
     - tparallel
     - unparam
     - usestdlibvars
     - usetesting
     - whitespace
-  disable:
-    - perfsprint  # Performance optimizations cause many changes
-    - testifylint # Test assertion order changes cause large diffs
-    - revive      # Too many style changes (265+ issues)
 
   exclusions:
     rules:
@@ -154,8 +154,7 @@ linters:
         - name: duplicated-imports
 
         - name: early-return
-          arguments:
-            - preserveScope
+          disabled: true
 
         - name: empty-block
           disabled: true
@@ -177,8 +176,7 @@ linters:
         - name: increment-decrement
 
         - name: indent-error-flow
-          arguments:
-            - preserveScope
+          disabled: true
 
         - name: modifies-parameter
 
@@ -218,11 +216,7 @@ linters:
         - name: var-declaration
 
         - name: var-naming
-          arguments:
-            - - ID
-            - - VM
-            - - skipPackageNameChecks: true
-                upperCaseConst: true
+          disabled: true
 
     staticcheck:
       checks:

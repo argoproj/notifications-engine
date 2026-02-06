@@ -3,11 +3,13 @@ package services
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	texttemplate "text/template"
 	_ "time/tzdata"
 
+	"github.com/sirupsen/logrus"
 	"sigs.k8s.io/yaml"
 )
 
@@ -115,6 +117,16 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 // NotificationService defines notification service interface
 type NotificationService interface {
 	Send(notification Notification, dest Destination) error
+}
+
+// HandleSendError inspects the error and signals the caller if the Send operation should be retried.
+func HandleSendError(err error, logEntry *logrus.Entry) (retry bool) {
+	var tooManyErr *TooManyGitHubCommitStatusesError
+	if errors.As(err, &tooManyErr) {
+		logEntry.Warn(tooManyErr)
+		return false
+	}
+	return true
 }
 
 func NewService(serviceType string, optsData []byte) (NotificationService, error) {
@@ -233,6 +245,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewWebexService(opts), nil
+	case "nats":
+		var opts NatsOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewNatsService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
@@ -263,7 +281,7 @@ func (n *Notification) getTemplater(name string, f texttemplate.FuncMap, sources
 		return nil, err
 	}
 
-	templaters := []Templater{func(notification *Notification, vars map[string]interface{}) error {
+	templaters := []Templater{func(notification *Notification, vars map[string]any) error {
 		var messageData bytes.Buffer
 		if err := message.Execute(&messageData, vars); err != nil {
 			return err
@@ -283,7 +301,7 @@ func (n *Notification) getTemplater(name string, f texttemplate.FuncMap, sources
 		templaters = append(templaters, t)
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		for _, t := range templaters {
 			if err := t(notification, vars); err != nil {
 				return err
@@ -293,7 +311,7 @@ func (n *Notification) getTemplater(name string, f texttemplate.FuncMap, sources
 	}, nil
 }
 
-type Templater func(notification *Notification, vars map[string]interface{}) error
+type Templater func(notification *Notification, vars map[string]any) error
 
 type TemplaterSource interface {
 	GetTemplater(name string, f texttemplate.FuncMap) (Templater, error)

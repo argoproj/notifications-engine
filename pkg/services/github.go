@@ -3,6 +3,8 @@ package services
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -20,16 +22,14 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/util/text"
 )
 
-var (
-	gitSuffix = regexp.MustCompile(`\.git$`)
-)
+var gitSuffix = regexp.MustCompile(`\.git$`)
 
 type GitHubOptions struct {
-	AppID              interface{} `json:"appID"`
-	InstallationID     interface{} `json:"installationID"`
-	PrivateKey         string      `json:"privateKey"`
-	EnterpriseBaseURL  string      `json:"enterpriseBaseURL"`
-	InsecureSkipVerify bool        `json:"insecureSkipVerify"`
+	AppID              any    `json:"appID"`
+	InstallationID     any    `json:"installationID"`
+	PrivateKey         string `json:"privateKey"`
+	EnterpriseBaseURL  string `json:"enterpriseBaseURL"`
+	InsecureSkipVerify bool   `json:"insecureSkipVerify"`
 	httputil.TransportOptions
 }
 
@@ -42,6 +42,7 @@ type GitHubNotification struct {
 	RepoURLPath        string                    `json:"repoURLPath,omitempty"`
 	RevisionPath       string                    `json:"revisionPath,omitempty"`
 	CheckRun           *GitHubCheckRun           `json:"checkRun,omitempty"`
+	RepositoryDispatch *GitHubRepositoryDispatch `json:"repositoryDispatch,omitempty"`
 }
 
 type GitHubStatus struct {
@@ -81,6 +82,20 @@ type GitHubDeployment struct {
 type GitHubPullRequestComment struct {
 	Content    string `json:"content,omitempty"`
 	CommentTag string `json:"commentTag,omitempty"`
+}
+
+type TooManyGitHubCommitStatusesError struct {
+	Sha     string
+	Context string
+}
+
+func (e *TooManyGitHubCommitStatusesError) Error() string {
+	return fmt.Sprintf("too many commit statuses for sha %s and context %s", e.Sha, e.Context)
+}
+
+type GitHubRepositoryDispatch struct {
+	EventType     string `json:"event_type,omitempty"`
+	ClientPayload string `json:"client_payload,omitempty"`
 }
 
 const (
@@ -205,7 +220,18 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	var repoDispatchEventType, repoDispatchClientPayload *texttemplate.Template
+	if g.RepositoryDispatch != nil {
+		repoDispatchEventType, err = texttemplate.New(name).Funcs(f).Parse(g.RepositoryDispatch.EventType)
+		if err != nil {
+			return nil, err
+		}
+		repoDispatchClientPayload, err = texttemplate.New(name).Funcs(f).Parse(g.RepositoryDispatch.ClientPayload)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.GitHub == nil {
 			notification.GitHub = &GitHubNotification{
 				RepoURLPath:  g.RepoURLPath,
@@ -376,6 +402,20 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.CheckRun.Output.Text = textData.String()
 		}
 
+		if g.RepositoryDispatch != nil {
+			notification.GitHub.RepositoryDispatch = &GitHubRepositoryDispatch{}
+			var eventTypeData bytes.Buffer
+			if err := repoDispatchEventType.Execute(&eventTypeData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.RepositoryDispatch.EventType = eventTypeData.String()
+			var clientPayloadData bytes.Buffer
+			if err := repoDispatchClientPayload.Execute(&clientPayloadData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.RepositoryDispatch.ClientPayload = clientPayloadData.String()
+		}
+
 		return nil
 	}, nil
 }
@@ -440,7 +480,7 @@ type issuesService interface {
 }
 
 type pullRequestsService interface {
-	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error)
+	ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.ListOptions) ([]*github.PullRequest, *github.Response, error)
 }
 
 type repositoriesService interface {
@@ -448,6 +488,7 @@ type repositoriesService interface {
 	ListDeployments(ctx context.Context, owner, repo string, opts *github.DeploymentsListOptions) ([]*github.Deployment, *github.Response, error)
 	CreateDeployment(ctx context.Context, owner, repo string, request *github.DeploymentRequest) (*github.Deployment, *github.Response, error)
 	CreateDeploymentStatus(ctx context.Context, owner, repo string, deploymentID int64, request *github.DeploymentStatusRequest) (*github.DeploymentStatus, *github.Response, error)
+	Dispatch(ctx context.Context, owner, repo string, opts github.DispatchRequestOptions) (*github.Repository, *github.Response, error)
 }
 
 type checksService interface {
@@ -464,7 +505,7 @@ func (g *githubClientAdapter) GetIssues() issuesService {
 }
 
 func (g *githubClientAdapter) GetPullRequests() pullRequestsService {
-	return &pullRequestsServiceAdapter{service: g.client.PullRequests}
+	return g.client.PullRequests
 }
 
 func (g *githubClientAdapter) GetRepositories() repositoriesService {
@@ -498,7 +539,7 @@ func fullNameByRepoURL(rawURL string) string {
 
 func (g gitHubService) Send(notification Notification, _ Destination) error {
 	if notification.GitHub == nil {
-		return fmt.Errorf("config is empty")
+		return errors.New("config is empty")
 	}
 
 	u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
@@ -520,7 +561,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				TargetURL:   &notification.GitHub.Status.TargetURL,
 			},
 		)
-		if err != nil {
+
+		var ghErr *github.ErrorResponse
+		if ok := errors.As(err, &ghErr); ok && ghErr.Response.StatusCode == http.StatusUnprocessableEntity {
+			return &TooManyGitHubCommitStatusesError{Sha: notification.GitHub.revision, Context: notification.GitHub.Status.Label}
+		} else if err != nil {
 			return err
 		}
 	}
@@ -695,25 +740,26 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				Output:      checkRunOutput,
 			},
 		)
+		if err != nil {
+			return err
+		}
+	}
 
+	if notification.GitHub.RepositoryDispatch != nil {
+		payload := json.RawMessage(notification.GitHub.RepositoryDispatch.ClientPayload)
+		_, _, err := g.client.GetRepositories().Dispatch(
+			context.Background(),
+			u[0],
+			u[1],
+			github.DispatchRequestOptions{
+				EventType:     notification.GitHub.RepositoryDispatch.EventType,
+				ClientPayload: &payload,
+			},
+		)
 		if err != nil {
 			return err
 		}
 	}
 
 	return nil
-}
-
-// PullRequestsServiceAdapter adapts GitHub's PullRequestsService to our interface
-type pullRequestsServiceAdapter struct {
-	service *github.PullRequestsService
-}
-
-func (a *pullRequestsServiceAdapter) ListPullRequestsWithCommit(ctx context.Context, owner string, repo string, sha string, opts *github.PullRequestListOptions) ([]*github.PullRequest, *github.Response, error) {
-	// Convert PullRequestListOptions to ListOptions
-	listOpts := &github.ListOptions{
-		Page:    opts.Page,
-		PerPage: opts.PerPage,
-	}
-	return a.service.ListPullRequestsWithCommit(ctx, owner, repo, sha, listOpts)
 }

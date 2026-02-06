@@ -67,12 +67,20 @@ func (s awsSqsService) Send(notif Notification, dest Destination) error {
 }
 
 func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *sqs.SendMessageInput {
-	return &sqs.SendMessageInput{
+	input := &sqs.SendMessageInput{
 		QueueUrl:     queueUrl,
 		MessageBody:  aws.String(notif.Message),
 		DelaySeconds: 10,
 	}
+
+	// Add MessageGroupId if available (required for FIFO queues)
+	if notif.AwsSqs != nil && notif.AwsSqs.MessageGroupId != "" {
+		input.MessageGroupId = aws.String(notif.AwsSqs.MessageGroupId)
+	}
+
+	return input
 }
+
 func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
 	result := &sqs.GetQueueUrlInput{}
 	result.QueueName = &s.opts.Queue
@@ -132,7 +140,7 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		return nil, err
 	}
 
-	return func(notification *Notification, vars map[string]interface{}) error {
+	return func(notification *Notification, vars map[string]any) error {
 		if notification.AwsSqs == nil {
 			notification.AwsSqs = &AwsSqsNotification{}
 		}
@@ -156,7 +164,7 @@ func (n *AwsSqsNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 	}, nil
 }
 
-func (n *AwsSqsNotification) parseMessageAttributes(name string, f texttemplate.FuncMap, vars map[string]interface{}) error {
+func (n *AwsSqsNotification) parseMessageAttributes(name string, f texttemplate.FuncMap, vars map[string]any) error {
 	for k, v := range n.MessageAttributes {
 		var tempData bytes.Buffer
 
