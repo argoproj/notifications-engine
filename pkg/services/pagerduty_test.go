@@ -5,6 +5,7 @@ import (
 	"text/template"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGetTemplater_PagerDuty(t *testing.T) {
@@ -15,22 +16,18 @@ func TestGetTemplater_PagerDuty(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"title": "hello",
 		"body":  "world",
 		"urg":   "high",
 		"prid":  "PE456Y",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, "hello", notification.Pagerduty.Title)
 	assert.Equal(t, "world", notification.Pagerduty.Body)

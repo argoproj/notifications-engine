@@ -7,23 +7,21 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 )
 
-var (
-	emptySecret = &corev1.Secret{Data: map[string][]byte{}}
-)
+var emptySecret = &corev1.Secret{Data: map[string][]byte{}}
 
 func TestParseConfig_Services(t *testing.T) {
 	cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
 		"service.slack": `
 token: my-token
-`}}, emptySecret)
+`,
+	}}, emptySecret)
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.NotNil(t, cfg.Services["slack"])
 }
@@ -32,11 +30,10 @@ func TestParseConfig_Templates(t *testing.T) {
 	cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
 		"template.my-template": `
 message: hello world
-`}}, emptySecret)
+`,
+	}}, emptySecret)
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, map[string]services.Notification{
 		"my-template": {Message: "hello world"},
@@ -48,11 +45,10 @@ func TestParseConfig_DefaultServiceTriggers(t *testing.T) {
 		"defaultTriggers.slack": `
 - trigger-a
 - trigger-b
-`}}, emptySecret)
+`,
+	}}, emptySecret)
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	assert.Equal(t, map[string][]string{
 		"slack": {
@@ -100,7 +96,7 @@ headers:
 
 	result, err := replaceServiceConfigSecrets(input, &secrets)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, string(result))
 }
 
@@ -126,7 +122,7 @@ apiKeys:
 
 	result, err := replaceServiceConfigSecrets(input, &secrets)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, string(result))
 }
 
@@ -154,7 +150,7 @@ installationID: 67890
 
 	result, err := replaceServiceConfigSecrets(input, &secrets)
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, expected, string(result))
 }
 
@@ -165,9 +161,7 @@ func TestParseConfig_DefaultTriggers(t *testing.T) {
 		},
 	}, emptySecret)
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	assert.Equal(t, []string{"trigger1", "trigger2"}, cfg.DefaultTriggers)
 }
 
@@ -181,14 +175,10 @@ func TestParseConfig_Subscriptions(t *testing.T) {
 		},
 	}, emptySecret)
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	label, err := labels.Parse("test=true")
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	assert.Equal(t, subscriptions.DefaultSubscriptions([]subscriptions.DefaultSubscription{
 		{Triggers: []string{"my-trigger2"}, Selector: label},
 	}), cfg.Subscriptions)
