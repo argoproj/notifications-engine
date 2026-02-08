@@ -719,6 +719,14 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			return fmt.Errorf("github checkrun: conclusion is required when status is completed or completed_at is set")
 		}
 
+		var statusPtr, conclusionPtr *string
+		if status != "" {
+			statusPtr = &status
+		}
+		if conclusion != "" {
+			conclusionPtr = &conclusion
+		}
+
 		var startedTS, completedTS *github.Timestamp
 		if notification.GitHub.CheckRun.StartedAt != "" {
 			startedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.StartedAt)
@@ -753,8 +761,8 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				ExternalID:  &externalID,
 				Name:        notification.GitHub.CheckRun.Name,
 				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL,
-				Status:      &status,
-				Conclusion:  &conclusion,
+				Status:      statusPtr,
+				Conclusion:  conclusionPtr,
 				StartedAt:   startedTS,
 				CompletedAt: completedTS,
 				Output:      checkRunOutput,
