@@ -373,6 +373,26 @@ func TestGitHubCheckRunNotification(t *testing.T) {
 	assert.Equal(t, "All tests passed.", notification.GitHub.CheckRun.Output.Summary)
 }
 
+func TestGitHubCheckRun_ConclusionRequired(t *testing.T) {
+	service := &gitHubService{client: &githubClientAdapter{client: github.NewClient(nil)}}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			CheckRun: &GitHubCheckRun{
+				Status:      "completed",
+				Conclusion:  "",
+				StartedAt:   time.Now().Format(time.RFC3339),
+				CompletedAt: time.Now().Add(1 * time.Minute).Format(time.RFC3339),
+			},
+		},
+	}, Destination{})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "conclusion is required")
+}
+
 // Mock implementations
 type mockIssuesService struct {
 	comments []*github.IssueComment
@@ -407,9 +427,14 @@ func (m *mockRepositoriesService) Dispatch(_ context.Context, _, _ string, reque
 	return &github.Repository{}, nil, nil
 }
 
-type mockChecksService struct{}
+type mockChecksService struct {
+	lastOpts github.CreateCheckRunOptions
+	calls    int
+}
 
-func (m *mockChecksService) CreateCheckRun(_ context.Context, _, _ string, _ github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+func (m *mockChecksService) CreateCheckRun(_ context.Context, _, _ string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error) {
+	m.lastOpts = opts
+	m.calls++
 	return &github.CheckRun{}, nil, nil
 }
 
@@ -430,11 +455,12 @@ func setupMockServices() (*mockIssuesService, *mockPullRequestsService, *mockRep
 	issues := &mockIssuesService{comments: []*github.IssueComment{}}
 	pulls := &mockPullRequestsService{prs: []*github.PullRequest{{Number: github.Ptr(1)}}}
 	repos := &mockRepositoriesService{}
+	checks := &mockChecksService{}
 	client := &mockGitHubClientImpl{
 		issues: issues,
 		prs:    pulls,
 		repos:  repos,
-		checks: &mockChecksService{},
+		checks: checks,
 	}
 	return issues, pulls, repos, client
 }
@@ -546,4 +572,90 @@ func TestGitHubService_Send_UpdateExistingComment(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, issues.comments, 1)
 	assert.Equal(t, "updated comment\n<!-- argocd-notifications test-tag -->", *issues.comments[0].Body)
+}
+
+func TestGitHubService_Send_CheckRun_InProgress_NoConclusion(t *testing.T) {
+	_, _, _, client := setupMockServices()
+	mockClient := client.(*mockGitHubClientImpl)
+
+	start := time.Now().Format(time.RFC3339)
+
+	service := &gitHubService{client: mockClient}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			CheckRun: &GitHubCheckRun{
+				Name:       "cd/app",
+				DetailsURL: "http://example.com",
+				Status:     "in_progress",
+				StartedAt:  start,
+			},
+		},
+	}, Destination{})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, mockClient.checks.calls)
+	if assert.NotNil(t, mockClient.checks.lastOpts.Status) {
+		assert.Equal(t, "in_progress", *mockClient.checks.lastOpts.Status)
+	}
+	assert.Nil(t, mockClient.checks.lastOpts.Conclusion) // conclusion omitted
+	assert.NotNil(t, mockClient.checks.lastOpts.StartedAt)
+	assert.Nil(t, mockClient.checks.lastOpts.CompletedAt)
+}
+
+func TestGitHubService_Send_CheckRun_ConclusionSetsCompletedStatus(t *testing.T) {
+	_, _, _, client := setupMockServices()
+	mockClient := client.(*mockGitHubClientImpl)
+
+	start := time.Now().Format(time.RFC3339)
+
+	service := &gitHubService{client: mockClient}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			CheckRun: &GitHubCheckRun{
+				Name:       "cd/app",
+				DetailsURL: "http://example.com",
+				Conclusion: "success",
+				StartedAt:  start,
+			},
+		},
+	}, Destination{})
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, mockClient.checks.calls)
+	if assert.NotNil(t, mockClient.checks.lastOpts.Status) {
+		assert.Equal(t, "completed", *mockClient.checks.lastOpts.Status)
+	}
+	if assert.NotNil(t, mockClient.checks.lastOpts.Conclusion) {
+		assert.Equal(t, "success", *mockClient.checks.lastOpts.Conclusion)
+	}
+}
+
+func TestGitHubService_Send_CheckRun_CompletedAtRequiresConclusion(t *testing.T) {
+	_, _, _, client := setupMockServices()
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			CheckRun: &GitHubCheckRun{
+				Name:        "cd/app",
+				DetailsURL:  "http://example.com",
+				Status:      "in_progress",
+				StartedAt:   time.Now().Format(time.RFC3339),
+				CompletedAt: time.Now().Add(1 * time.Minute).Format(time.RFC3339),
+				// Conclusion intentionally omitted
+			},
+		},
+	}, Destination{})
+
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "conclusion is required")
 }
