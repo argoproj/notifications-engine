@@ -389,8 +389,8 @@ func TestGitHubCheckRun_ConclusionRequired(t *testing.T) {
 		},
 	}, Destination{})
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "conclusion is required")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "conclusion is required")
 }
 
 // Mock implementations
@@ -656,6 +656,6 @@ func TestGitHubService_Send_CheckRun_CompletedAtRequiresConclusion(t *testing.T)
 		},
 	}, Destination{})
 
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "conclusion is required")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "conclusion is required")
 }

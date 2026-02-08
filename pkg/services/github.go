@@ -716,7 +716,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		}
 
 		if (status == "completed" || notification.GitHub.CheckRun.CompletedAt != "") && conclusion == "" {
-			return fmt.Errorf("github checkrun: conclusion is required when status is completed or completed_at is set")
+			return errors.New("github checkrun: conclusion is required when status is completed or completed_at is set")
 		}
 
 		var statusPtr, conclusionPtr *string
