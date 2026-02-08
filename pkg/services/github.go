@@ -735,7 +735,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			completedTS = &github.Timestamp{Time: completedTime}
 		}
 		externalID := "argocd-notifications"
-		checkRunOutput := &github.CheckRunOutput{}
+		var checkRunOutput *github.CheckRunOutput
 		if notification.GitHub.CheckRun.Output != nil {
 			checkRunOutput = &github.CheckRunOutput{
 				Title:   &notification.GitHub.CheckRun.Output.Title,
