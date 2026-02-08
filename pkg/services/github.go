@@ -708,13 +708,31 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 	}
 
 	if notification.GitHub.CheckRun != nil {
-		startedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.StartedAt)
-		if err != nil {
-			return err
+		status := notification.GitHub.CheckRun.Status
+		conclusion := notification.GitHub.CheckRun.Conclusion
+
+		if conclusion != "" && status == "" {
+			status = "completed"
 		}
-		completedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.CompletedAt)
-		if err != nil {
-			return err
+
+		if (status == "completed" || notification.GitHub.CheckRun.CompletedAt != "") && conclusion == "" {
+			return fmt.Errorf("github checkrun: conclusion is required when status is completed or completed_at is set")
+		}
+
+		var startedTS, completedTS *github.Timestamp
+		if notification.GitHub.CheckRun.StartedAt != "" {
+			startedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.StartedAt)
+			if err != nil {
+				return err
+			}
+			startedTS = &github.Timestamp{Time: startedTime}
+		}
+		if notification.GitHub.CheckRun.CompletedAt != "" {
+			completedTime, err := time.Parse(time.RFC3339, notification.GitHub.CheckRun.CompletedAt)
+			if err != nil {
+				return err
+			}
+			completedTS = &github.Timestamp{Time: completedTime}
 		}
 		externalID := "argocd-notifications"
 		checkRunOutput := &github.CheckRunOutput{}
@@ -726,7 +744,7 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 			}
 		}
 
-		_, _, err = g.client.GetChecks().CreateCheckRun(
+		_, _, err := g.client.GetChecks().CreateCheckRun(
 			context.Background(),
 			u[0],
 			u[1],
@@ -735,10 +753,10 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				ExternalID:  &externalID,
 				Name:        notification.GitHub.CheckRun.Name,
 				DetailsURL:  &notification.GitHub.CheckRun.DetailsURL,
-				Status:      &notification.GitHub.CheckRun.Status,
-				Conclusion:  &notification.GitHub.CheckRun.Conclusion,
-				StartedAt:   &github.Timestamp{Time: startedTime},
-				CompletedAt: &github.Timestamp{Time: completedTime},
+				Status:      &status,
+				Conclusion:  &conclusion,
+				StartedAt:   startedTS,
+				CompletedAt: completedTS,
 				Output:      checkRunOutput,
 			},
 		)
