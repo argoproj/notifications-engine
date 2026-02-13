@@ -1,6 +1,7 @@
 package services
 
 import (
+	"fmt"
 	"testing"
 	"text/template"
 
@@ -147,4 +148,43 @@ func Test_AlertManagerNoLabels(t *testing.T) {
 	svc := NewAlertmanagerService(AlertmanagerOptions{})
 	err := svc.Send(n, Destination{})
 	assert.EqualError(t, err, "alertmanager at least one label pair required")
+}
+
+func Test_AlertManagerReusableTemplater(t *testing.T) {
+	n := Notification{
+		Alertmanager: &AlertmanagerNotification{
+			Labels: map[string]string{
+				"alertname": "App_Deployed",
+				"appname":   "{{.app.metadata.name}}",
+			},
+			Annotations: map[string]string{
+				"appname": "{{.app.metadata.name}}",
+			},
+		},
+	}
+
+	templater, err := n.GetTemplater("", template.FuncMap{})
+	require.NoError(t, err)
+
+	for i := 0; i < 2; i++ {
+		name := fmt.Sprintf("argocd-notifications-%d", i)
+		var notification Notification
+		err = templater(&notification, map[string]any{
+			"app": map[string]any{
+				"metadata": map[string]any{
+					"name": name,
+				},
+				"spec": map[string]any{
+					"source": map[string]any{
+						"repoURL": "https://github.com/argoproj-labs/argocd-notifications.git",
+					},
+				},
+			},
+		})
+		require.NoError(t, err)
+
+		assert.Equal(t, "App_Deployed", notification.Alertmanager.Labels["alertname"])
+		assert.Equal(t, name, notification.Alertmanager.Labels["appname"])
+		assert.Equal(t, name, notification.Alertmanager.Annotations["appname"])
+	}
 }
