@@ -367,8 +367,8 @@ type adaptiveMessage struct {
 }
 
 type adaptiveAttachment struct {
-	ContentType string        `json:"contentType"`
-	Content     *adaptiveCard `json:"content"`
+	ContentType string          `json:"contentType"`
+	Content     json.RawMessage `json:"content"`
 }
 
 // buildAdaptiveCard converts notificationData to Adaptive Card format
@@ -487,9 +487,11 @@ func buildAdaptiveCard(data *notificationData) *adaptiveCard {
 func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
 	// Check if a custom AdaptiveCard template is provided
 	if n.TeamsWorkflows != nil && n.TeamsWorkflows.AdaptiveCard != "" {
-		// Use the custom AdaptiveCard template directly, wrapped in message envelope
-		var card adaptiveCard
-		if err := json.Unmarshal([]byte(n.TeamsWorkflows.AdaptiveCard), &card); err != nil {
+		// Use the custom AdaptiveCard template directly, wrapped in message envelope.
+		// Keep it as raw JSON so custom cards are not lossy-converted through limited structs.
+		cardBytes := bytes.TrimSpace([]byte(n.TeamsWorkflows.AdaptiveCard))
+		var raw json.RawMessage
+		if err := json.Unmarshal(cardBytes, &raw); err != nil {
 			return nil, fmt.Errorf("teams-workflows adaptiveCard unmarshalling error %w", err)
 		}
 
@@ -498,7 +500,7 @@ func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
 			Attachments: []adaptiveAttachment{
 				{
 					ContentType: "application/vnd.microsoft.card.adaptive",
-					Content:     &card,
+					Content:     raw,
 				},
 			},
 		}
@@ -513,12 +515,16 @@ func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
 
 	// Build AdaptiveCard and wrap it in the message envelope
 	card := buildAdaptiveCard(data)
+	cardBytes, err := json.Marshal(card)
+	if err != nil {
+		return nil, fmt.Errorf("teams-workflows adaptive card marshalling error %w", err)
+	}
 	payload := adaptiveMessage{
 		Type: "message",
 		Attachments: []adaptiveAttachment{
 			{
 				ContentType: "application/vnd.microsoft.card.adaptive",
-				Content:     card,
+				Content:     json.RawMessage(cardBytes),
 			},
 		},
 	}

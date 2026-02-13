@@ -12,6 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func mustUnmarshalCard(t *testing.T, raw json.RawMessage) *adaptiveCard {
+	t.Helper()
+	var card adaptiveCard
+	require.NoError(t, json.Unmarshal(raw, &card))
+	return &card
+}
+
 func TestGetTemplater_TeamsWorkflows(t *testing.T) {
 	notificationTemplate := Notification{
 		TeamsWorkflows: &TeamsWorkflowsNotification{
@@ -91,9 +98,10 @@ func TestTeamsWorkflows_DefaultMessage(t *testing.T) {
 	assert.Equal(t, "message", receivedBody.Type)
 	assert.Len(t, receivedBody.Attachments, 1)
 	assert.Equal(t, "application/vnd.microsoft.card.adaptive", receivedBody.Attachments[0].ContentType)
-	assert.NotNil(t, receivedBody.Attachments[0].Content)
-	assert.Equal(t, "AdaptiveCard", receivedBody.Attachments[0].Content.Type)
-	assert.Equal(t, "1.4", receivedBody.Attachments[0].Content.Version)
+	require.NotEmpty(t, receivedBody.Attachments[0].Content)
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
+	assert.Equal(t, "AdaptiveCard", card.Type)
+	assert.Equal(t, "1.4", card.Version)
 }
 
 func TestTeamsWorkflows_AdaptiveCardTemplate(t *testing.T) {
@@ -143,12 +151,125 @@ func TestTeamsWorkflows_AdaptiveCardTemplate(t *testing.T) {
 	assert.Equal(t, "message", receivedBody.Type)
 	assert.Len(t, receivedBody.Attachments, 1)
 	assert.Equal(t, "application/vnd.microsoft.card.adaptive", receivedBody.Attachments[0].ContentType)
-	assert.NotNil(t, receivedBody.Attachments[0].Content)
-	assert.Equal(t, "AdaptiveCard", receivedBody.Attachments[0].Content.Type)
-	assert.Equal(t, "1.4", receivedBody.Attachments[0].Content.Version)
-	assert.Len(t, receivedBody.Attachments[0].Content.Body, 1)
-	assert.Equal(t, "TextBlock", receivedBody.Attachments[0].Content.Body[0].Type)
-	assert.Equal(t, "Custom Adaptive Card", receivedBody.Attachments[0].Content.Body[0].Text)
+	require.NotEmpty(t, receivedBody.Attachments[0].Content)
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
+	assert.Equal(t, "AdaptiveCard", card.Type)
+	assert.Equal(t, "1.4", card.Version)
+	assert.Len(t, card.Body, 1)
+	assert.Equal(t, "TextBlock", card.Body[0].Type)
+	assert.Equal(t, "Custom Adaptive Card", card.Body[0].Text)
+}
+
+func TestTeamsWorkflows_AdaptiveCardTemplate_PreservesColumnSetColumnsItemsAndBadge(t *testing.T) {
+	var receivedBody adaptiveMessage
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		data, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+
+		err = json.Unmarshal(data, &receivedBody)
+		require.NoError(t, err)
+
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	webhookURL := server.URL + "/powerautomate/webhook"
+
+	service := NewTeamsWorkflowsService(TeamsWorkflowsOptions{
+		RecipientUrls: map[string]string{
+			"test": webhookURL,
+		},
+	})
+
+	notification := Notification{
+		TeamsWorkflows: &TeamsWorkflowsNotification{
+			AdaptiveCard: `{
+				"type": "AdaptiveCard",
+				"version": "1.4",
+				"body": [
+					{
+						"type": "TextBlock",
+						"text": "header"
+					},
+					{
+						"type": "Container",
+						"items": [
+							{
+								"type": "ColumnSet",
+								"columns": [
+									{
+										"type": "Column",
+										"width": "auto",
+										"items": [
+											{ "type": "TextBlock", "text": "OK" },
+											{ "type": "Badge", "size": "Large", "style": "Accent", "text": "Good" }
+										]
+									},
+									{
+										"type": "Column",
+										"width": "stretch",
+										"items": [
+											{ "type": "TextBlock", "text": "Application my-app", "weight": "Bolder", "size": "Large" },
+											{ "type": "TextBlock", "text": "Successfully synced", "spacing": "None", "isSubtle": true }
+										]
+									}
+								]
+							}
+						]
+					}
+				],
+				"$schema": "https://adaptivecards.io/schemas/adaptive-card.json"
+			}`,
+		},
+	}
+
+	err := service.Send(notification,
+		Destination{
+			Recipient: "test",
+			Service:   "teams-workflows",
+		},
+	)
+
+	require.NoError(t, err)
+	assert.Len(t, receivedBody.Attachments, 1)
+	require.NotEmpty(t, receivedBody.Attachments[0].Content)
+
+	// Decode as generic JSON so we can assert nested ColumnSet/Column structure is preserved.
+	var card map[string]any
+	require.NoError(t, json.Unmarshal(receivedBody.Attachments[0].Content, &card))
+
+	body, ok := card["body"].([]any)
+	require.True(t, ok)
+	require.GreaterOrEqual(t, len(body), 2)
+
+	container, ok := body[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Container", container["type"])
+
+	items, ok := container["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, items, 1)
+
+	columnSet, ok := items[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "ColumnSet", columnSet["type"])
+
+	columns, ok := columnSet["columns"].([]any)
+	require.True(t, ok)
+	require.Len(t, columns, 2)
+
+	col0, ok := columns[0].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Column", col0["type"])
+
+	col0Items, ok := col0["items"].([]any)
+	require.True(t, ok)
+	require.Len(t, col0Items, 2)
+
+	badge, ok := col0Items[1].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "Badge", badge["type"])
+	assert.Equal(t, "Good", badge["text"])
 }
 
 func TestTeamsWorkflows_MessageFields(t *testing.T) {
@@ -210,7 +331,7 @@ func TestTeamsWorkflows_MessageFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "message", receivedBody.Type)
 	assert.Len(t, receivedBody.Attachments, 1)
-	card := receivedBody.Attachments[0].Content
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
 	assert.NotNil(t, card)
 
 	// Check title
@@ -648,7 +769,7 @@ func TestTeamsWorkflows_FactsWithNonStringValue(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	card := receivedBody.Attachments[0].Content
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
 	foundFactSet := false
 	for _, element := range card.Body {
 		if element.Type != "FactSet" {
@@ -706,7 +827,7 @@ func TestTeamsWorkflows_SectionsWithFacts(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	card := receivedBody.Attachments[0].Content
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
 	foundFactSet := false
 	for _, element := range card.Body {
 		if element.Type != "FactSet" {
@@ -765,7 +886,7 @@ func TestTeamsWorkflows_ActionOpenUri(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	card := receivedBody.Attachments[0].Content
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
 	assert.Len(t, card.Actions, 1)
 	assert.Equal(t, "Action.OpenUrl", card.Actions[0].Type)
 	assert.Equal(t, "View in Argo CD", card.Actions[0].Title)
@@ -813,7 +934,7 @@ func TestTeamsWorkflows_ActionNonOpenUri(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	card := receivedBody.Attachments[0].Content
+	card := mustUnmarshalCard(t, receivedBody.Attachments[0].Content)
 	// Non-OpenUri actions should not be converted
 	assert.Empty(t, card.Actions)
 }
