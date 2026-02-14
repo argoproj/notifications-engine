@@ -16,6 +16,7 @@ import (
 type Notification struct {
 	Message        string                      `json:"message,omitempty"`
 	AwsSqs         *AwsSqsNotification         `json:"awssqs,omitempty"`
+	GcpPubsub      *GcpPubsubNotification      `json:"gcppubsub,omitempty"`
 	Email          *EmailNotification          `json:"email,omitempty"`
 	Slack          *SlackNotification          `json:"slack,omitempty"`
 	Mattermost     *MattermostNotification     `json:"mattermost,omitempty"`
@@ -66,6 +67,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	var sources []TemplaterSource
 	if n.AwsSqs != nil {
 		sources = append(sources, n.AwsSqs)
+	}
+	if n.GcpPubsub != nil {
+		sources = append(sources, n.GcpPubsub)
 	}
 	if n.Slack != nil {
 		sources = append(sources, n.Slack)
@@ -251,6 +255,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewNatsService(opts), nil
+	case "gcppubsub":
+		var opts GcpPubsubOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewGcpPubsubService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
