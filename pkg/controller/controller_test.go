@@ -456,6 +456,10 @@ func TestWithEventCallback(t *testing.T) {
 
 			ctrl.processQueueItem()
 
+			if tc.apiErr == nil {
+				app.Object["trigger"] = "my-trigger"
+			}
+
 			assert.Equal(t, app, actualSequence.Resource)
 
 			assert.Len(t, actualSequence.Delivered, len(tc.expectedDeliveries))

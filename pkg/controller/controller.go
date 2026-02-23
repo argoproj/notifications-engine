@@ -204,7 +204,10 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 	}
 
 	for trigger, destinations := range destinations {
-		res, err := api.RunTrigger(trigger, un.Object)
+		vars := un.Object
+		vars["trigger"] = trigger
+
+		res, err := api.RunTrigger(trigger, vars)
 		if err != nil {
 			logEntry.Errorf("Failed to evaluate condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
 			eventSequence.addWarning(fmt.Errorf("failed to evaluate condition of trigger %s: %w using the configuration in namespace %s", trigger, err, apiNamespace))
@@ -231,7 +234,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 					})
 				} else {
 					logEntry.Infof("Sending notification about condition '%s.%s' to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
-					if err := api.Send(un.Object, cr.Templates, to); err != nil {
+					if err := api.Send(vars, cr.Templates, to); err != nil {
 						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
 							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
 
