@@ -19,18 +19,33 @@ import (
 )
 
 type GoogleChatNotification struct {
-	Cards     string `json:"cards"`
-	CardsV2   string `json:"cardsV2"`
-	ThreadKey string `json:"threadKey,omitempty"`
+	Cards                        string `json:"cards"`
+	CardsV2                      string `json:"cardsV2"`
+	ThreadKey                    string `json:"threadKey,omitempty"`
+	Text                         string `json:"text,omitempty"`
+	FallbackText                 string `json:"fallbackText,omitempty"`
+	DefaultTextToMessage         bool   `json:"defaultTextToMessage,omitempty"`
+	DefaultFallbackTextToMessage bool   `json:"defaultFallbackTextToMessage,omitempty"`
 }
 
 type googleChatMessage struct {
-	Text    string            `json:"text"`
-	Cards   []chat.Card       `json:"cards,omitempty"`
-	CardsV2 []chat.CardWithId `json:"cardsV2,omitempty"`
+	Text         string            `json:"text,omitempty"`
+	Cards        []chat.Card       `json:"cards,omitempty"`
+	CardsV2      []chat.CardWithId `json:"cardsV2,omitempty"`
+	FallbackText string            `json:"fallbackText,omitempty"`
 }
 
 func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
+	text, err := texttemplate.New(name).Funcs(f).Parse(n.Text)
+	if err != nil {
+		return nil, fmt.Errorf("error in '%s' googlechat.text : %w", name, err)
+	}
+
+	fallbackText, err := texttemplate.New(name).Funcs(f).Parse(n.FallbackText)
+	if err != nil {
+		return nil, fmt.Errorf("error in '%s' googlechat.fallbackText : %w", name, err)
+	}
+
 	cards, err := texttemplate.New(name).Funcs(f).Parse(n.Cards)
 	if err != nil {
 		return nil, fmt.Errorf("error in '%s' googlechat.cards : %w", name, err)
@@ -50,6 +65,25 @@ func (n *GoogleChatNotification) GetTemplater(name string, f texttemplate.FuncMa
 		if notification.GoogleChat == nil {
 			notification.GoogleChat = &GoogleChatNotification{}
 		}
+		notification.GoogleChat.DefaultTextToMessage = n.DefaultTextToMessage
+		notification.GoogleChat.DefaultFallbackTextToMessage = n.DefaultFallbackTextToMessage
+
+		var textBuff bytes.Buffer
+		if err := text.Execute(&textBuff, vars); err != nil {
+			return err
+		}
+		if val := textBuff.String(); val != "" {
+			notification.GoogleChat.Text = val
+		}
+
+		var fallbackTextBuff bytes.Buffer
+		if err := fallbackText.Execute(&fallbackTextBuff, vars); err != nil {
+			return err
+		}
+		if val := fallbackTextBuff.String(); val != "" {
+			notification.GoogleChat.FallbackText = val
+		}
+
 		var cardsBuff bytes.Buffer
 		if err := cards.Execute(&cardsBuff, vars); err != nil {
 			return err
@@ -185,10 +219,12 @@ func (s googleChatService) Send(notification Notification, dest Destination) err
 
 func googleChatNotificationToMessage(n Notification) (*googleChatMessage, error) {
 	message := &googleChatMessage{}
-	if n.GoogleChat != nil && (n.GoogleChat.CardsV2 != "" || n.GoogleChat.Cards != "") {
-		if n.GoogleChat.CardsV2 != "" {
-			// Unmarshal Modern Type
+	useCards := false
 
+	if n.GoogleChat != nil {
+		if n.GoogleChat.CardsV2 != "" {
+			useCards = true
+			// Unmarshal Modern Type
 			var cardData []chat.GoogleAppsCardV1Card
 			err := yaml.Unmarshal([]byte(n.GoogleChat.CardsV2), &cardData)
 			if err != nil {
@@ -206,14 +242,34 @@ func googleChatNotificationToMessage(n Notification) (*googleChatMessage, error)
 		}
 
 		if n.GoogleChat.Cards != "" {
+			useCards = true
 			// Unmarshal Legacy Type
 			err := yaml.Unmarshal([]byte(n.GoogleChat.Cards), &message.Cards)
 			if err != nil {
 				return nil, err
 			}
 		}
-	} else {
+
+		// May override message text even if `defaultTextToMessage` is true, give priority to explicit `Text`.
+		// User may arrange for their template to render empty and fallback to `Message`.
+		if n.GoogleChat.Text != "" {
+			message.Text = n.GoogleChat.Text
+		} else if n.GoogleChat.DefaultTextToMessage {
+			message.Text = n.Message
+		}
+
+		// May override message text even if `defaultFallbackTextToMessage` is true, give priority to explicit `FallbackText`.
+		// User may arrange for their template to render empty and fallback to `Message`.
+		if n.GoogleChat.FallbackText != "" {
+			message.FallbackText = n.GoogleChat.FallbackText
+		} else if n.GoogleChat.DefaultFallbackTextToMessage {
+			message.FallbackText = n.Message
+		}
+	}
+
+	if message.Text == "" && !useCards {
 		message.Text = n.Message
 	}
+
 	return message, nil
 }

@@ -1,3 +1,4 @@
+/.tool-versions
 .idea
 notifiers-secret.yaml
 vendor/

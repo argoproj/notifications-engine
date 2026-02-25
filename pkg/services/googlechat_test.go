@@ -47,6 +47,86 @@ func TestTextMessage_GoogleChat(t *testing.T) {
 	assert.Equal(t, "message value", message.Text)
 }
 
+func TestTextMessageOverride_GoogleChat(t *testing.T) {
+	notificationTemplate := Notification{
+		Message: "message {{.value}}",
+		GoogleChat: &GoogleChatNotification{
+			Text: "text {{.value}}",
+		},
+	}
+
+	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	notification := Notification{}
+
+	err = templater(&notification, map[string]any{
+		"value": "value",
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assert.Equal(t,
+		&GoogleChatNotification{
+			Text: "text value",
+		},
+		notification.GoogleChat,
+	)
+
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assert.NotNil(t, message)
+	assert.Equal(t, "text value", message.Text)
+}
+
+func TestTextMessageOverrideEmpty_GoogleChat(t *testing.T) {
+	notificationTemplate := Notification{
+		Message: "message {{.value}}",
+		GoogleChat: &GoogleChatNotification{
+			Text: "{{if false}}never{{end}}",
+		},
+	}
+
+	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	notification := Notification{}
+
+	err = templater(&notification, map[string]any{
+		"value": "value",
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assert.Equal(t,
+		&GoogleChatNotification{},
+		notification.GoogleChat,
+	)
+
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	assert.NotNil(t, message)
+	assert.Equal(t, "message value", message.Text)
+}
+
 func TestTextMessageWithThreadKey_GoogleChat(t *testing.T) {
 	notificationTemplate := Notification{
 		Message: "message {{.value}}",
@@ -87,6 +167,7 @@ func TestTextMessageWithThreadKey_GoogleChat(t *testing.T) {
 
 func TestCardMessage_GoogleChat(t *testing.T) {
 	notificationTemplate := Notification{
+		Message: "message {{.text}}",
 		GoogleChat: &GoogleChatNotification{
 			Cards: `- sections:
   - widgets:
@@ -128,28 +209,31 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 	}
 
 	assert.NotNil(t, message)
-	assert.Equal(t, []chat.Card{
-		{
-			Sections: []*chat.Section{
-				{
-					Widgets: []*chat.WidgetMarkup{
-						{
-							TextParagraph: &chat.TextParagraph{
-								Text: "text",
-							},
-						}, {
-							KeyValue: &chat.KeyValue{
-								TopLabel: "topLabel",
-							},
-						}, {
-							Image: &chat.Image{
-								ImageUrl: "imageUrl",
-							},
-						}, {
-							Buttons: []*chat.Button{
-								{
-									TextButton: &chat.TextButton{
-										Text: "button",
+	assert.Empty(t, message.Text)
+	assert.Equal(t,
+		[]chat.Card{
+			{
+				Sections: []*chat.Section{
+					{
+						Widgets: []*chat.WidgetMarkup{
+							{
+								TextParagraph: &chat.TextParagraph{
+									Text: "text",
+								},
+							}, {
+								KeyValue: &chat.KeyValue{
+									TopLabel: "topLabel",
+								},
+							}, {
+								Image: &chat.Image{
+									ImageUrl: "imageUrl",
+								},
+							}, {
+								Buttons: []*chat.Button{
+									{
+										TextButton: &chat.TextButton{
+											Text: "button",
+										},
 									},
 								},
 							},
@@ -158,11 +242,13 @@ func TestCardMessage_GoogleChat(t *testing.T) {
 				},
 			},
 		},
-	}, message.Cards)
+		message.Cards,
+	)
 }
 
 func TestCardV2Message_GoogleChat(t *testing.T) {
 	notificationTemplate := Notification{
+		Message: "message {{.text}}",
 		GoogleChat: &GoogleChatNotification{
 			CardsV2: `
 - header:
@@ -265,6 +351,349 @@ func TestCardV2Message_GoogleChat(t *testing.T) {
 	assert.NotNil(t, message)
 	assert.True(t, cmp.Equal(message.CardsV2, expected, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
 		cmp.Diff(message.CardsV2, expected, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")))
+}
+
+func TestFullMessage_GoogleChat(t *testing.T) {
+	notificationTemplate := Notification{
+		Message: "Message {{ .action }}",
+		GoogleChat: &GoogleChatNotification{
+			Text:         "Text {{ .action }}",
+			FallbackText: "Fallback Text {{ .action }}",
+			CardsV2: `
+- header:
+    title: "Action {{ .action }} as been completed"
+    subtitle: Argo Notifications
+    imageUrl: https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png
+    imageType: CIRCLE
+    imageAltText: Argo Logo
+  sections:
+    - header: Metadata
+      collapsible: false
+      uncollapsibleWidgetsCount: 1
+      widgets:
+        - decoratedText:
+            startIcon:
+                knownIcon: BOOKMARK
+            text: "{{ .text }}"
+        - buttonList:
+            buttons:
+              - icon:
+                  knownIcon: BOOKMARK
+                text: Docs
+                onClick:
+                  openLink:
+                    url: "{{ .button }}"`,
+		},
+	}
+
+	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	notification := Notification{}
+
+	err = templater(&notification, map[string]any{
+		"action": "test",
+		"text":   "text",
+		"button": "button",
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	expected := &googleChatMessage{
+		Text:         "Text test",
+		FallbackText: "Fallback Text test",
+		CardsV2: []chat.CardWithId{
+			{
+				Card: &chat.GoogleAppsCardV1Card{
+					Header: &chat.GoogleAppsCardV1CardHeader{
+						Title:        "Action test as been completed",
+						Subtitle:     "Argo Notifications",
+						ImageUrl:     "https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png",
+						ImageType:    "CIRCLE",
+						ImageAltText: "Argo Logo",
+					},
+					Sections: []*chat.GoogleAppsCardV1Section{
+						{
+							Collapsible:               false,
+							Header:                    "Metadata",
+							UncollapsibleWidgetsCount: 1,
+							Widgets: []*chat.GoogleAppsCardV1Widget{
+								{
+									DecoratedText: &chat.GoogleAppsCardV1DecoratedText{
+										StartIcon: &chat.GoogleAppsCardV1Icon{
+											KnownIcon: "BOOKMARK",
+										},
+										Text: "text",
+									},
+								},
+								{
+									ButtonList: &chat.GoogleAppsCardV1ButtonList{
+										Buttons: []*chat.GoogleAppsCardV1Button{
+											{
+												Icon: &chat.GoogleAppsCardV1Icon{
+													KnownIcon: "BOOKMARK",
+												},
+												Text: "Docs",
+												OnClick: &chat.GoogleAppsCardV1OnClick{
+													OpenLink: &chat.GoogleAppsCardV1OpenLink{
+														Url: "button",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.NotNil(t, message)
+	assert.True(t,
+		cmp.Equal(expected, message, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
+		cmp.Diff(expected, message, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
+	)
+}
+
+func TestFullMessageDefaultText_GoogleChat(t *testing.T) {
+	notificationTemplate := Notification{
+		Message: "Message {{ .action }}",
+		GoogleChat: &GoogleChatNotification{
+			DefaultTextToMessage: true,
+			Text:                 "{{if false}}never{{end}}",
+			CardsV2: `
+- header:
+    title: "Action {{ .action }} as been completed"
+    subtitle: Argo Notifications
+    imageUrl: https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png
+    imageType: CIRCLE
+    imageAltText: Argo Logo
+  sections:
+    - header: Metadata
+      collapsible: false
+      uncollapsibleWidgetsCount: 1
+      widgets:
+        - decoratedText:
+            startIcon:
+                knownIcon: BOOKMARK
+            text: "{{ .text }}"
+        - buttonList:
+            buttons:
+              - icon:
+                  knownIcon: BOOKMARK
+                text: Docs
+                onClick:
+                  openLink:
+                    url: "{{ .button }}"`,
+		},
+	}
+
+	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	notification := Notification{}
+
+	err = templater(&notification, map[string]any{
+		"action": "test",
+		"text":   "text",
+		"button": "button",
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	expected := &googleChatMessage{
+		Text: "Message test",
+		CardsV2: []chat.CardWithId{
+			{
+				Card: &chat.GoogleAppsCardV1Card{
+					Header: &chat.GoogleAppsCardV1CardHeader{
+						Title:        "Action test as been completed",
+						Subtitle:     "Argo Notifications",
+						ImageUrl:     "https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png",
+						ImageType:    "CIRCLE",
+						ImageAltText: "Argo Logo",
+					},
+					Sections: []*chat.GoogleAppsCardV1Section{
+						{
+							Collapsible:               false,
+							Header:                    "Metadata",
+							UncollapsibleWidgetsCount: 1,
+							Widgets: []*chat.GoogleAppsCardV1Widget{
+								{
+									DecoratedText: &chat.GoogleAppsCardV1DecoratedText{
+										StartIcon: &chat.GoogleAppsCardV1Icon{
+											KnownIcon: "BOOKMARK",
+										},
+										Text: "text",
+									},
+								},
+								{
+									ButtonList: &chat.GoogleAppsCardV1ButtonList{
+										Buttons: []*chat.GoogleAppsCardV1Button{
+											{
+												Icon: &chat.GoogleAppsCardV1Icon{
+													KnownIcon: "BOOKMARK",
+												},
+												Text: "Docs",
+												OnClick: &chat.GoogleAppsCardV1OnClick{
+													OpenLink: &chat.GoogleAppsCardV1OpenLink{
+														Url: "button",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.NotNil(t, message)
+	assert.True(t,
+		cmp.Equal(expected, message, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
+		cmp.Diff(expected, message, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
+	)
+}
+
+func TestFullMessageDefaultFallback_GoogleChat(t *testing.T) {
+	notificationTemplate := Notification{
+		Message: "Message {{ .action }}",
+		GoogleChat: &GoogleChatNotification{
+			DefaultFallbackTextToMessage: true,
+			FallbackText:                 "{{if false}}never{{end}}",
+			CardsV2: `
+- header:
+    title: "Action {{ .action }} as been completed"
+    subtitle: Argo Notifications
+    imageUrl: https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png
+    imageType: CIRCLE
+    imageAltText: Argo Logo
+  sections:
+    - header: Metadata
+      collapsible: false
+      uncollapsibleWidgetsCount: 1
+      widgets:
+        - decoratedText:
+            startIcon:
+                knownIcon: BOOKMARK
+            text: "{{ .text }}"
+        - buttonList:
+            buttons:
+              - icon:
+                  knownIcon: BOOKMARK
+                text: Docs
+                onClick:
+                  openLink:
+                    url: "{{ .button }}"`,
+		},
+	}
+
+	templater, err := notificationTemplate.GetTemplater("test", template.FuncMap{})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	notification := Notification{}
+
+	err = templater(&notification, map[string]any{
+		"action": "test",
+		"text":   "text",
+		"button": "button",
+	})
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	message, err := googleChatNotificationToMessage(notification)
+	if err != nil {
+		t.Error(err)
+		return
+	}
+
+	expected := &googleChatMessage{
+		FallbackText: "Message test",
+		CardsV2: []chat.CardWithId{
+			{
+				Card: &chat.GoogleAppsCardV1Card{
+					Header: &chat.GoogleAppsCardV1CardHeader{
+						Title:        "Action test as been completed",
+						Subtitle:     "Argo Notifications",
+						ImageUrl:     "https://argo-rollouts.readthedocs.io/en/stable/assets/logo.png",
+						ImageType:    "CIRCLE",
+						ImageAltText: "Argo Logo",
+					},
+					Sections: []*chat.GoogleAppsCardV1Section{
+						{
+							Collapsible:               false,
+							Header:                    "Metadata",
+							UncollapsibleWidgetsCount: 1,
+							Widgets: []*chat.GoogleAppsCardV1Widget{
+								{
+									DecoratedText: &chat.GoogleAppsCardV1DecoratedText{
+										StartIcon: &chat.GoogleAppsCardV1Icon{
+											KnownIcon: "BOOKMARK",
+										},
+										Text: "text",
+									},
+								},
+								{
+									ButtonList: &chat.GoogleAppsCardV1ButtonList{
+										Buttons: []*chat.GoogleAppsCardV1Button{
+											{
+												Icon: &chat.GoogleAppsCardV1Icon{
+													KnownIcon: "BOOKMARK",
+												},
+												Text: "Docs",
+												OnClick: &chat.GoogleAppsCardV1OnClick{
+													OpenLink: &chat.GoogleAppsCardV1OpenLink{
+														Url: "button",
+													},
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	assert.NotNil(t, message)
+	assert.True(t,
+		cmp.Equal(expected, message, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
+		cmp.Diff(expected, message, cmpopts.IgnoreFields(chat.CardWithId{}, "CardId")),
+	)
 }
 
 func TestCreateClient_NoError(t *testing.T) {
