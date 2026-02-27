@@ -69,7 +69,7 @@ func (s NotificationsState) SetAlreadyNotified(isSelfConfig bool, apiNamespace, 
 }
 
 // Persist returns a map of annotations that need to be updated in the resource
-func (s NotificationsState) Persist(res metav1.Object) (map[string]any, error) {
+func (s NotificationsState) Persist() (map[string]any, error) {
 	s.truncate(notifiedHistoryMaxSize)
 
 	notifiedAnnotationKey := subscriptions.NotifiedAnnotationKey()

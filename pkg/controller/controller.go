@@ -256,7 +256,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 		}
 	}
 
-	return notificationsState.Persist(resource)
+	return notificationsState.Persist()
 }
 
 func (c *notificationController) getDestinations(resource metav1.Object, cfg api.Config) services.Destinations {
