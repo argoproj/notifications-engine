@@ -68,20 +68,15 @@ func (s NotificationsState) SetAlreadyNotified(isSelfConfig bool, apiNamespace, 
 	return true
 }
 
-func (s NotificationsState) Persist(res metav1.Object) (map[string]string, error) {
+// Persist returns a map of annotations that need to be updated in the resource
+func (s NotificationsState) Persist(res metav1.Object) (map[string]any, error) {
 	s.truncate(notifiedHistoryMaxSize)
 
 	notifiedAnnotationKey := subscriptions.NotifiedAnnotationKey()
-	annotations := map[string]string{}
-
-	if res.GetAnnotations() != nil {
-		for k, v := range res.GetAnnotations() {
-			annotations[k] = v
-		}
-	}
+	annotations := map[string]any{}
 
 	if len(s) == 0 {
-		delete(annotations, notifiedAnnotationKey)
+		annotations[notifiedAnnotationKey] = nil
 	} else {
 		stateJson, err := json.Marshal(s)
 		if err != nil {

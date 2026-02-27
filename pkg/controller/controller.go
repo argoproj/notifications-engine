@@ -189,13 +189,13 @@ func (c *notificationController) isSelfServiceConfigureApi(api api.API) bool {
 	return c.namespaceSupport && api.GetConfig().IsSelfServiceConfig
 }
 
-func (c *notificationController) processResourceWithAPI(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
+func (c *notificationController) processResourceWithAPI(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]any, error) {
 	apiNamespace := api.GetConfig().Namespace
 	notificationsState := NewStateFromRes(resource)
 
 	destinations := c.getDestinations(resource, api.GetConfig())
 	if len(destinations) == 0 {
-		return resource.GetAnnotations(), nil
+		return nil, nil
 	}
 
 	un, err := c.toUnstructured(resource)
@@ -365,17 +365,17 @@ func (c *notificationController) processResource(api api.API, resource metav1.Ob
 		return
 	}
 
-	if !mapsEqual(resource.GetAnnotations(), annotations) {
-		annotationsPatch := make(map[string]any)
-		for k, v := range annotations {
+	annotationsPatch := map[string]any{}
+	for k, v := range annotations {
+		existing, ok := resource.GetAnnotations()[k]
+		if v == nil && ok {
+			annotationsPatch[k] = nil
+		} else if v != nil && existing != v {
 			annotationsPatch[k] = v
 		}
-		for k := range resource.GetAnnotations() {
-			if _, ok := annotations[k]; !ok {
-				annotationsPatch[k] = nil
-			}
-		}
+	}
 
+	if len(annotationsPatch) > 0 {
 		patchData, err := json.Marshal(map[string]map[string]any{
 			"metadata": {"annotations": annotationsPatch},
 		})

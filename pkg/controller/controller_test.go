@@ -46,6 +46,13 @@ func mustToJson(val any) string {
 	return string(res)
 }
 
+func anyToString(v any) string {
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return ""
+}
+
 func withAnnotations(annotations map[string]string) func(obj *unstructured.Unstructured) {
 	return func(app *unstructured.Unstructured) {
 		app.SetAnnotations(annotations)
@@ -165,7 +172,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 
 	require.NoError(t, err)
 
-	state := NewState(annotations[notifiedAnnotationKey])
+	state := NewState(anyToString(annotations[notifiedAnnotationKey]))
 	assert.NotNil(t, state[StateItemKey(false, "", "mock", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
@@ -221,7 +228,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 	require.NoError(t, err)
 
 	// Persist the notification state in the annotations.
-	setAnnotations(annotations1[notifiedAnnotationKey])(app)
+	setAnnotations(anyToString(annotations1[notifiedAnnotationKey]))(app)
 
 	// The second attempt should see that the notification has already been processed
 	// and the value of the notification annotation should not change. In the second attempt api.Send is not called.
@@ -286,7 +293,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 		logEntry.Errorf("Failed to process: %v", err)
 	}
 	require.NoError(t, err)
-	state = NewState(annotations[notifiedAnnotationKey])
+	state = NewState(anyToString(annotations[notifiedAnnotationKey]))
 	assert.Empty(t, state)
 }
 
@@ -327,6 +334,51 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, ok)
 		assert.Nil(t, val)
+	}
+}
+
+func TestPatchOnlyContainsNotifiedAnnotations(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	state := NotificationsState{}
+	_ = state.SetAlreadyNotified(false, "", "my-trigger", triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"}, true)
+
+	customAnnotation := "argocd.argoproj.io/sync-wave"
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+		notifiedAnnotationKey: mustToJson(state),
+		customAnnotation:      "1",
+	}))
+
+	patchCh := make(chan []byte)
+	client := newFakeClient(app)
+	client.PrependReactor("patch", "*", func(action kubetesting.Action) (handled bool, ret runtime.Object, err error) {
+		patchCh <- action.(kubetesting.PatchAction).GetPatch()
+		return true, nil, nil
+	})
+	ctrl, api, err := newController(t, ctx, client)
+	require.NoError(t, err)
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
+
+	go ctrl.Run(1, ctx.Done())
+
+	select {
+	case <-time.After(time.Second * 5):
+		t.Error("application was not patched")
+	case patchData := <-patchCh:
+		patch := map[string]any{}
+		err = json.Unmarshal(patchData, &patch)
+		require.NoError(t, err)
+		patchAnnotations, ok, err := unstructured.NestedMap(patch, "metadata", "annotations")
+		require.NoError(t, err)
+		require.True(t, ok, "patch should contain metadata.annotations")
+
+		// Patch must only contain the notified annotation key, never custom annotations
+		assert.Len(t, patchAnnotations, 1, "patch should only modify notified annotation, not touch other annotations")
+		assert.Contains(t, patchAnnotations, notifiedAnnotationKey)
+		assert.NotContains(t, patchAnnotations, customAnnotation)
 	}
 }
 
@@ -502,7 +554,7 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 
 	require.NoError(t, err)
 
-	state := NewState(annotations[notifiedAnnotationKey])
+	state := NewState(anyToString(annotations[notifiedAnnotationKey]))
 	assert.NotZero(t, state[StateItemKey(true, namespace, trigger, triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
 }
