@@ -196,10 +196,10 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	setAnnotations := func(notifiedAnnoationKeyValue string) func(obj *unstructured.Unstructured) {
+	setAnnotations := func(notifiedAnnotationKeyValue string) func(obj *unstructured.Unstructured) {
 		return withAnnotations(map[string]string{
 			subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-			notifiedAnnotationKey: notifiedAnnoationKeyValue,
+			notifiedAnnotationKey: notifiedAnnotationKeyValue,
 		})
 	}
 
@@ -235,10 +235,10 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
 
-	setAnnotations := func(notifiedAnnoationKeyValue string) func(obj *unstructured.Unstructured) {
+	setAnnotations := func(notifiedAnnotationKeyValue string) func(obj *unstructured.Unstructured) {
 		return withAnnotations(map[string]string{
 			subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
-			notifiedAnnotationKey: notifiedAnnoationKeyValue,
+			notifiedAnnotationKey: notifiedAnnotationKeyValue,
 		})
 	}
 

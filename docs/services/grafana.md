@@ -42,7 +42,7 @@ stringData:
 ```
 
 7. Create a template in `argo-notifications-cm` Configmap
-This will be used to pass the (required) text of the annocation to Grafana (or re-use an existing one)
+This will be used to pass the (required) text of the annotation to Grafana (or re-use an existing one)
 As there is no specific template for Grafana, you must use the generic `message`:
 
 ```yaml
