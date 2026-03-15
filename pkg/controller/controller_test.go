@@ -215,7 +215,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 
 	// First attempt should hit the TooManyCommitStatusesError.
 	// Returned annotations1 should contain the information about processed notification
-	// as a result of hitting the ToomanyCommitStatusesError error.
+	// as a result of hitting the TooManyCommitStatusesError error.
 	annotations1, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 
 	require.NoError(t, err)
