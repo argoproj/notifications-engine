@@ -31,7 +31,6 @@ type gcpPubsubService struct {
 func (s *gcpPubsubService) Send(notif Notification, dest Destination) error {
 	ctx := context.Background()
 
-	// Determine topic name, annotations takes precedence over the default topic
 	topicName := s.opts.Topic
 	if dest.Recipient != "" {
 		topicName = dest.Recipient
@@ -60,7 +59,10 @@ func (n *GcpPubsubNotification) GetTemplater(name string, f texttemplate.FuncMap
 		}
 
 		if len(n.Attributes) > 0 {
-			notification.GcpPubsub.Attributes = n.Attributes
+			notification.GcpPubsub.Attributes = make(map[string]string, len(n.Attributes))
+			for k, v := range n.Attributes {
+				notification.GcpPubsub.Attributes[k] = v
+			}
 			if err := notification.GcpPubsub.parseAttributes(name, f, vars); err != nil {
 				return err
 			}
@@ -88,9 +90,7 @@ func (n *GcpPubsubNotification) parseAttributes(name string, f texttemplate.Func
 	return nil
 }
 
-// Mockable function for testing
 var PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
-	// Create client with key file if provided, else default creds (enables GKE Workload Identity)
 	var client *pubsub.Client
 	var err error
 	if keyFile != "" {

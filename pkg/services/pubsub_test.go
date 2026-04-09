@@ -2,7 +2,7 @@ package services
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"testing"
 	"text/template"
 
@@ -12,12 +12,11 @@ import (
 )
 
 func TestSend_GcpPubsub(t *testing.T) {
-	// Save original function
 	savePublishPubsubMessage := PublishPubsubMessage
 	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
 	var publishedMsg *pubsub.Message
-	PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+	PublishPubsubMessage = func(_ context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
 		publishedMsg = msg
 		return "mock-message-id", nil
 	}
@@ -40,12 +39,11 @@ func TestSend_GcpPubsub(t *testing.T) {
 }
 
 func TestSend_GcpPubsub_WithRecipient(t *testing.T) {
-	// Save original function
 	savePublishPubsubMessage := PublishPubsubMessage
 	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
 	var capturedTopicName string
-	PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+	PublishPubsubMessage = func(_ context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
 		capturedTopicName = topicName
 		return "mock-message-id", nil
 	}
@@ -64,12 +62,11 @@ func TestSend_GcpPubsub_WithRecipient(t *testing.T) {
 }
 
 func TestSend_GcpPubsub_PublishError(t *testing.T) {
-	// Save original function
 	savePublishPubsubMessage := PublishPubsubMessage
 	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
-	PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
-		return "", fmt.Errorf("publish failed")
+	PublishPubsubMessage = func(_ context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+		return "", errors.New("publish error")
 	}
 
 	service := NewGcpPubsubService(GcpPubsubOptions{
