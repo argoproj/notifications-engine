@@ -15,9 +15,12 @@ func TestSend_GcpPubsub(t *testing.T) {
 	savePublishPubsubMessage := PublishPubsubMessage
 	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
-	var publishedMsg *pubsub.Message
-	PublishPubsubMessage = func(_ context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
-		publishedMsg = msg
+	var capturedProject, capturedTopic string
+	var capturedMsg *pubsub.Message
+	PublishPubsubMessage = func(_ context.Context, projectID, _, topicName string, msg *pubsub.Message) (string, error) {
+		capturedProject = projectID
+		capturedTopic = topicName
+		capturedMsg = msg
 		return "mock-message-id", nil
 	}
 
@@ -34,16 +37,19 @@ func TestSend_GcpPubsub(t *testing.T) {
 
 	err := service.Send(notification, dest)
 	require.NoError(t, err)
-	assert.Equal(t, "hello world", string(publishedMsg.Data))
-	assert.Equal(t, map[string]string{"foo": "bar"}, publishedMsg.Attributes)
+	assert.Equal(t, "test-project", capturedProject)
+	assert.Equal(t, "test-topic", capturedTopic)
+	assert.Equal(t, "hello world", string(capturedMsg.Data))
+	assert.Equal(t, map[string]string{"foo": "bar"}, capturedMsg.Attributes)
 }
 
 func TestSend_GcpPubsub_WithRecipient(t *testing.T) {
 	savePublishPubsubMessage := PublishPubsubMessage
 	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
-	var capturedTopicName string
-	PublishPubsubMessage = func(_ context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+	var capturedProject, capturedTopicName string
+	PublishPubsubMessage = func(_ context.Context, projectID, _, topicName string, _ *pubsub.Message) (string, error) {
+		capturedProject = projectID
 		capturedTopicName = topicName
 		return "mock-message-id", nil
 	}
@@ -58,6 +64,7 @@ func TestSend_GcpPubsub_WithRecipient(t *testing.T) {
 
 	err := service.Send(notification, dest)
 	require.NoError(t, err)
+	assert.Equal(t, "test-project", capturedProject)
 	assert.Equal(t, "override-topic", capturedTopicName)
 }
 
@@ -65,7 +72,7 @@ func TestSend_GcpPubsub_PublishError(t *testing.T) {
 	savePublishPubsubMessage := PublishPubsubMessage
 	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
-	PublishPubsubMessage = func(_ context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+	PublishPubsubMessage = func(_ context.Context, _, _, _ string, _ *pubsub.Message) (string, error) {
 		return "", errors.New("publish error")
 	}
 
