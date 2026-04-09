@@ -2,62 +2,30 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"text/template"
 
 	"cloud.google.com/go/pubsub"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// --- Mocks ---
-type mockTopic struct {
-	publishedMsg  string
-	publishedAttr map[string]string
-	publishErr    error
-}
-
-func (m *mockTopic) Publish(ctx context.Context, msg *pubsub.Message) pubsubPublishResult {
-	m.publishedMsg = string(msg.Data)
-	m.publishedAttr = msg.Attributes
-	return &mockPublishResult{err: m.publishErr}
-}
-func (m *mockTopic) Stop() {}
-
-type mockPublishResult struct {
-	err error
-}
-
-func (m *mockPublishResult) Get(ctx context.Context) (string, error) {
-	if m.err != nil {
-		return "", m.err
-	}
-	return "mock-id", nil
-}
-
-type pubSubMockClient struct {
-	topics map[string]*mockTopic
-}
-
-func (m *pubSubMockClient) Topic(name string) pubsubTopic {
-	if t, ok := m.topics[name]; ok {
-		return t
-	}
-	return nil
-}
-func (m *pubSubMockClient) Close() error { return nil }
-
-// --- Test ---
 func TestSend_GcpPubsub(t *testing.T) {
-	topic := &mockTopic{}
-	client := &pubSubMockClient{topics: map[string]*mockTopic{"test-topic": topic}}
+	// Save original function
+	savePublishPubsubMessage := PublishPubsubMessage
+	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
 
-	service := &gcpPubsubService{
-		opts: GcpPubsubOptions{
-			Project: "test-project",
-			Topic:   "test-topic",
-		},
-		client: client,
+	var publishedMsg *pubsub.Message
+	PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+		publishedMsg = msg
+		return "mock-message-id", nil
 	}
+
+	service := NewGcpPubsubService(GcpPubsubOptions{
+		Project: "test-project",
+		Topic:   "test-topic",
+	})
 
 	notification := Notification{
 		Message:   "hello world",
@@ -66,9 +34,54 @@ func TestSend_GcpPubsub(t *testing.T) {
 	dest := Destination{Recipient: ""}
 
 	err := service.Send(notification, dest)
-	assert.NoError(t, err)
-	assert.Equal(t, "hello world", topic.publishedMsg)
-	assert.Equal(t, map[string]string{"foo": "bar"}, topic.publishedAttr)
+	require.NoError(t, err)
+	assert.Equal(t, "hello world", string(publishedMsg.Data))
+	assert.Equal(t, map[string]string{"foo": "bar"}, publishedMsg.Attributes)
+}
+
+func TestSend_GcpPubsub_WithRecipient(t *testing.T) {
+	// Save original function
+	savePublishPubsubMessage := PublishPubsubMessage
+	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
+
+	var capturedTopicName string
+	PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+		capturedTopicName = topicName
+		return "mock-message-id", nil
+	}
+
+	service := NewGcpPubsubService(GcpPubsubOptions{
+		Project: "test-project",
+		Topic:   "default-topic",
+	})
+
+	notification := Notification{Message: "hello"}
+	dest := Destination{Recipient: "override-topic"}
+
+	err := service.Send(notification, dest)
+	require.NoError(t, err)
+	assert.Equal(t, "override-topic", capturedTopicName)
+}
+
+func TestSend_GcpPubsub_PublishError(t *testing.T) {
+	// Save original function
+	savePublishPubsubMessage := PublishPubsubMessage
+	defer func() { PublishPubsubMessage = savePublishPubsubMessage }()
+
+	PublishPubsubMessage = func(ctx context.Context, projectID, keyFile, topicName string, msg *pubsub.Message) (string, error) {
+		return "", fmt.Errorf("publish failed")
+	}
+
+	service := NewGcpPubsubService(GcpPubsubOptions{
+		Project: "test-project",
+		Topic:   "test-topic",
+	})
+
+	notification := Notification{Message: "hello"}
+	dest := Destination{}
+
+	err := service.Send(notification, dest)
+	require.Error(t, err)
 }
 
 func TestGetTemplater_GcpPubsub(t *testing.T) {
@@ -83,21 +96,17 @@ func TestGetTemplater_GcpPubsub(t *testing.T) {
 	}
 
 	templater, err := n.GetTemplater("", template.FuncMap{})
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	var notification Notification
 
-	err = templater(&notification, map[string]interface{}{
+	err = templater(&notification, map[string]any{
 		"message":   "deployment ready",
 		"app":       "my-app",
 		"namespace": "production",
 	})
 
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 	assert.Equal(t, "deployment ready", notification.Message)
 	assert.Equal(t, map[string]string{
 		"app":       "my-app",
