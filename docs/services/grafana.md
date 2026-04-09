@@ -53,7 +53,7 @@ metadata:
 data:
   templates:
     template.app-deployed: |
-      messsage: Application {{.app.metadata.name}} is now running new version of deployments manifests.
+      message: Application {{.app.metadata.name}} is now running new version of deployments manifests.
 ```
 
 8. Create subscription for your Grafana integration
