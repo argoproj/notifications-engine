@@ -289,10 +289,10 @@ func TestOpsgenie_SendNotification_MissingAPIKey(t *testing.T) {
 		},
 	}
 
-	// Execute the service method with missing API Key
+	// Execute the service method without required API Key
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
-	// Assert the result for missing API Key
+	// Assert the result for call without API Key
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no API key configured for recipient testRecipient")
 }
@@ -319,15 +319,15 @@ func TestOpsgenie_SendNotification_WithMessageOnly(t *testing.T) {
 	recipient := "testRecipient"
 	message := "Test message"
 
-	// Create test notification with missing description and priority
+	// Create test notification that is missing description and priority
 	notification := Notification{
 		Message: message,
 	}
 
-	// Execute the service method with missing description and priority
+	// Execute the service method that is missing description and priority
 	err := service.Send(notification, Destination{Recipient: recipient, Service: "opsgenie"})
 
-	// Assert the result for missing description and priority
+	// Assert the result for when description and priority are missing
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Description is missing")
 }

@@ -16,7 +16,7 @@ type PagerDutyNotification struct {
 	PriorityId string `json:"priorityId,omitempty"`
 }
 
-type PagerdutyOptions struct {
+type PagerDutyOptions struct {
 	Token     string `json:"token"`
 	From      string `json:"from,omitempty"`
 	ServiceID string `json:"serviceId"`
@@ -41,50 +41,50 @@ func (p *PagerDutyNotification) GetTemplater(name string, f texttemplate.FuncMap
 	}
 
 	return func(notification *Notification, vars map[string]any) error {
-		if notification.Pagerduty == nil {
-			notification.Pagerduty = &PagerDutyNotification{}
+		if notification.PagerDuty == nil {
+			notification.PagerDuty = &PagerDutyNotification{}
 		}
 		var titleData bytes.Buffer
 		if err := title.Execute(&titleData, vars); err != nil {
 			return err
 		}
-		notification.Pagerduty.Title = titleData.String()
+		notification.PagerDuty.Title = titleData.String()
 
 		var pdBodyData bytes.Buffer
 		if err := body.Execute(&pdBodyData, vars); err != nil {
 			return err
 		}
-		notification.Pagerduty.Body = pdBodyData.String()
+		notification.PagerDuty.Body = pdBodyData.String()
 
 		var pdUrgencyData bytes.Buffer
 		if err := urgency.Execute(&pdUrgencyData, vars); err != nil {
 			return err
 		}
-		notification.Pagerduty.Urgency = pdUrgencyData.String()
+		notification.PagerDuty.Urgency = pdUrgencyData.String()
 
 		var pdPriorityIDData bytes.Buffer
 		if err := priorityId.Execute(&pdPriorityIDData, vars); err != nil {
 			return err
 		}
-		notification.Pagerduty.PriorityId = pdPriorityIDData.String()
+		notification.PagerDuty.PriorityId = pdPriorityIDData.String()
 
 		return nil
 	}, nil
 }
 
-func NewPagerdutyService(opts PagerdutyOptions) NotificationService {
+func NewPagerDutyService(opts PagerDutyOptions) NotificationService {
 	return &pagerdutyService{opts: opts}
 }
 
 type pagerdutyService struct {
-	opts PagerdutyOptions
+	opts PagerDutyOptions
 }
 
 func (p pagerdutyService) Send(notification Notification, dest Destination) error {
-	title := notification.Pagerduty.Title
-	body := notification.Pagerduty.Body
-	urgency := notification.Pagerduty.Urgency
-	priorityID := notification.Pagerduty.PriorityId
+	title := notification.PagerDuty.Title
+	body := notification.PagerDuty.Body
+	urgency := notification.PagerDuty.Urgency
+	priorityID := notification.PagerDuty.PriorityId
 
 	pagerDutyClient := pagerduty.NewClient(p.opts.Token)
 	input := &pagerduty.CreateIncidentOptions{
