@@ -78,7 +78,7 @@ func (n *GcpPubsubNotification) parseAttributes(name string, f texttemplate.Func
 
 		tmpl, err := texttemplate.New(name).Funcs(f).Parse(v)
 		if err != nil {
-			continue
+			return err
 		}
 		if err := tmpl.Execute(&tempData, vars); err != nil {
 			return err
