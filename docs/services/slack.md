@@ -60,7 +60,7 @@ The Slack notification service configuration includes following settings:
           token: $slack-token
     ```
 
-1. Add annotation in application yaml file to enable notifications for specific argocd app.  The following example uses the [on-sync-succeeded trigger](../catalog.md#triggers):
+1. Add annotation in application yaml file to enable notifications for specific argocd app.  The following example uses the [on-sync-succeeded trigger](../triggers.md#triggers):
 
     ```yaml
       apiVersion: argoproj.io/v1alpha1
@@ -70,7 +70,7 @@ The Slack notification service configuration includes following settings:
           notifications.argoproj.io/subscribe.on-sync-succeeded.slack: my_channel
     ```
 
-1. Annotation with more than one [trigger](../catalog.md#triggers), with multiple destinations and recipients
+1. Annotation with more than one [trigger](../triggers.md#triggers), with multiple destinations and recipients
 
     ```yaml
       apiVersion: argoproj.io/v1alpha1
