@@ -559,6 +559,95 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 	})
 }
 
+func TestSlackTemplateFuncs_WithMockServer(t *testing.T) {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/users.lookupByEmail", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":   true,
+			"user": map[string]any{"id": "UABC123"},
+		})
+	})
+
+	mux.HandleFunc("/conversations.list", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"channels": []map[string]any{
+				{"id": "C123456", "name": "general"},
+			},
+			"response_metadata": map[string]any{"next_cursor": ""},
+		})
+	})
+
+	mux.HandleFunc("/usergroups.list", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"usergroups": []map[string]any{
+				{"id": "SGROUPID", "handle": "oncall", "name": "On-Call"},
+			},
+		})
+	})
+
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	svc := NewSlackService(SlackOptions{
+		Token:              "test-token",
+		ApiURL:             srv.URL + "/",
+		InsecureSkipVerify: true,
+	}).(*slackService)
+
+	fns := svc.TemplateFuncs()
+
+	t.Run("slackUserByEmail resolves to mention", func(t *testing.T) {
+		byEmail := fns["slackUserByEmail"].(func(string) string)
+		assert.Equal(t, "<@UABC123>", byEmail("user@example.com"))
+	})
+
+	t.Run("slackChannel resolves to link", func(t *testing.T) {
+		channel := fns["slackChannel"].(func(string) string)
+		assert.Equal(t, "<#C123456>", channel("general"))
+	})
+
+	t.Run("slackUserGroup resolves by handle", func(t *testing.T) {
+		group := fns["slackUserGroup"].(func(string) string)
+		assert.Equal(t, "<!subteam^SGROUPID>", group("oncall"))
+	})
+
+	t.Run("slackUserGroup resolves by name", func(t *testing.T) {
+		group := fns["slackUserGroup"].(func(string) string)
+		assert.Equal(t, "<!subteam^SGROUPID>", group("On-Call"))
+	})
+}
+
+func TestSlackTemplateFuncs_InTemplate(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/users.lookupByEmail", func(w http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"ok":   true,
+			"user": map[string]any{"id": "UABC123"},
+		})
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	svc := NewSlackService(SlackOptions{
+		Token:              "test-token",
+		ApiURL:             srv.URL + "/",
+		InsecureSkipVerify: true,
+	}).(*slackService)
+
+	n := SlackNotification{Username: `{{slackUserByEmail "user@example.com"}}`}
+
+	templater, err := n.GetTemplater("test", svc.TemplateFuncs())
+	require.NoError(t, err)
+
+	var result Notification
+	err = templater(&result, map[string]any{})
+	require.NoError(t, err)
+	assert.Equal(t, "<@UABC123>", result.Slack.Username)
+}
+
 func TestSlack_SendNotification_WithInvalidJSON(t *testing.T) {
 	service := NewSlackService(SlackOptions{
 		Token:              "something-token",

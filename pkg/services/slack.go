@@ -116,6 +116,88 @@ func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
 }
 
+// TemplateFuncs returns Slack-specific template functions (slackUserByEmail,
+// slackChannel, slackUserGroup). These are injected per-send by the API layer
+// so they are scoped to the specific Slack service instance, not globally.
+func (s *slackService) TemplateFuncs() texttemplate.FuncMap {
+	return texttemplate.FuncMap{
+		"slackUserByEmail": s.slackUserByEmail,
+		"slackChannel":     s.slackChannel,
+		"slackUserGroup":   s.slackUserGroup,
+	}
+}
+
+// slackUserByEmail looks up a Slack user by email and returns "<@USERID>".
+// Requires the users:read and users:read.email OAuth scopes.
+func (s *slackService) slackUserByEmail(email string) string {
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		log.Warnf("slackUserByEmail: failed to create client: %v", err)
+		return ""
+	}
+	user, err := client.GetUserByEmail(email)
+	if err != nil {
+		log.Warnf("slackUserByEmail: failed to lookup user %q: %v", email, err)
+		return ""
+	}
+	return fmt.Sprintf("<@%s>", user.ID)
+}
+
+// slackChannel looks up a Slack channel by name and returns "<#CHANNELID>".
+// Requires the channels:read and groups:read OAuth scopes.
+func (s *slackService) slackChannel(channelName string) string {
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		log.Warnf("slackChannel: failed to create client: %v", err)
+		return ""
+	}
+	cursor := ""
+	for {
+		channels, nextCursor, err := client.GetConversations(&slack.GetConversationsParameters{
+			Cursor: cursor,
+			Limit:  200,
+			Types:  []string{"public_channel", "private_channel"},
+		})
+		if err != nil {
+			log.Warnf("slackChannel: failed to list channels: %v", err)
+			return ""
+		}
+		for _, ch := range channels {
+			if ch.Name == channelName {
+				return fmt.Sprintf("<#%s>", ch.ID)
+			}
+		}
+		if nextCursor == "" {
+			break
+		}
+		cursor = nextCursor
+	}
+	log.Warnf("slackChannel: channel %q not found", channelName)
+	return ""
+}
+
+// slackUserGroup looks up a Slack user group by handle or name and returns
+// "<!subteam^GROUPID>". Requires the usergroups:read OAuth scope.
+func (s *slackService) slackUserGroup(handle string) string {
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		log.Warnf("slackUserGroup: failed to create client: %v", err)
+		return ""
+	}
+	groups, err := client.GetUserGroups()
+	if err != nil {
+		log.Warnf("slackUserGroup: failed to list user groups: %v", err)
+		return ""
+	}
+	for _, g := range groups {
+		if g.Handle == handle || g.Name == handle {
+			return fmt.Sprintf("<!subteam^%s>", g.ID)
+		}
+	}
+	log.Warnf("slackUserGroup: user group %q not found", handle)
+	return ""
+}
+
 func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
 	slackNotification := &SlackNotification{}
