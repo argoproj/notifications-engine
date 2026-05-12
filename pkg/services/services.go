@@ -16,6 +16,7 @@ import (
 type Notification struct {
 	Message        string                      `json:"message,omitempty"`
 	AwsSqs         *AwsSqsNotification         `json:"awssqs,omitempty"`
+	GcpPubsub      *GcpPubsubNotification      `json:"gcppubsub,omitempty"`
 	Email          *EmailNotification          `json:"email,omitempty"`
 	Slack          *SlackNotification          `json:"slack,omitempty"`
 	Mattermost     *MattermostNotification     `json:"mattermost,omitempty"`
@@ -27,8 +28,8 @@ type Notification struct {
 	GitHub         *GitHubNotification         `json:"github,omitempty"`
 	Alertmanager   *AlertmanagerNotification   `json:"alertmanager,omitempty"`
 	GoogleChat     *GoogleChatNotification     `json:"googlechat,omitempty"`
-	Pagerduty      *PagerDutyNotification      `json:"pagerduty,omitempty"`
-	PagerdutyV2    *PagerDutyV2Notification    `json:"pagerdutyv2,omitempty"`
+	PagerDuty      *PagerDutyNotification      `json:"pagerduty,omitempty"`
+	PagerDutyV2    *PagerDutyV2Notification    `json:"pagerdutyv2,omitempty"`
 	Newrelic       *NewrelicNotification       `json:"newrelic,omitempty"`
 }
 
@@ -67,6 +68,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	if n.AwsSqs != nil {
 		sources = append(sources, n.AwsSqs)
 	}
+	if n.GcpPubsub != nil {
+		sources = append(sources, n.GcpPubsub)
+	}
 	if n.Slack != nil {
 		sources = append(sources, n.Slack)
 	}
@@ -100,11 +104,11 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	if n.GoogleChat != nil {
 		sources = append(sources, n.GoogleChat)
 	}
-	if n.Pagerduty != nil {
-		sources = append(sources, n.Pagerduty)
+	if n.PagerDuty != nil {
+		sources = append(sources, n.PagerDuty)
 	}
-	if n.PagerdutyV2 != nil {
-		sources = append(sources, n.PagerdutyV2)
+	if n.PagerDutyV2 != nil {
+		sources = append(sources, n.PagerDutyV2)
 	}
 	if n.Newrelic != nil {
 		sources = append(sources, n.Newrelic)
@@ -222,17 +226,17 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 		}
 		return NewAlertmanagerService(opts), nil
 	case "pagerduty":
-		var opts PagerdutyOptions
+		var opts PagerDutyOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
 			return nil, err
 		}
-		return NewPagerdutyService(opts), nil
+		return NewPagerDutyService(opts), nil
 	case "pagerdutyv2":
-		var opts PagerdutyV2Options
+		var opts PagerDutyV2Options
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
 			return nil, err
 		}
-		return NewPagerdutyV2Service(opts), nil
+		return NewPagerDutyV2Service(opts), nil
 	case "newrelic":
 		var opts NewrelicOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
@@ -251,6 +255,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewNatsService(opts), nil
+	case "gcppubsub":
+		var opts GcpPubsubOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewGcpPubsubService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
