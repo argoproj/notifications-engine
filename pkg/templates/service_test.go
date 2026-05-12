@@ -20,7 +20,7 @@ func TestFormat_Message(t *testing.T) {
 
 	notification, err := svc.FormatNotification(map[string]any{
 		"foo": "hello",
-	}, "test")
+	}, nil, "test")
 
 	require.NoError(t, err)
 
@@ -36,7 +36,6 @@ func TestNewService_Success(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, svc)
-		assert.Len(t, svc.templaters, 1)
 	})
 
 	t.Run("Multiple templates", func(t *testing.T) {
@@ -53,14 +52,12 @@ func TestNewService_Success(t *testing.T) {
 		})
 		require.NoError(t, err)
 		require.NotNil(t, svc)
-		assert.Len(t, svc.templaters, 3)
 	})
 
 	t.Run("Empty templates map", func(t *testing.T) {
 		svc, err := NewService(map[string]services.Notification{})
 		require.NoError(t, err)
 		require.NotNil(t, svc)
-		assert.Empty(t, svc.templaters)
 	})
 
 	t.Run("Env and expandenv functions are removed", func(t *testing.T) {
@@ -75,13 +72,16 @@ func TestNewService_Success(t *testing.T) {
 	})
 }
 
-func TestNewService_InvalidTemplate(t *testing.T) {
+func TestFormatNotification_InvalidTemplate(t *testing.T) {
 	t.Run("Invalid template syntax", func(t *testing.T) {
-		_, err := NewService(map[string]services.Notification{
+		svc, err := NewService(map[string]services.Notification{
 			"invalid": {
 				Message: "{{.foo",
 			},
 		})
+		require.NoError(t, err)
+
+		_, err = svc.FormatNotification(map[string]any{}, nil, "invalid")
 		require.Error(t, err)
 	})
 }
@@ -97,7 +97,7 @@ func TestFormatNotification_Success(t *testing.T) {
 
 		notification, err := svc.FormatNotification(map[string]any{
 			"name": "World",
-		}, "greeting")
+		}, nil, "greeting")
 
 		require.NoError(t, err)
 		assert.Equal(t, "Hello World!", notification.Message)
@@ -118,7 +118,7 @@ func TestFormatNotification_Success(t *testing.T) {
 		notification, err := svc.FormatNotification(map[string]any{
 			"first":  "First",
 			"second": "Second",
-		}, "template1", "template2")
+		}, nil, "template1", "template2")
 
 		require.NoError(t, err)
 		assert.Equal(t, "Second", notification.Message)
@@ -134,7 +134,7 @@ func TestFormatNotification_Success(t *testing.T) {
 
 		notification, err := svc.FormatNotification(map[string]any{
 			"name": "test",
-		}, "complex")
+		}, nil, "complex")
 
 		require.NoError(t, err)
 		assert.Equal(t, "TEST", notification.Message)
@@ -148,7 +148,7 @@ func TestFormatNotification_Success(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		notification, err := svc.FormatNotification(map[string]any{})
+		notification, err := svc.FormatNotification(map[string]any{}, nil)
 		require.NoError(t, err)
 		assert.NotNil(t, notification)
 		assert.Empty(t, notification.Message)
@@ -163,7 +163,7 @@ func TestFormatNotification_TemplateNotFound(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	notification, err := svc.FormatNotification(map[string]any{}, "nonexistent")
+	notification, err := svc.FormatNotification(map[string]any{}, nil, "nonexistent")
 	require.Error(t, err)
 	assert.Nil(t, notification)
 	assert.Contains(t, err.Error(), "template 'nonexistent' is not supported")
@@ -180,7 +180,7 @@ func TestFormatNotification_TemplateExecutionError(t *testing.T) {
 	// This should trigger an error during template execution
 	notification, err := svc.FormatNotification(map[string]any{
 		"other": "value",
-	}, "test")
+	}, nil, "test")
 
 	require.Error(t, err)
 	assert.Nil(t, notification)
@@ -197,7 +197,7 @@ func TestFormatNotification_MultipleTemplatesWithError(t *testing.T) {
 	// First template is valid, second doesn't exist
 	notification, err := svc.FormatNotification(map[string]any{
 		"foo": "bar",
-	}, "valid", "invalid")
+	}, nil, "valid", "invalid")
 
 	require.Error(t, err)
 	assert.Nil(t, notification)

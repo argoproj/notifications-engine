@@ -316,3 +316,11 @@ type Templater func(notification *Notification, vars map[string]any) error
 type TemplaterSource interface {
 	GetTemplater(name string, f texttemplate.FuncMap) (Templater, error)
 }
+
+// TemplateFuncsProvider can be implemented by a NotificationService to expose
+// service-specific template functions (e.g. slackUserByEmail). The returned
+// funcs are merged into the template FuncMap for each send, keeping them
+// scoped to the specific service rather than globally available.
+type TemplateFuncsProvider interface {
+	TemplateFuncs() texttemplate.FuncMap
+}
