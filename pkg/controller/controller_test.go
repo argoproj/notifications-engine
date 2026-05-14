@@ -151,7 +151,7 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	require.NoError(t, err)
 
 	receivedObj := map[string]any{}
-	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]any) bool {
 		receivedObj = obj
@@ -182,7 +182,7 @@ func TestDoesNotSendNotificationIfAnnotationPresent(t *testing.T) {
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	require.NoError(t, err)
 
-	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 
 	_, err = ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
@@ -209,7 +209,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	require.NoError(t, err)
 
-	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
 	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(&services.TooManyGitHubCommitStatusesError{Sha: "sha", Context: "context"}).Times(1)
 
@@ -248,7 +248,7 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	require.NoError(t, err)
 
-	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
 	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("boom")).Times(2)
 
@@ -278,7 +278,7 @@ func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	ctrl, api, err := newController(t, ctx, newFakeClient(app))
 	require.NoError(t, err)
 
-	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
 	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
@@ -311,7 +311,7 @@ func TestUpdatedAnnotationsSavedAsPatch(t *testing.T) {
 	})
 	ctrl, api, err := newController(t, ctx, client)
 	require.NoError(t, err)
-	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: false}}, nil)
 
 	go ctrl.Run(1, ctx.Done())
@@ -443,7 +443,7 @@ func TestWithEventCallback(t *testing.T) {
 
 			ctrl, api, err := newController(t, ctx, newFakeClient(app), WithEventCallback(mockEventCallback))
 			ctrl.namespaceSupport = false
-			api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+			api.EXPECT().GetConfig().Return(notificationApi.Config{Triggers: map[string][]triggers.Condition{"my-trigger": nil}}).AnyTimes()
 			require.NoError(t, err)
 			ctrl.apiFactory = &mocks.FakeFactory{Api: api, Err: tc.apiErr}
 
@@ -488,7 +488,7 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 	receivedObj := map[string]any{}
 
 	// SelfService API: config has IsSelfServiceConfig set to true
-	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: namespace}).AnyTimes()
+	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: namespace, Triggers: map[string][]triggers.Condition{trigger: nil}}).AnyTimes()
 	api.EXPECT().RunTrigger(trigger, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]any) bool {
 		receivedObj = obj
@@ -505,6 +505,34 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 	state := NewState(annotations[notifiedAnnotationKey])
 	assert.NotZero(t, state[StateItemKey(true, namespace, trigger, triggers.ConditionResult{}, services.Destination{Service: "mock", Recipient: "recipient"})])
 	assert.Equal(t, app.Object, receivedObj)
+}
+
+// verify that, in namespace-support mode, an API that does not have the
+// resource's subscribed trigger configured is skipped without invoking
+// RunTrigger or emitting an error. Without this guard, the per-namespace
+// API path produces spurious "trigger '<name>' is not configured" errors
+// for every subscribed trigger on every reconcile.
+func TestProcessResourceWithAPIWithSelfServiceSkipsUnconfiguredTrigger(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+	}))
+
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	require.NoError(t, err)
+	ctrl.namespaceSupport = true
+
+	// Config omits "my-trigger" — the controller should skip it rather than calling RunTrigger.
+	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "my-namespace"}).AnyTimes()
+	api.EXPECT().RunTrigger(gomock.Any(), gomock.Any()).Times(0)
+	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+	eventSequence := NotificationEventSequence{}
+	_, err = ctrl.processResourceWithAPI(api, app, logEntry, &eventSequence)
+	require.NoError(t, err)
+	assert.Empty(t, eventSequence.Warnings)
+	assert.Empty(t, eventSequence.Errors)
 }
 
 // verify notification sent to both default and self-service configuration after calling processResourceWithAPI when using self-service
@@ -528,13 +556,13 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 
 	ctrl.namespaceSupport = true
 	// SelfService API: config has IsSelfServiceConfig set to true
-	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).Times(3)
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace", Triggers: map[string][]triggers.Condition{triggerName: nil}}).AnyTimes()
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
 		return true
 	}), []string{"test"}, destination).Return(nil).AnyTimes()
 
-	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default"}).Times(3)
+	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default", Triggers: map[string][]triggers.Condition{triggerName: nil}}).AnyTimes()
 	apiMap["default"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
 	apiMap["default"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
 		return true

@@ -190,10 +190,11 @@ func (c *notificationController) isSelfServiceConfigureApi(api api.API) bool {
 }
 
 func (c *notificationController) processResourceWithAPI(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
-	apiNamespace := api.GetConfig().Namespace
+	cfg := api.GetConfig()
+	apiNamespace := cfg.Namespace
 	notificationsState := NewStateFromRes(resource)
 
-	destinations := c.getDestinations(resource, api.GetConfig())
+	destinations := c.getDestinations(resource, cfg)
 	if len(destinations) == 0 {
 		return resource.GetAnnotations(), nil
 	}
@@ -204,6 +205,16 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 	}
 
 	for trigger, destinations := range destinations {
+		// In namespace-support mode, multiple APIs are iterated per resource — each may
+		// legitimately have only a subset of triggers configured. Skip triggers that
+		// aren't configured in this API to avoid spurious "not configured" errors when
+		// a subscribed trigger lives in a different API in the same iteration.
+		if c.namespaceSupport {
+			if _, ok := cfg.Triggers[trigger]; !ok {
+				logEntry.Debugf("Skipping trigger %s: not configured in namespace %s", trigger, apiNamespace)
+				continue
+			}
+		}
 		res, err := api.RunTrigger(trigger, un.Object)
 		if err != nil {
 			logEntry.Errorf("Failed to evaluate condition of trigger %s: %v using the configuration in namespace %s", trigger, err, apiNamespace)
