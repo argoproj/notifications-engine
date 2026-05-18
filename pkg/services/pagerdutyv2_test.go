@@ -12,7 +12,7 @@ import (
 func TestGetTemplater_PagerDutyV2(t *testing.T) {
 	t.Run("all parameters specified", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}}",
 				Source:    "{{.source}}",
@@ -42,19 +42,19 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 		require.NoError(t, err)
 
-		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
-		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
-		assert.Equal(t, "my-app", notification.PagerdutyV2.Source)
-		assert.Equal(t, "test-component", notification.PagerdutyV2.Component)
-		assert.Equal(t, "test-group", notification.PagerdutyV2.Group)
-		assert.Equal(t, "test-class", notification.PagerdutyV2.Class)
-		assert.Equal(t, "http://example.com", notification.PagerdutyV2.URL)
-		assert.Equal(t, "app-123", notification.PagerdutyV2.DedupKey)
+		assert.Equal(t, "hello", notification.PagerDutyV2.Summary)
+		assert.Equal(t, "critical", notification.PagerDutyV2.Severity)
+		assert.Equal(t, "my-app", notification.PagerDutyV2.Source)
+		assert.Equal(t, "test-component", notification.PagerDutyV2.Component)
+		assert.Equal(t, "test-group", notification.PagerDutyV2.Group)
+		assert.Equal(t, "test-class", notification.PagerDutyV2.Class)
+		assert.Equal(t, "http://example.com", notification.PagerDutyV2.URL)
+		assert.Equal(t, "app-123", notification.PagerDutyV2.DedupKey)
 	})
 
 	t.Run("handle error for summary", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}",
 				Severity:  "{{.severity}",
 				Source:    "{{.source}",
@@ -72,7 +72,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("handle error for severity", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}",
 				Source:    "{{.source}",
@@ -90,7 +90,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("handle error for source", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}}",
 				Source:    "{{.source}",
@@ -108,7 +108,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("handle error for component", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}}",
 				Source:    "{{.source}}",
@@ -126,7 +126,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("handle error for group", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}}",
 				Source:    "{{.source}}",
@@ -144,7 +144,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("handle error for class", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}}",
 				Source:    "{{.source}}",
@@ -162,7 +162,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("handle error for url", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   "{{.summary}}",
 				Severity:  "{{.severity}}",
 				Source:    "{{.source}}",
@@ -180,7 +180,7 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 	t.Run("only required parameters specified", func(t *testing.T) {
 		n := Notification{
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary: "{{.summary}}", Severity: "{{.severity}}", Source: "{{.source}}",
 			},
 		}
@@ -198,13 +198,13 @@ func TestGetTemplater_PagerDutyV2(t *testing.T) {
 
 		require.NoError(t, err)
 
-		assert.Equal(t, "hello", notification.PagerdutyV2.Summary)
-		assert.Equal(t, "critical", notification.PagerdutyV2.Severity)
-		assert.Equal(t, "my-app", notification.PagerdutyV2.Source)
-		assert.Empty(t, notification.PagerdutyV2.Component)
-		assert.Empty(t, notification.PagerdutyV2.Group)
-		assert.Empty(t, notification.PagerdutyV2.Class)
-		assert.Empty(t, notification.PagerdutyV2.DedupKey)
+		assert.Equal(t, "hello", notification.PagerDutyV2.Summary)
+		assert.Equal(t, "critical", notification.PagerDutyV2.Severity)
+		assert.Equal(t, "my-app", notification.PagerDutyV2.Source)
+		assert.Empty(t, notification.PagerDutyV2.Component)
+		assert.Empty(t, notification.PagerDutyV2.Group)
+		assert.Empty(t, notification.PagerDutyV2.Class)
+		assert.Empty(t, notification.PagerDutyV2.DedupKey)
 	})
 }
 
@@ -222,7 +222,7 @@ func TestSend_PagerDuty(t *testing.T) {
 
 		event := buildEvent(routingKey, Notification{
 			Message: "message",
-			PagerdutyV2: &PagerDutyV2Notification{
+			PagerDutyV2: &PagerDutyV2Notification{
 				Summary:   summary,
 				Severity:  severity,
 				Source:    source,
@@ -246,7 +246,7 @@ func TestSend_PagerDuty(t *testing.T) {
 	})
 
 	t.Run("missing config", func(t *testing.T) {
-		service := NewPagerdutyV2Service(PagerdutyV2Options{
+		service := NewPagerDutyV2Service(PagerDutyV2Options{
 			ServiceKeys: map[string]string{
 				"test-service": "key",
 			},
@@ -264,7 +264,7 @@ func TestSend_PagerDuty(t *testing.T) {
 	})
 
 	t.Run("missing apiKey", func(t *testing.T) {
-		service := NewPagerdutyV2Service(PagerdutyV2Options{})
+		service := NewPagerDutyV2Service(PagerDutyV2Options{})
 		err := service.Send(Notification{
 			Message: "message",
 		}, Destination{
