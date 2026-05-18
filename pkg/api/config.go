@@ -10,7 +10,7 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/triggers"
 
 	log "github.com/sirupsen/logrus"
-	yaml3 "gopkg.in/yaml.v3"
+	yaml3 "go.yaml.in/yaml/v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/labels"
 	"sigs.k8s.io/yaml"
