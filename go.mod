@@ -26,7 +26,7 @@ require (
 	github.com/nats-io/nkeys v0.4.11
 	github.com/opsgenie/opsgenie-go-sdk-v2 v1.2.23
 	github.com/prometheus/client_golang v1.21.0
-	github.com/sirupsen/logrus v1.9.3
+	github.com/sirupsen/logrus v1.9.4
 	github.com/slack-go/slack v0.16.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
