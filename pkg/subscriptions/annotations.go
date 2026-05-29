@@ -159,7 +159,7 @@ func (a Annotations) Unsubscribe(trigger string, service string, recipient strin
 			if r[i] == recipient {
 				updatedRecipients := append(r[:i], r[i+1:]...)
 				if len(updatedRecipients) > 0 {
-					a[k] = strings.Join(updatedRecipients, "")
+					a[k] = strings.Join(updatedRecipients, ";")
 				} else {
 					delete(a, k)
 				}
