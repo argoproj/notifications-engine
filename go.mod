@@ -30,7 +30,7 @@ require (
 	github.com/slack-go/slack v0.16.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	go.yaml.in/yaml/v3 v3.0.4
 	golang.org/x/time v0.11.0
 	gomodules.xyz/notify v0.1.1
