@@ -77,6 +77,7 @@ type GitHubDeployment struct {
 	AutoMerge            *bool    `json:"autoMerge,omitempty"`
 	TransientEnvironment *bool    `json:"transientEnvironment,omitempty"`
 	Reference            string   `json:"reference,omitempty"`
+	Payload              string   `json:"payload,omitempty"`
 }
 
 type GitHubPullRequestComment struct {
@@ -141,7 +142,7 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 	}
 
-	var deploymentState, environment, environmentURL, reference, logURL *texttemplate.Template
+	var deploymentState, environment, environmentURL, reference, logURL, payload *texttemplate.Template
 	if g.Deployment != nil {
 		deploymentState, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.State)
 		if err != nil {
@@ -164,6 +165,11 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 		}
 
 		logURL, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.LogURL)
+		if err != nil {
+			return nil, err
+		}
+
+		payload, err = texttemplate.New(name).Funcs(f).Parse(g.Deployment.Payload)
 		if err != nil {
 			return nil, err
 		}
@@ -324,6 +330,12 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			}
 			notification.GitHub.Deployment.Reference = referenceData.String()
 			notification.GitHub.Deployment.RequiredContexts = g.Deployment.RequiredContexts
+
+			var payloadData bytes.Buffer
+			if err := payload.Execute(&payloadData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.Deployment.Payload = strings.TrimSpace(payloadData.String())
 		}
 
 		if g.PullRequestComment != nil {
@@ -596,17 +608,21 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		if len(deployments) != 0 {
 			deployment = deployments[0]
 		} else {
+			deploymentReq := &github.DeploymentRequest{
+				Ref:                  &ref,
+				Environment:          &notification.GitHub.Deployment.Environment,
+				RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
+				AutoMerge:            notification.GitHub.Deployment.AutoMerge,
+				TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
+			}
+			if notification.GitHub.Deployment.Payload != "" {
+				deploymentReq.Payload = notification.GitHub.Deployment.Payload
+			}
 			deployment, _, err = g.client.GetRepositories().CreateDeployment(
 				context.Background(),
 				u[0],
 				u[1],
-				&github.DeploymentRequest{
-					Ref:                  &ref,
-					Environment:          &notification.GitHub.Deployment.Environment,
-					RequiredContexts:     &notification.GitHub.Deployment.RequiredContexts,
-					AutoMerge:            notification.GitHub.Deployment.AutoMerge,
-					TransientEnvironment: notification.GitHub.Deployment.TransientEnvironment,
-				},
+				deploymentReq,
 			)
 			if err != nil {
 				return err
