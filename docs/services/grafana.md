@@ -9,6 +9,7 @@ Available parameters :
 * `apiURL` - the server url, e.g. https://grafana.example.com
 * `apiKey` - the API key for the serviceaccount
 * `insecureSkipVerify` - optional bool, true or false
+* `tags` - optional, a list of tags (separated by `|`) added to every annotation created by this service, e.g. `argocd|production`
 * `maxIdleConns` - optional, maximum number of idle (keep-alive) connections across all hosts.
 * `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
 * `maxConnsPerHost` - optional, maximum total connections per host.
@@ -68,3 +69,44 @@ metadata:
 
 9. Change the annotations settings
 ![8](https://user-images.githubusercontent.com/18019529/112022083-47fb0600-8b75-11eb-849b-d25d41925909.png)
+
+## Tags
+
+The tags attached to a Grafana annotation are collected from three independent sources, all of which are optional and are merged together:
+
+1. **Subscription tags** - the value of the subscription annotation (see step 8), a list of tags separated by `|`:
+
+    ```yaml
+    notifications.argoproj.io/subscribe.<trigger-name>.grafana: tag1|tag2
+    ```
+
+2. **Global service tags** - the `tags` parameter on the service configuration. These tags are added to *every* annotation created by this service:
+
+    ```yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: argocd-notifications-cm
+    data:
+      service.grafana: |
+        apiUrl: https://grafana.example.com/api
+        apiKey: $grafana-api-key
+        tags: argocd|production
+    ```
+
+3. **Per-notification tags** - the `grafana.tags` field of a template. These are evaluated per notification and support templating, so they can include data from the triggering resource. The list of tags is separated by `|`:
+
+    ```yaml
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: argocd-notifications-cm
+    data:
+      templates:
+        template.app-deployed: |
+          message: Application {{.app.metadata.name}} is now running new version of deployments manifests.
+          grafana:
+            tags: "app:{{.app.metadata.name}}|revision:{{.app.status.sync.revision}}"
+    ```
+
+The resulting annotation contains the union of all three sources.
