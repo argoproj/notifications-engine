@@ -938,3 +938,73 @@ func TestTeamsWorkflows_ActionNonOpenUri(t *testing.T) {
 	// Non-OpenUri actions should not be converted
 	assert.Empty(t, card.Actions)
 }
+
+func TestTeamsWorkflows_RawCardPayload_BuiltIn(t *testing.T) {
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		data, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		receivedBody = data
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	webhookURL := server.URL + "/powerautomate/webhook"
+
+	service := NewTeamsWorkflowsService(TeamsWorkflowsOptions{
+		RecipientUrls: map[string]string{
+			"test": webhookURL,
+		},
+		RawCardPayload: true,
+	})
+
+	notification := Notification{
+		TeamsWorkflows: &TeamsWorkflowsNotification{
+			Title: "Test Title",
+			Text:  "Test message body",
+		},
+	}
+
+	err := service.Send(notification, Destination{Recipient: "test", Service: "teams-workflows"})
+	require.NoError(t, err)
+
+	var root map[string]any
+	require.NoError(t, json.Unmarshal(receivedBody, &root))
+	assert.Equal(t, "AdaptiveCard", root["type"])
+	assert.NotContains(t, root, "attachments")
+}
+
+func TestTeamsWorkflows_RawCardPayload_CustomCard(t *testing.T) {
+	var receivedBody []byte
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		data, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		receivedBody = data
+		writer.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	webhookURL := server.URL + "/powerautomate/webhook"
+
+	service := NewTeamsWorkflowsService(TeamsWorkflowsOptions{
+		RecipientUrls: map[string]string{
+			"test": webhookURL,
+		},
+		RawCardPayload: true,
+	})
+
+	notification := Notification{
+		TeamsWorkflows: &TeamsWorkflowsNotification{
+			AdaptiveCard: `{"type":"AdaptiveCard","version":"1.4","body":[{"type":"TextBlock","text":"hello"}]}`,
+		},
+	}
+
+	err := service.Send(notification, Destination{Recipient: "test", Service: "teams-workflows"})
+	require.NoError(t, err)
+
+	var root map[string]any
+	require.NoError(t, json.Unmarshal(receivedBody, &root))
+	assert.Equal(t, "AdaptiveCard", root["type"])
+	assert.Equal(t, "1.4", root["version"])
+	assert.NotContains(t, root, "attachments")
+}
