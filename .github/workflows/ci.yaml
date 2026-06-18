@@ -23,7 +23,7 @@ jobs:
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9.2.0
         with:
