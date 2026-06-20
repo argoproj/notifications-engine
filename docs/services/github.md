@@ -102,6 +102,14 @@ template.app-deployed: |
         text: |
           Application {{.app.metadata.name}} is now running new version of deployments manifests.
           See more here: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true
+    workflowDispatch:
+      workflow: deploy.yml
+      ref: "{{.app.spec.source.targetRevision}}"
+      inputs: |
+        {
+          "application": "{{.app.metadata.name}}",
+          "revision": "{{.app.status.operationState.syncResult.revision}}"
+        }
 ```
 
 **Notes**:
@@ -114,6 +122,7 @@ template.app-deployed: |
 - If `github.pullRequestComment.content` is set to 65536 characters or more, it will be truncated.
 - The `github.pullRequestComment.commentTag` parameter is used to identify the comment. If a comment with the specified tag is found, it will be updated (upserted). If no comment with the tag is found, a new comment will be created.
 - Reference is optional. When set, it will be used as the ref to deploy. If not set, the revision will be used as the ref to deploy.
+- `github.workflowDispatch` triggers a [workflow dispatch event](https://docs.github.com/en/rest/actions/workflows?apiVersion=2022-11-28#create-a-workflow-dispatch-event) for the given workflow. `workflow` is the workflow file name (for example `deploy.yml`) or its ID, `ref` is the branch or tag the workflow runs from, and `inputs` is an optional JSON object of workflow inputs. The GitHub App or token must have the `actions: write` permission.
 
 ## Commit Statuses
 
