@@ -50,12 +50,15 @@ func (s awsSqsService) Send(notif Notification, dest Destination) error {
 	clientOptions := s.getClientOptions()
 	client := sqs.NewFromConfig(cfg, clientOptions...)
 
+	// 'client' provides credential, region, endpointUrl
+	// 'getQueueInput()' provides queueName, accountId
 	queueUrl, err := GetQueueURL(context.TODO(), client, s.getQueueInput(dest))
 	if err != nil {
 		log.Error("Got an error getting the queue URL: ", err)
 		return err
 	}
 
+	// 'sendMessageInput()' provides queueUrl, message
 	sendMessage, err := SendMsg(context.TODO(), client, s.sendMessageInput(queueUrl.QueueUrl, notif))
 	if err != nil {
 		log.Error("Got an error sending the message: ", err)
@@ -193,9 +196,17 @@ type SQSSendMessageAPI interface {
 }
 
 var GetQueueURL = func(c context.Context, api SQSSendMessageAPI, input *sqs.GetQueueUrlInput) (*sqs.GetQueueUrlOutput, error) {
+	// QueueName is required, QueueOwnerAWSAccountId is optional
+	accountIdStr := ""
+	if input.QueueOwnerAWSAccountId != nil {
+		accountIdStr = ", account_id: " + *input.QueueOwnerAWSAccountId
+	}
+	log.Infof("[GetQueueUrl] queue_name: %s%s", *input.QueueName, accountIdStr)
 	return api.GetQueueUrl(c, input)
 }
 
 var SendMsg = func(c context.Context, api SQSSendMessageAPI, input *sqs.SendMessageInput) (*sqs.SendMessageOutput, error) {
+	// QueueUrl & MessageBody are required fields.
+	log.Infof("[SendMsg] queue_url: %s, message_body: %s", *input.QueueUrl, *input.MessageBody)
 	return api.SendMessage(c, input)
 }
