@@ -16,7 +16,7 @@ data:
 
 * **trigger.\<name\>** - trigger name
 * **when** - a predicate expression that returns true or false. The expression evaluation is powered by [expr-lang/expr](https://github.com/expr-lang/expr).
-  The condition language syntax is described at [Language-Definition.md](https://github.com/expr-lang/expr/blob/master/docs/Language-Definition.md).
+  The condition language syntax is described at [language-definition.md](https://github.com/expr-lang/expr/blob/master/docs/language-definition.md).
 * **send** - the templates list that should be used to generate a notification.
 
 ### oncePer
