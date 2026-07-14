@@ -209,7 +209,9 @@ The message is sent according to the `deliveryPolicy` string field under the `sl
 
 ## Mentioning Users, Channels, and User Groups
 
-The Slack notification service supports mentioning users by email, channels by name, and user groups by handle using special template functions. These functions automatically look up the corresponding Slack IDs and format them as proper mentions.
+The Slack notification service supports mentioning users by email, channels by name, and user groups by handle using special template functions. These functions look up the corresponding Slack IDs via the Slack API when the template is rendered and format them as proper mentions.
+
+If a lookup fails (for example, the user, channel, or group does not exist, or the required scope is missing), the function logs a warning and returns an empty string, so the rest of the message is still delivered.
 
 ### Template Functions
 
@@ -239,6 +241,9 @@ template.app-deployed: |
     {{slackUserByEmail (call .repo.GetCommitMetadata .app.status.sync.revision).Author}}, your changes have been deployed to {{.app.metadata.name}}.
 ```
 
+!!! note
+    The `.repo.GetCommitMetadata` function and `.app.status.sync.revision` field are provided by Argo CD and are only available when the notification is triggered from Argo CD. For **multi-source** applications `.app.status.sync.revision` is empty; the revisions are stored as a list in `.app.status.sync.revisions`, so select the relevant one with `index`, e.g. `(call .repo.GetCommitMetadata (index .app.status.sync.revisions 0)).Author`. The email returned by `.Author` must match the email on the user's Slack profile for `slackUserByEmail` to resolve it.
+
 #### Mentioning a channel
 
 ```yaml
@@ -248,6 +253,8 @@ template.app-health-degraded: |
 ```
 
 This will render as: `Application my-app health is degraded. Check <#C123ABC456> for more details.`
+
+A channel name may be given with or without a leading `#` (`"alerts"` and `"#alerts"` are equivalent). Note that **private channels are only visible to the lookup if the Slack bot has been invited to them**; otherwise the lookup will fail and the mention is omitted.
 
 #### Mentioning a user group
 
