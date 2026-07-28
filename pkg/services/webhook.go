@@ -179,6 +179,9 @@ func (r *request) execute(service *webhookService) (*http.Response, error) {
 
 	client := retryablehttp.NewClient()
 	client.HTTPClient = whclient
+	// without this retryablehttp logs "[DEBUG] <method> <url>" to stderr for every request,
+	// ignoring the configured log level
+	client.Logger = httputil.NewRetryableHTTPLogger(r.destService)
 	client.RetryWaitMin = service.opts.RetryWaitMin
 	client.RetryWaitMax = service.opts.RetryWaitMax
 	client.RetryMax = service.opts.RetryMax
