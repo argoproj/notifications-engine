@@ -61,6 +61,74 @@ func TestSend_RocketChatWebhook(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestSend_RocketChatWebhook_ChannelAlreadyPrefixed(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"text": "message", "channel": "@someuser"}`, string(b))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	service := NewRocketChatService(RocketChatOptions{WebhookUrl: ts.URL})
+	err := service.Send(Notification{Message: "message"}, Destination{Recipient: "@someuser"})
+	require.NoError(t, err)
+}
+
+func TestSend_RocketChatWebhook_InvalidIconAndAvatarAreIgnored(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"text": "message", "channel": "#chan"}`, string(b))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts.Close()
+
+	service := NewRocketChatService(RocketChatOptions{
+		WebhookUrl: ts.URL,
+		Icon:       "not-an-emoji",
+		Avatar:     "not-a-url",
+	})
+	err := service.Send(Notification{Message: "message"}, Destination{Recipient: "#chan"})
+	require.NoError(t, err)
+}
+
+func TestSend_RocketChatWebhook_InvalidAttachments(t *testing.T) {
+	service := NewRocketChatService(RocketChatOptions{WebhookUrl: "http://example.invalid"})
+	err := service.Send(Notification{
+		Message:    "message",
+		RocketChat: &RocketChatNotification{Attachments: "not-json"},
+	}, Destination{Recipient: "#chan"})
+	require.ErrorContains(t, err, "failed to unmarshal attachments")
+}
+
+func TestSend_RocketChatWebhook_NonSuccessStatus(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte("boom"))
+	}))
+	defer ts.Close()
+
+	service := NewRocketChatService(RocketChatOptions{WebhookUrl: ts.URL})
+	err := service.Send(Notification{Message: "message"}, Destination{Recipient: "#chan"})
+	require.ErrorContains(t, err, "rocketchat webhook post error")
+}
+
+func TestSend_RocketChatWebhook_RequestCreationError(t *testing.T) {
+	service := NewRocketChatService(RocketChatOptions{WebhookUrl: "http://x\x00y"})
+	err := service.Send(Notification{Message: "message"}, Destination{Recipient: "#chan"})
+	require.ErrorContains(t, err, "failed to create request")
+}
+
+func TestSend_RocketChatWebhook_RequestError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {}))
+	ts.Close()
+
+	service := NewRocketChatService(RocketChatOptions{WebhookUrl: ts.URL})
+	err := service.Send(Notification{Message: "message"}, Destination{Recipient: "#chan"})
+	require.ErrorContains(t, err, "failed to request")
+}
+
 func TestGetTemplater_RocketChat(t *testing.T) {
 	n := Notification{
 		RocketChat: &RocketChatNotification{
