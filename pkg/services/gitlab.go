@@ -231,7 +231,7 @@ func projectPathByRepoURL(rawURL string) (string, error) {
 
 	pathParts := text.SplitRemoveEmpty(gitSuffix.ReplaceAllString(parsed.Path, ""), "/")
 	if len(pathParts) < 2 {
-		return "", fmt.Errorf("GitLab.repoURL (%s) does not have a `/`", rawURL)
+		return "", fmt.Errorf("GitLab.repoURL (%s) is not a project path, expected at least <namespace>/<project>", rawURL)
 	}
 
 	return strings.Join(pathParts, "/"), nil
@@ -249,6 +249,10 @@ func (g gitLabService) Send(notification Notification, _ Destination) error {
 
 	ctx := context.Background()
 
+	// Each action reports independently: a status GitLab refuses must not stop the
+	// merge request note, which the trigger's oncePer would never retry.
+	var errs []error
+
 	if notification.GitLab.Status != nil {
 		opts := &gitlab.SetCommitStatusOptions{
 			State:       gitlab.BuildStateValue(notification.GitLab.Status.State),
@@ -262,7 +266,7 @@ func (g gitLabService) Send(notification Notification, _ Destination) error {
 		}
 
 		if _, _, err := g.client.Commits.SetCommitStatus(pid, notification.GitLab.revision, opts, gitlab.WithContext(ctx)); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
@@ -284,24 +288,24 @@ func (g gitLabService) Send(notification Notification, _ Destination) error {
 			Tag:         gitlab.Ptr(tag),
 			Status:      gitlab.Ptr(gitlab.DeploymentStatusValue(notification.GitLab.Deployment.State)),
 		}, gitlab.WithContext(ctx)); err != nil {
-			return err
+			errs = append(errs, err)
 		}
 	}
 
 	if notification.GitLab.MergeRequestComment != nil {
 		mrs, _, err := g.client.Commits.ListMergeRequestsByCommit(pid, notification.GitLab.revision, gitlab.WithContext(ctx))
 		if err != nil {
-			return err
+			errs = append(errs, err)
 		}
 
 		for _, mr := range mrs {
 			if _, _, err := g.client.Notes.CreateMergeRequestNote(pid, mr.IID, &gitlab.CreateMergeRequestNoteOptions{
 				Body: gitlab.Ptr(notification.GitLab.MergeRequestComment.Content),
 			}, gitlab.WithContext(ctx)); err != nil {
-				return err
+				errs = append(errs, err)
 			}
 		}
 	}
 
-	return nil
+	return errors.Join(errs...)
 }

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"text/template"
 
@@ -142,7 +143,7 @@ func TestProjectPathByRepoURL_GitLab(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := projectPathByRepoURL(tt.repoURL)
 			if tt.wantErr {
-				require.ErrorContains(t, err, "does not have a `/`")
+				require.ErrorContains(t, err, "is not a project path")
 				return
 			}
 			require.NoError(t, err)
@@ -307,9 +308,45 @@ func TestSend_GitLab_MergeRequestComment(t *testing.T) {
 	assert.Equal(t, []string{"Application is now running", "Application is now running"}, noteBodies)
 }
 
+func TestSend_GitLab_RejectedStatusStillComments(t *testing.T) {
+	var notePaths []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch {
+		case strings.HasSuffix(request.URL.Path, "/statuses/0123456789"):
+			writer.WriteHeader(http.StatusBadRequest)
+			_, _ = writer.Write([]byte(`{"message": "Cannot transition status via :run from :running"}`))
+		case request.Method == http.MethodGet:
+			_, _ = writer.Write([]byte(`[{"iid": 11}]`))
+		default:
+			notePaths = append(notePaths, request.URL.EscapedPath())
+			writer.WriteHeader(http.StatusCreated)
+			_, _ = writer.Write([]byte(`{"id": 1}`))
+		}
+	}))
+	defer server.Close()
+
+	service, err := NewGitLabService(GitLabOptions{BaseURL: server.URL, Token: "token"})
+	require.NoError(t, err)
+
+	err = service.Send(Notification{
+		Message: "Application is now running",
+		GitLab: &GitLabNotification{
+			repoURL:             "https://gitlab.com/argoproj-labs/argocd-notifications.git",
+			revision:            "0123456789",
+			Status:              &GitLabStatus{State: "running"},
+			MergeRequestComment: &GitLabMergeRequestComment{Content: "Application is now running"},
+		},
+	}, Destination{})
+	require.ErrorContains(t, err, "Cannot transition status")
+
+	assert.Equal(t, []string{
+		"/api/v4/projects/argoproj-labs%2Fargocd-notifications/merge_requests/11/notes",
+	}, notePaths)
+}
+
 func TestSend_GitLab_BadRepoURL(t *testing.T) {
 	err := gitLabService{}.Send(Notification{
 		GitLab: &GitLabNotification{repoURL: "hello"},
 	}, Destination{})
-	require.ErrorContains(t, err, "does not have a `/`")
+	require.ErrorContains(t, err, "is not a project path")
 }
