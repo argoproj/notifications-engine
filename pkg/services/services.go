@@ -26,6 +26,7 @@ type Notification struct {
 	Webhook        WebhookNotifications        `json:"webhook,omitempty"`
 	Opsgenie       *OpsgenieNotification       `json:"opsgenie,omitempty"`
 	GitHub         *GitHubNotification         `json:"github,omitempty"`
+	GitLab         *GitLabNotification         `json:"gitlab,omitempty"`
 	Alertmanager   *AlertmanagerNotification   `json:"alertmanager,omitempty"`
 	GoogleChat     *GoogleChatNotification     `json:"googlechat,omitempty"`
 	PagerDuty      *PagerDutyNotification      `json:"pagerduty,omitempty"`
@@ -91,6 +92,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.GitHub != nil {
 		sources = append(sources, n.GitHub)
+	}
+	if n.GitLab != nil {
+		sources = append(sources, n.GitLab)
 	}
 	if n.Teams != nil {
 		sources = append(sources, n.Teams)
@@ -195,6 +199,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewGitHubService(opts)
+	case "gitlab":
+		var opts GitLabOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewGitLabService(opts)
 	case "teams":
 		var opts TeamsOptions
 		if err := yaml.Unmarshal(optsData, &opts); err != nil {
