@@ -59,11 +59,14 @@ metadata:
 You can reuse the template of slack.  
 Mattermost is compatible with attachments of Slack. See [Mattermost Integration Guide](https://docs.mattermost.com/developer/message-attachments.html).
 
+Messages can be grouped into Mattermost threads by setting `groupingKey` under the `mattermost` field. The first message for a grouping key creates a root post, and subsequent messages with the same key are sent as replies. Grouping keys are independent for each Mattermost API URL and channel. A message with an omitted or empty `groupingKey` is sent independently and does not reset an existing thread. Root post IDs are kept in memory in each notifications controller process; they are not shared between replicas, and a controller restart starts new threads.
+
 ```yaml
 template.app-deployed: |
   message: |
     Application {{.app.metadata.name}} is now running new version of deployments manifests.
   mattermost:
+    groupingKey: "{{.app.metadata.uid}}"
     attachments: |
       [{
         "title": "{{.app.metadata.name}}",
