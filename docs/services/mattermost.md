@@ -59,11 +59,17 @@ metadata:
 You can reuse the template of slack.  
 Mattermost is compatible with attachments of Slack. See [Mattermost Integration Guide](https://docs.mattermost.com/developer/message-attachments.html).
 
+The `deliveryPolicy` field supports `Post` (default) and `Update`. `Post` always creates an independent message. `Update` requires a `groupingKey`: the first notification creates a message, and later notifications with the same Mattermost API URL, channel, and key update its text and attachments. Other Mattermost post properties are preserved. If `groupingKey` is empty, `Update` also creates an independent message.
+
+Message IDs used by `Update` are stored in memory without expiration and are shared by service instances in the same notifications controller process. A controller restart starts a new message. If an existing message can no longer be updated, the error is returned and no replacement message is created automatically.
+
 ```yaml
 template.app-deployed: |
   message: |
     Application {{.app.metadata.name}} is now running new version of deployments manifests.
   mattermost:
+    groupingKey: "{{.app.metadata.uid}}"
+    deliveryPolicy: Update
     attachments: |
       [{
         "title": "{{.app.metadata.name}}",
