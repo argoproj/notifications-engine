@@ -23,8 +23,9 @@ type MattermostNotification struct {
 type MattermostDeliveryPolicy string
 
 const (
-	MattermostPost   MattermostDeliveryPolicy = "Post"
-	MattermostUpdate MattermostDeliveryPolicy = "Update"
+	MattermostPost          MattermostDeliveryPolicy = "Post"
+	MattermostPostAndUpdate MattermostDeliveryPolicy = "PostAndUpdate"
+	MattermostUpdate        MattermostDeliveryPolicy = "Update"
 )
 
 func (p *MattermostDeliveryPolicy) UnmarshalJSON(data []byte) error {
@@ -33,7 +34,7 @@ func (p *MattermostDeliveryPolicy) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	switch MattermostDeliveryPolicy(value) {
-	case "", MattermostPost, MattermostUpdate:
+	case "", MattermostPost, MattermostPostAndUpdate, MattermostUpdate:
 		*p = MattermostDeliveryPolicy(value)
 		return nil
 	default:
@@ -143,11 +144,11 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 			deliveryPolicy = notification.Mattermost.DeliveryPolicy
 		}
 	}
-	if deliveryPolicy != MattermostPost && deliveryPolicy != MattermostUpdate {
+	if deliveryPolicy != MattermostPost && deliveryPolicy != MattermostPostAndUpdate && deliveryPolicy != MattermostUpdate {
 		return fmt.Errorf("unsupported Mattermost delivery policy %q", deliveryPolicy)
 	}
-	if deliveryPolicy == MattermostPost || groupingKey == "" {
-		_, err = m.post(client, notification.Message, attachments, dest.Recipient, false)
+	if groupingKey == "" {
+		_, err = m.post(client, notification.Message, attachments, dest.Recipient, "", false)
 		return err
 	}
 
@@ -155,23 +156,35 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 	update.mutex.Lock()
 	defer update.mutex.Unlock()
 	if update.postID == "" {
-		postID, err := m.post(client, notification.Message, attachments, dest.Recipient, true)
+		postID, err := m.post(client, notification.Message, attachments, dest.Recipient, "", true)
 		if err != nil {
 			return err
 		}
 		update.postID = postID
 		return nil
 	}
-	return m.update(client, notification.Message, attachments, update.postID)
+
+	if deliveryPolicy == MattermostPost || deliveryPolicy == MattermostPostAndUpdate {
+		if _, err := m.post(client, notification.Message, attachments, dest.Recipient, update.postID, false); err != nil {
+			return err
+		}
+	}
+	if deliveryPolicy == MattermostUpdate || deliveryPolicy == MattermostPostAndUpdate {
+		return m.update(client, notification.Message, attachments, update.postID)
+	}
+	return nil
 }
 
-func (m *mattermostService) post(client *http.Client, message string, attachments []any, channelID string, requireID bool) (string, error) {
+func (m *mattermostService) post(client *http.Client, message string, attachments []any, channelID, rootID string, requireID bool) (string, error) {
 	body := map[string]any{
 		"channel_id": channelID,
 		"message":    message,
 		"props": map[string]any{
 			"attachments": attachments,
 		},
+	}
+	if rootID != "" {
+		body["root_id"] = rootID
 	}
 	b, _ := json.Marshal(body)
 

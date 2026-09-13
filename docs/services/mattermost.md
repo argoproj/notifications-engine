@@ -59,9 +59,15 @@ metadata:
 You can reuse the template of slack.  
 Mattermost is compatible with attachments of Slack. See [Mattermost Integration Guide](https://docs.mattermost.com/developer/message-attachments.html).
 
-The `deliveryPolicy` field supports `Post` (default) and `Update`. `Post` always creates an independent message. `Update` requires a `groupingKey`: the first notification creates a message, and later notifications with the same Mattermost API URL, channel, and key update its text and attachments. Other Mattermost post properties are preserved. If `groupingKey` is empty, `Update` also creates an independent message.
+`deliveryPolicy` follows the Slack notification policies. With a `groupingKey`, the first notification creates the root message. Later notifications behave as follows:
 
-Message IDs used by `Update` are stored in memory without expiration and are shared by service instances in the same notifications controller process. A controller restart starts a new message. If an existing message can no longer be updated, the error is returned and no replacement message is created automatically.
+* `Post` (default) posts a reply in the root message thread.
+* `Update` updates the root message.
+* `PostAndUpdate` posts a reply, then updates the root message.
+
+Without a `groupingKey`, every policy creates an independent message. Updates change the text and attachments while preserving other post properties.
+
+Root message IDs are stored in memory without expiration and shared within the notifications controller process. A controller restart starts a new root message. Failed sends return an error and do not create a replacement root automatically. If the reply succeeds but the root update fails under `PostAndUpdate`, retrying can post the reply again.
 
 ```yaml
 template.app-deployed: |

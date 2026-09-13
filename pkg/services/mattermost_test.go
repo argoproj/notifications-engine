@@ -99,7 +99,7 @@ func TestGetTemplater_Mattermost(t *testing.T) {
 }
 
 func TestMattermostDeliveryPolicyUnmarshal(t *testing.T) {
-	for _, policy := range []MattermostDeliveryPolicy{MattermostPost, MattermostUpdate} {
+	for _, policy := range []MattermostDeliveryPolicy{MattermostPost, MattermostPostAndUpdate, MattermostUpdate} {
 		t.Run(string(policy), func(t *testing.T) {
 			var notification MattermostNotification
 			require.NoError(t, json.Unmarshal([]byte(fmt.Sprintf(`{"deliveryPolicy":%q}`, policy)), &notification))
@@ -107,10 +107,10 @@ func TestMattermostDeliveryPolicyUnmarshal(t *testing.T) {
 		})
 	}
 	var notification MattermostNotification
-	require.EqualError(t, json.Unmarshal([]byte(`{"deliveryPolicy":"PostAndUpdate"}`), &notification), `unsupported Mattermost delivery policy "PostAndUpdate"`)
+	require.EqualError(t, json.Unmarshal([]byte(`{"deliveryPolicy":"Invalid"}`), &notification), `unsupported Mattermost delivery policy "Invalid"`)
 }
 
-func TestSend_MattermostPostAlwaysCreatesIndependentMessages(t *testing.T) {
+func TestSend_MattermostWithoutGroupingKeyAlwaysCreatesIndependentMessages(t *testing.T) {
 	var posts atomic.Int32
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, http.MethodPost, r.Method)
@@ -120,11 +120,59 @@ func TestSend_MattermostPostAlwaysCreatesIndependentMessages(t *testing.T) {
 	defer ts.Close()
 	service := newMattermostService(MattermostOptions{ApiURL: ts.URL}, newMattermostUpdateState())
 	destination := Destination{Recipient: "channel"}
-	for _, policy := range []MattermostDeliveryPolicy{"", MattermostPost} {
-		notification := Notification{Message: "message", Mattermost: &MattermostNotification{GroupingKey: "ignored", DeliveryPolicy: policy}}
+	for _, policy := range []MattermostDeliveryPolicy{"", MattermostPost, MattermostPostAndUpdate, MattermostUpdate} {
+		notification := Notification{Message: "message", Mattermost: &MattermostNotification{DeliveryPolicy: policy}}
 		require.NoError(t, service.Send(notification, destination))
 	}
-	assert.Equal(t, int32(2), posts.Load())
+	assert.Equal(t, int32(4), posts.Load())
+}
+
+func TestSend_MattermostDeliveryPoliciesWithGroupingKey(t *testing.T) {
+	tests := map[string][]string{
+		string(MattermostPost):          {"POST root", "POST reply"},
+		string(MattermostUpdate):        {"POST root", "GET root", "PUT root"},
+		string(MattermostPostAndUpdate): {"POST root", "POST reply", "GET root", "PUT root"},
+	}
+	for policy, expected := range tests {
+		t.Run(policy, func(t *testing.T) {
+			var mutex sync.Mutex
+			var operations []string
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					var body struct {
+						RootID string `json:"root_id"`
+					}
+					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					operation := "POST root"
+					if body.RootID != "" {
+						assert.Equal(t, "root", body.RootID)
+						operation = "POST reply"
+					}
+					mutex.Lock()
+					operations = append(operations, operation)
+					mutex.Unlock()
+					_, _ = io.WriteString(w, `{"id":"root"}`)
+				case http.MethodGet:
+					mutex.Lock()
+					operations = append(operations, "GET root")
+					mutex.Unlock()
+					_, _ = io.WriteString(w, `{"props":{}}`)
+				case http.MethodPut:
+					mutex.Lock()
+					operations = append(operations, "PUT root")
+					mutex.Unlock()
+				}
+			}))
+			defer ts.Close()
+
+			service := newMattermostService(MattermostOptions{ApiURL: ts.URL}, newMattermostUpdateState())
+			notification := Notification{Mattermost: &MattermostNotification{GroupingKey: "operation", DeliveryPolicy: MattermostDeliveryPolicy(policy)}}
+			require.NoError(t, service.Send(notification, Destination{Recipient: "channel"}))
+			require.NoError(t, service.Send(notification, Destination{Recipient: "channel"}))
+			assert.Equal(t, expected, operations)
+		})
+	}
 }
 
 func TestSend_MattermostUpdateAndServiceReconstruction(t *testing.T) {
@@ -195,41 +243,51 @@ func TestSend_MattermostUpdateWithoutGroupingKeyIsIndependent(t *testing.T) {
 	assert.Equal(t, int32(2), posts.Load())
 }
 
-func TestSend_MattermostConcurrentUpdateCreatesOnePost(t *testing.T) {
+func TestSend_MattermostConcurrentGroupedDeliveryCreatesOneRoot(t *testing.T) {
 	const sends = 16
-	var posts atomic.Int32
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodPost:
-			posts.Add(1)
-			_, _ = io.WriteString(w, `{"id":"root"}`)
-		case http.MethodGet:
-			_, _ = io.WriteString(w, `{"props":{}}`)
-		case http.MethodPut:
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	defer ts.Close()
-	service := newMattermostService(MattermostOptions{ApiURL: ts.URL}, newMattermostUpdateState())
-	destination := Destination{Recipient: "channel"}
-	start := make(chan struct{})
-	errs := make(chan error, sends)
-	var wait sync.WaitGroup
-	for i := 0; i < sends; i++ {
-		wait.Add(1)
-		go func(i int) {
-			defer wait.Done()
-			<-start
-			errs <- service.Send(Notification{Message: fmt.Sprintf("message-%d", i), Mattermost: &MattermostNotification{GroupingKey: "operation", DeliveryPolicy: MattermostUpdate}}, destination)
-		}(i)
+	for _, policy := range []MattermostDeliveryPolicy{MattermostPost, MattermostPostAndUpdate, MattermostUpdate} {
+		t.Run(string(policy), func(t *testing.T) {
+			var roots atomic.Int32
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.Method {
+				case http.MethodPost:
+					var body struct {
+						RootID string `json:"root_id"`
+					}
+					require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+					if body.RootID == "" {
+						roots.Add(1)
+					}
+					_, _ = io.WriteString(w, `{"id":"root"}`)
+				case http.MethodGet:
+					_, _ = io.WriteString(w, `{"props":{}}`)
+				case http.MethodPut:
+					w.WriteHeader(http.StatusOK)
+				}
+			}))
+			defer ts.Close()
+			service := newMattermostService(MattermostOptions{ApiURL: ts.URL}, newMattermostUpdateState())
+			destination := Destination{Recipient: "channel"}
+			start := make(chan struct{})
+			errs := make(chan error, sends)
+			var wait sync.WaitGroup
+			for i := 0; i < sends; i++ {
+				wait.Add(1)
+				go func(i int) {
+					defer wait.Done()
+					<-start
+					errs <- service.Send(Notification{Message: fmt.Sprintf("message-%d", i), Mattermost: &MattermostNotification{GroupingKey: "operation", DeliveryPolicy: policy}}, destination)
+				}(i)
+			}
+			close(start)
+			wait.Wait()
+			close(errs)
+			for err := range errs {
+				require.NoError(t, err)
+			}
+			assert.Equal(t, int32(1), roots.Load())
+		})
 	}
-	close(start)
-	wait.Wait()
-	close(errs)
-	for err := range errs {
-		require.NoError(t, err)
-	}
-	assert.Equal(t, int32(1), posts.Load())
 }
 
 func TestSend_MattermostUpdateStateIsolationAndRestart(t *testing.T) {
@@ -314,6 +372,48 @@ func TestSend_MattermostUpdateFailuresDoNotReplacePost(t *testing.T) {
 	assert.Equal(t, int32(2), posts.Load())
 }
 
+func TestSend_MattermostPostAndUpdateStopsOnPartialFailure(t *testing.T) {
+	var posts atomic.Int32
+	var gets atomic.Int32
+	var puts atomic.Int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			call := posts.Add(1)
+			if call == 1 {
+				_, _ = io.WriteString(w, `{"id":"root"}`)
+				return
+			}
+			if call == 2 {
+				http.Error(w, "reply failed", http.StatusBadGateway)
+				return
+			}
+			_, _ = io.WriteString(w, `{"id":"reply"}`)
+		case http.MethodGet:
+			gets.Add(1)
+			_, _ = io.WriteString(w, `{"props":{}}`)
+		case http.MethodPut:
+			if puts.Add(1) == 1 {
+				http.Error(w, "update failed", http.StatusBadGateway)
+				return
+			}
+		}
+	}))
+	defer ts.Close()
+
+	service := newMattermostService(MattermostOptions{ApiURL: ts.URL}, newMattermostUpdateState())
+	destination := Destination{Recipient: "channel"}
+	notification := Notification{Mattermost: &MattermostNotification{GroupingKey: "operation", DeliveryPolicy: MattermostPostAndUpdate}}
+	require.NoError(t, service.Send(notification, destination))
+	require.ErrorContains(t, service.Send(notification, destination), "reply failed")
+	assert.Zero(t, gets.Load(), "a failed reply must prevent the root update")
+	require.ErrorContains(t, service.Send(notification, destination), "update failed")
+	require.NoError(t, service.Send(notification, destination))
+	assert.Equal(t, int32(4), posts.Load(), "the retry posts another reply after a successful reply and failed update")
+	assert.Equal(t, int32(2), gets.Load())
+	assert.Equal(t, int32(2), puts.Load())
+}
+
 func TestSend_MattermostInvalidCreateResponsesAreNotCached(t *testing.T) {
 	var posts atomic.Int32
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -349,7 +449,7 @@ func TestSend_MattermostRejectsUnknownDeliveryPolicy(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) { calls.Add(1) }))
 	defer ts.Close()
 	service := newMattermostService(MattermostOptions{ApiURL: ts.URL}, newMattermostUpdateState())
-	err := service.Send(Notification{Mattermost: &MattermostNotification{DeliveryPolicy: MattermostDeliveryPolicy("PostAndUpdate")}}, Destination{Recipient: "channel"})
-	require.EqualError(t, err, `unsupported Mattermost delivery policy "PostAndUpdate"`)
+	err := service.Send(Notification{Mattermost: &MattermostNotification{DeliveryPolicy: MattermostDeliveryPolicy("Invalid")}}, Destination{Recipient: "channel"})
+	require.EqualError(t, err, `unsupported Mattermost delivery policy "Invalid"`)
 	assert.Equal(t, int32(0), calls.Load())
 }
