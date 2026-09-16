@@ -56,3 +56,17 @@ func TestSetAlreadyNotified_OncePerItem(t *testing.T) {
 	_, ok = state["abc:app-synced:0:slack:my-channel"]
 	assert.True(t, ok)
 }
+
+func TestRemoveAlreadyNotified_OncePerItem(t *testing.T) {
+	dest := services.Destination{Service: "slack", Recipient: "my-channel"}
+	result := triggers.ConditionResult{OncePer: "abc", Key: "0"}
+	state := NotificationsState{}
+	state.SetAlreadyNotified(false, "", "app-synced", result, dest, true)
+
+	changed := state.RemoveAlreadyNotified(false, "", "app-synced", result, dest)
+
+	assert.True(t, changed)
+	_, ok := state["abc:app-synced:0:slack:my-channel"]
+	assert.False(t, ok)
+	assert.False(t, state.RemoveAlreadyNotified(false, "", "app-synced", result, dest))
+}

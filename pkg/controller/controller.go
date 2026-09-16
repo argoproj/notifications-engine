@@ -238,7 +238,7 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 						retry := services.HandleSendError(err, logEntry)
 
 						if retry {
-							notificationsState.SetAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to, false)
+							notificationsState.RemoveAlreadyNotified(c.isSelfServiceConfigureApi(api), apiNamespace, trigger, cr, to)
 							c.metricsRegistry.IncDeliveriesCounter(trigger, to.Service, false)
 							eventSequence.addError(fmt.Errorf("failed to deliver notification %s to %s: %w using the configuration in namespace %s", trigger, to, err, apiNamespace))
 						}

@@ -68,6 +68,16 @@ func (s NotificationsState) SetAlreadyNotified(isSelfConfig bool, apiNamespace, 
 	return true
 }
 
+// RemoveAlreadyNotified removes the state for a notification whose delivery failed.
+func (s NotificationsState) RemoveAlreadyNotified(isSelfConfig bool, apiNamespace, trigger string, result triggers.ConditionResult, dest services.Destination) bool {
+	key := StateItemKey(isSelfConfig, apiNamespace, trigger, result, dest)
+	if _, ok := s[key]; !ok {
+		return false
+	}
+	delete(s, key)
+	return true
+}
+
 func (s NotificationsState) Persist(res metav1.Object) (map[string]string, error) {
 	s.truncate(notifiedHistoryMaxSize)
 
