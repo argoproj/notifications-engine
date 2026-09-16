@@ -249,7 +249,11 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 	require.NoError(t, err)
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
-	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{
+		Triggered: true,
+		OncePer:   "source-revision",
+		Templates: []string{"test"},
+	}}, nil).Times(2)
 	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("boom")).Times(2)
 
 	// First attempt. The returned annotations should not contain the notification state due to the error.
