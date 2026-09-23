@@ -57,7 +57,7 @@ func (c *mockClient) To(string, ...string) notify.ByEmail {
 	return c
 }
 
-func TestSend_SingleRecepient(t *testing.T) {
+func TestSend_SingleRecipient(t *testing.T) {
 	es := emailService{&mockClient{}, false}
 	err := es.Send(Notification{}, Destination{Recipient: "test@email.com"})
 	if err != nil {
@@ -65,7 +65,7 @@ func TestSend_SingleRecepient(t *testing.T) {
 	}
 }
 
-func TestSend_MultipleRecepient(t *testing.T) {
+func TestSend_MultipleRecipient(t *testing.T) {
 	es := emailService{&mockClient{}, true}
 	// two email addresses
 	err := es.Send(Notification{}, Destination{Recipient: "test1@email.com,test2@email.com"})
