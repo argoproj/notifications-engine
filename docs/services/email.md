@@ -27,7 +27,8 @@ To Generate an app password, follow this link https://myaccount.google.com/apppa
 
 ## Example
 
-Store the credentials in `argocd-notifications-secret`, in the same namespace as `argocd-notifications-cm`.
+Replace `<secret-name>` with the configured notifications Secret name (`argocd-notifications-secret` by default in Argo CD).
+Create the Secret in the same namespace as `argocd-notifications-cm`.
 The keys below match the `$username`, `$password`, and `$email-address` references in the service configuration.
 Use `stringData` to provide the values without base64 encoding, and do not commit real credentials to Git.
 
@@ -35,8 +36,7 @@ Use `stringData` to provide the values without base64 encoding, and do not commi
 apiVersion: v1
 kind: Secret
 metadata:
-  name: argocd-notifications-secret
-type: Opaque
+  name: <secret-name>
 stringData:
   username: <your-gmail-address>
   password: <your-app-password>
