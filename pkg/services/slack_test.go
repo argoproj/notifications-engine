@@ -559,6 +559,93 @@ func TestSlack_SetUsernameAndIcon(t *testing.T) {
 	})
 }
 
+// TestSlack_ThreadPersistsAcrossRestart reproduces and verifies the fix for
+// https://github.com/argoproj/argo-rollouts/issues/4809: Slack thread continuity for a given
+// groupingKey used to be lost whenever the controller process serving notifications restarted
+// (pod restart, leader-election failover), because thread_ts only lived in an in-memory map.
+//
+// This test drives slackService exactly like the controller does: it sends a first message,
+// captures the annotations SendWithAnnotations asks the caller to persist, then simulates a
+// full restart by constructing a brand new slackService (equivalent to a new process/pod) and
+// feeding it only those persisted annotations via dest.Annotations. The second message must
+// still be posted as a threaded reply (ts option set, same thread) instead of a new top-level
+// message.
+func TestSlack_ThreadPersistsAcrossRestart(t *testing.T) {
+	const groupingKey = "my-group"
+	const channel = "test-channel"
+
+	firstResponse, err := json.Marshal(chatResponseFull{
+		Channel:          channel,
+		Timestamp:        "1503435956.000247",
+		MessageTimeStamp: "1503435956.000247",
+		Text:             "first",
+	})
+	require.NoError(t, err)
+
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusOK)
+		_, err := writer.Write(firstResponse)
+		require.NoError(t, err)
+	}))
+	defer server.Close()
+
+	opts := SlackOptions{
+		ApiURL:             server.URL + "/",
+		Token:              "something-token",
+		InsecureSkipVerify: true,
+	}
+
+	// First message, sent by the "original" process. No prior state.
+	service1 := NewSlackService(opts).(*slackService)
+	annotations, err := service1.SendWithAnnotations(
+		Notification{
+			Message: "first",
+			Slack:   &SlackNotification{GroupingKey: groupingKey},
+		},
+		Destination{Recipient: channel, Service: "slack"},
+	)
+	require.NoError(t, err)
+	require.NotEmpty(t, annotations[slackThreadStateAnnotationKey],
+		"SendWithAnnotations must return thread state for the caller to persist onto the resource")
+
+	// Simulate a controller restart / leader-election failover: a brand new slackService is
+	// constructed (as happens in a fresh process), and the only thing carried over is the
+	// annotation the previous process asked to persist - exactly what the controller does by
+	// storing the returned map on the resource and passing it back in via dest.Annotations on
+	// the next reconcile.
+	service2 := NewSlackService(opts).(*slackService)
+
+	var capturedBody string
+	server.Config.Handler = http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		data, err := io.ReadAll(request.Body)
+		require.NoError(t, err)
+		capturedBody = string(data)
+		writer.WriteHeader(http.StatusOK)
+		_, err = writer.Write(firstResponse)
+		require.NoError(t, err)
+	})
+
+	err = service2.Send(
+		Notification{
+			Message: "second",
+			Slack:   &SlackNotification{GroupingKey: groupingKey},
+		},
+		Destination{
+			Recipient:   channel,
+			Service:     "slack",
+			Annotations: annotations,
+		},
+	)
+	require.NoError(t, err)
+
+	values, err := url.ParseQuery(capturedBody)
+	require.NoError(t, err)
+	assert.Equal(t, "1503435956.000247", values.Get("thread_ts"),
+		"BUG REPRODUCED IF THIS FAILS: after a simulated restart, the second message for the "+
+			"same groupingKey did not include thread_ts, so it would start a new top-level "+
+			"thread instead of replying to the original one")
+}
+
 func TestSlack_SendNotification_WithInvalidJSON(t *testing.T) {
 	service := NewSlackService(SlackOptions{
 		Token:              "something-token",

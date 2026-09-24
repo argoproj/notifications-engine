@@ -44,11 +44,14 @@ func (s Destinations) Merge(other Destinations) {
 
 func (s Destinations) Dedup() Destinations {
 	for k, v := range s {
-		set := map[Destination]bool{}
+		set := map[string]bool{}
 		var dedup []Destination
 		for _, dest := range v {
-			if !set[dest] {
-				set[dest] = true
+			// \x00 can't appear in Service/Recipient, so it safely delimits them to avoid
+			// key collisions like ("ab", "c") vs ("a", "bc").
+			key := dest.Service + "\x00" + dest.Recipient
+			if !set[key] {
+				set[key] = true
 				dedup = append(dedup, dest)
 			}
 		}
@@ -61,6 +64,11 @@ func (s Destinations) Dedup() Destinations {
 type Destination struct {
 	Service   string `json:"service"`
 	Recipient string `json:"recipient"`
+	// Annotations holds a read-only snapshot of the target resource's annotations at the
+	// time the notification is sent. Services that need to persist state across process
+	// restarts (e.g. Slack thread timestamps) can use it to rehydrate that state; see
+	// AnnotatingNotificationService.
+	Annotations map[string]string `json:"-"`
 }
 
 func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templater, error) {
@@ -121,6 +129,16 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 // NotificationService defines notification service interface
 type NotificationService interface {
 	Send(notification Notification, dest Destination) error
+}
+
+// AnnotatingNotificationService is an optional extension of NotificationService for services
+// that need to persist state across process restarts (e.g. Slack thread timestamps used to
+// keep grouped notifications in the same thread). Implementations read prior state from
+// dest.Annotations and return the annotations that should be persisted back onto the target
+// resource so the state survives controller restarts and leader-election failovers.
+type AnnotatingNotificationService interface {
+	NotificationService
+	SendWithAnnotations(notification Notification, dest Destination) (map[string]string, error)
 }
 
 // HandleSendError inspects the error and signals the caller if the Send operation should be retried.

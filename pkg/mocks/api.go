@@ -104,3 +104,18 @@ func (mr *MockAPIMockRecorder) Send(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Send", reflect.TypeOf((*MockAPI)(nil).Send), arg0, arg1, arg2)
 }
+
+// SendWithAnnotations mocks base method.
+func (m *MockAPI) SendWithAnnotations(arg0 map[string]interface{}, arg1 []string, arg2 services.Destination) (map[string]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SendWithAnnotations", arg0, arg1, arg2)
+	ret0, _ := ret[0].(map[string]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SendWithAnnotations indicates an expected call of SendWithAnnotations.
+func (mr *MockAPIMockRecorder) SendWithAnnotations(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SendWithAnnotations", reflect.TypeOf((*MockAPI)(nil).SendWithAnnotations), arg0, arg1, arg2)
+}

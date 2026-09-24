@@ -192,6 +192,7 @@ func (c *notificationController) isSelfServiceConfigureApi(api api.API) bool {
 func (c *notificationController) processResourceWithAPI(api api.API, resource metav1.Object, logEntry *log.Entry, eventSequence *NotificationEventSequence) (map[string]string, error) {
 	apiNamespace := api.GetConfig().Namespace
 	notificationsState := NewStateFromRes(resource)
+	serviceAnnotations := map[string]string{}
 
 	destinations := c.getDestinations(resource, api.GetConfig())
 	if len(destinations) == 0 {
@@ -231,7 +232,13 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 					})
 				} else {
 					logEntry.Infof("Sending notification about condition '%s.%s' to '%v' using the configuration in namespace %s", trigger, cr.Key, to, apiNamespace)
-					if err := api.Send(un.Object, cr.Templates, to); err != nil {
+					toWithAnnotations := to
+					toWithAnnotations.Annotations = resource.GetAnnotations()
+					annotations, err := api.SendWithAnnotations(un.Object, cr.Templates, toWithAnnotations)
+					for k, v := range annotations {
+						serviceAnnotations[k] = v
+					}
+					if err != nil {
 						logEntry.Errorf("Failed to notify recipient %s defined in resource %s/%s: %v using the configuration in namespace %s",
 							to, resource.GetNamespace(), resource.GetName(), err, apiNamespace)
 
@@ -256,7 +263,17 @@ func (c *notificationController) processResourceWithAPI(api api.API, resource me
 		}
 	}
 
-	return notificationsState.Persist(resource)
+	annotations, err := notificationsState.Persist(resource)
+	if err != nil {
+		return nil, err
+	}
+	if annotations == nil {
+		annotations = map[string]string{}
+	}
+	for k, v := range serviceAnnotations {
+		annotations[k] = v
+	}
+	return annotations, nil
 }
 
 func (c *notificationController) getDestinations(resource metav1.Object, cfg api.Config) services.Destinations {
