@@ -74,6 +74,17 @@ func TestIterate(t *testing.T) {
 			key:        "notifications.argoproj.io/subscribe.slack",
 		},
 		{
+			// Named service (e.g. service.github.orgb in the config) must resolve from
+			// the subscription annotation; the name segment was previously dropped (#346).
+			annotations: map[string]string{
+				"notifications.argoproj.io/subscribe.on-sync.github.orgb": "my-recipient",
+			},
+			triggers:   []string{"on-sync"},
+			service:    []string{"github.orgb"},
+			recipients: []string{"my-recipient"},
+			key:        "notifications.argoproj.io/subscribe.on-sync.github.orgb",
+		},
+		{
 			annotations: map[string]string{
 				"notifications.argoproj.io/subscriptions": data,
 			},
