@@ -1,6 +1,6 @@
 module github.com/argoproj/notifications-engine
 
-go 1.24.0
+go 1.25
 
 require (
 	cloud.google.com/go/pubsub v1.49.0
@@ -27,7 +27,7 @@ require (
 	github.com/opsgenie/opsgenie-go-sdk-v2 v1.2.23
 	github.com/prometheus/client_golang v1.21.0
 	github.com/sirupsen/logrus v1.9.4
-	github.com/slack-go/slack v0.16.0
+	github.com/slack-go/slack v0.27.0
 	github.com/spf13/cast v1.7.1
 	github.com/spf13/cobra v1.9.1
 	github.com/stretchr/testify v1.11.1

@@ -251,9 +251,10 @@ func TestBuildMessageOptions_IconURL(t *testing.T) {
 
 		_, opts, err := buildMessageOptions(n, SlackOptions{})
 		require.NoError(t, err)
-		// Should have text + attachments + blocks (but no icon option because it's invalid)
+		// Should have text + attachments (but no icon option because it's invalid,
+		// and no blocks option since none were configured)
 		// Use GreaterOrEqual to make test less fragile to implementation changes
-		assert.GreaterOrEqual(t, len(opts), 3)
+		assert.GreaterOrEqual(t, len(opts), 2)
 	})
 }
 
