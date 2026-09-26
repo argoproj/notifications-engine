@@ -37,7 +37,7 @@ func newTemplateNotifyCommand(cmdContext *commandContext) *cobra.Command {
 # Render notification render generated notification in console
 %s template notify app-sync-succeeded guestbook
 `, cmdContext.cliName, cmdContext.cliName),
-		Short: "Generates notification using the specified template and send it to specified recipients",
+		Short: "Generates notification using the specified template and sends it to specified recipients",
 		RunE: func(_ *cobra.Command, args []string) error {
 			cancel := withDebugLogs()
 			defer cancel()
