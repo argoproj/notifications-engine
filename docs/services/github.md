@@ -112,7 +112,7 @@ template.app-deployed: |
   Setting this option to `false` is required if you would like to deploy older refs in your default branch.
   For more information see the [GitHub Deployment API Docs](https://docs.github.com/en/rest/deployments/deployments?apiVersion=2022-11-28#create-a-deployment).
 - If `github.pullRequestComment.content` is set to 65536 characters or more, it will be truncated.
-- The `github.pullRequestComment.commentTag` parameter is used to identify the comment. If a comment with the specified tag is found, it will be updated (upserted). If no comment with the tag is found, a new comment will be created.
+- The `github.pullRequestComment.commentTag` parameter supports templating and is used to identify the comment. If a comment with the specified tag is found, it will be updated (upserted). If no comment with the tag is found, a new comment will be created.
 - Reference is optional. When set, it will be used as the ref to deploy. If not set, the revision will be used as the ref to deploy.
 
 ## Commit Statuses
