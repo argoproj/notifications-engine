@@ -523,18 +523,18 @@ func trunc(message string, n int) string {
 	return message
 }
 
-func fullNameByRepoURL(rawURL string) string {
+func fullNameByRepoURL(rawURL string) (string, error) {
 	parsed, err := giturls.Parse(rawURL)
 	if err != nil {
-		panic(err)
+		return "", fmt.Errorf("failed to parse repository URL %q: %w", rawURL, err)
 	}
 
 	path := gitSuffix.ReplaceAllString(parsed.Path, "")
 	if pathParts := text.SplitRemoveEmpty(path, "/"); len(pathParts) >= 2 {
-		return strings.Join(pathParts[:2], "/")
+		return strings.Join(pathParts[:2], "/"), nil
 	}
 
-	return path
+	return path, nil
 }
 
 func (g gitHubService) Send(notification Notification, _ Destination) error {
@@ -542,7 +542,11 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 		return errors.New("config is empty")
 	}
 
-	u := strings.Split(fullNameByRepoURL(notification.GitHub.repoURL), "/")
+	uParts, err := fullNameByRepoURL(notification.GitHub.repoURL)
+	if err != nil {
+		return err
+	}
+	u := strings.Split(uParts, "/")
 	if len(u) < 2 {
 		return fmt.Errorf("GitHub.repoURL (%s) does not have a `/`", notification.GitHub.repoURL)
 	}
