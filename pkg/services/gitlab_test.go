@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -126,6 +127,122 @@ func TestGetTemplater_GitLab_MergeRequestComment(t *testing.T) {
 	assert.Equal(t, "Application root-sync-test is now running", notification.GitLab.MergeRequestComment.Content)
 }
 
+func TestGetTemplater_GitLab_InvalidTemplates(t *testing.T) {
+	tests := []struct {
+		name         string
+		notification GitLabNotification
+	}{
+		{
+			name:         "Invalid repoURLPath template",
+			notification: GitLabNotification{RepoURLPath: "{{.foo"},
+		},
+		{
+			name:         "Invalid revisionPath template",
+			notification: GitLabNotification{RevisionPath: "{{.foo"},
+		},
+		{
+			name:         "Invalid status state template",
+			notification: GitLabNotification{Status: &GitLabStatus{State: "{{.foo"}},
+		},
+		{
+			name:         "Invalid status label template",
+			notification: GitLabNotification{Status: &GitLabStatus{Label: "{{.foo"}},
+		},
+		{
+			name:         "Invalid status targetURL template",
+			notification: GitLabNotification{Status: &GitLabStatus{TargetURL: "{{.foo"}},
+		},
+		{
+			name:         "Invalid deployment state template",
+			notification: GitLabNotification{Deployment: &GitLabDeployment{State: "{{.foo"}},
+		},
+		{
+			name:         "Invalid deployment environment template",
+			notification: GitLabNotification{Deployment: &GitLabDeployment{Environment: "{{.foo"}},
+		},
+		{
+			name:         "Invalid deployment reference template",
+			notification: GitLabNotification{Deployment: &GitLabDeployment{Reference: "{{.foo"}},
+		},
+		{
+			name:         "Invalid merge request comment template",
+			notification: GitLabNotification{MergeRequestComment: &GitLabMergeRequestComment{Content: "{{.foo"}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := tt.notification.GetTemplater("test", template.FuncMap{})
+			require.Error(t, err)
+		})
+	}
+}
+
+func TestGetTemplater_GitLab_TemplateExecutionError(t *testing.T) {
+	funcMap := template.FuncMap{
+		"required": func(msg string, val any) (any, error) {
+			if val == nil || val == "" {
+				return nil, fmt.Errorf("%s", msg)
+			}
+			return val, nil
+		},
+	}
+	missing := "{{.missing | required \"missing is required\"}}"
+
+	tests := []struct {
+		name         string
+		notification GitLabNotification
+	}{
+		{
+			name:         "RepoURLPath execution error",
+			notification: GitLabNotification{RepoURLPath: missing},
+		},
+		{
+			name:         "RevisionPath execution error",
+			notification: GitLabNotification{RevisionPath: missing},
+		},
+		{
+			name:         "Status state execution error",
+			notification: GitLabNotification{Status: &GitLabStatus{State: missing}},
+		},
+		{
+			name:         "Status label execution error",
+			notification: GitLabNotification{Status: &GitLabStatus{Label: missing}},
+		},
+		{
+			name:         "Status targetURL execution error",
+			notification: GitLabNotification{Status: &GitLabStatus{TargetURL: missing}},
+		},
+		{
+			name:         "Deployment state execution error",
+			notification: GitLabNotification{Deployment: &GitLabDeployment{State: missing}},
+		},
+		{
+			name:         "Deployment environment execution error",
+			notification: GitLabNotification{Deployment: &GitLabDeployment{Environment: missing}},
+		},
+		{
+			name:         "Deployment reference execution error",
+			notification: GitLabNotification{Deployment: &GitLabDeployment{Reference: missing}},
+		},
+		{
+			name:         "Merge request comment execution error",
+			notification: GitLabNotification{MergeRequestComment: &GitLabMergeRequestComment{Content: missing}},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			templater, err := tt.notification.GetTemplater("", funcMap)
+			require.NoError(t, err)
+
+			var notification Notification
+			err = templater(&notification, gitLabTestVars())
+			require.ErrorContains(t, err, "missing is required")
+		})
+	}
+}
+
 func TestProjectPathByRepoURL_GitLab(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -150,6 +267,11 @@ func TestProjectPathByRepoURL_GitLab(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 		})
 	}
+}
+
+func TestNewGitLabService_InvalidBaseURL(t *testing.T) {
+	_, err := NewGitLabService(GitLabOptions{BaseURL: "://gitlab.example.com"})
+	require.ErrorContains(t, err, "failed to parse base URL")
 }
 
 func TestSend_GitLab_EmptyConfig(t *testing.T) {
@@ -341,6 +463,94 @@ func TestSend_GitLab_RejectedStatusStillComments(t *testing.T) {
 
 	assert.Equal(t, []string{
 		"/api/v4/projects/argoproj-labs%2Fargocd-notifications/merge_requests/11/notes",
+	}, notePaths)
+}
+
+func TestSend_GitLab_DeploymentError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusBadRequest)
+		_, _ = writer.Write([]byte(`{"message": "environment is invalid"}`))
+	}))
+	defer server.Close()
+
+	service, err := NewGitLabService(GitLabOptions{BaseURL: server.URL, Token: "token"})
+	require.NoError(t, err)
+
+	err = service.Send(Notification{
+		GitLab: &GitLabNotification{
+			repoURL:  "https://gitlab.com/argoproj-labs/argocd-notifications.git",
+			revision: "0123456789",
+			Deployment: &GitLabDeployment{
+				State:       "success",
+				Environment: "production",
+			},
+		},
+	}, Destination{})
+	require.ErrorContains(t, err, "environment is invalid")
+}
+
+func TestSend_GitLab_ListMergeRequestsError(t *testing.T) {
+	var notePaths []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodGet {
+			writer.WriteHeader(http.StatusForbidden)
+			_, _ = writer.Write([]byte(`{"message": "403 Forbidden"}`))
+			return
+		}
+		notePaths = append(notePaths, request.URL.EscapedPath())
+		writer.WriteHeader(http.StatusCreated)
+		_, _ = writer.Write([]byte(`{"id": 1}`))
+	}))
+	defer server.Close()
+
+	service, err := NewGitLabService(GitLabOptions{BaseURL: server.URL, Token: "token"})
+	require.NoError(t, err)
+
+	err = service.Send(Notification{
+		GitLab: &GitLabNotification{
+			repoURL:             "https://gitlab.com/argoproj-labs/argocd-notifications.git",
+			revision:            "0123456789",
+			MergeRequestComment: &GitLabMergeRequestComment{Content: "Application is now running"},
+		},
+	}, Destination{})
+	require.ErrorContains(t, err, "403 Forbidden")
+
+	assert.Empty(t, notePaths)
+}
+
+func TestSend_GitLab_RejectedNoteStillCommentsOnOthers(t *testing.T) {
+	var notePaths []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Method == http.MethodGet {
+			_, _ = writer.Write([]byte(`[{"iid": 11}, {"iid": 22}]`))
+			return
+		}
+		notePaths = append(notePaths, request.URL.EscapedPath())
+		if request.URL.EscapedPath() == "/api/v4/projects/argoproj-labs%2Fargocd-notifications/merge_requests/11/notes" {
+			writer.WriteHeader(http.StatusForbidden)
+			_, _ = writer.Write([]byte(`{"message": "403 Forbidden"}`))
+			return
+		}
+		writer.WriteHeader(http.StatusCreated)
+		_, _ = writer.Write([]byte(`{"id": 1}`))
+	}))
+	defer server.Close()
+
+	service, err := NewGitLabService(GitLabOptions{BaseURL: server.URL, Token: "token"})
+	require.NoError(t, err)
+
+	err = service.Send(Notification{
+		GitLab: &GitLabNotification{
+			repoURL:             "https://gitlab.com/argoproj-labs/argocd-notifications.git",
+			revision:            "0123456789",
+			MergeRequestComment: &GitLabMergeRequestComment{Content: "Application is now running"},
+		},
+	}, Destination{})
+	require.ErrorContains(t, err, "403 Forbidden")
+
+	assert.Equal(t, []string{
+		"/api/v4/projects/argoproj-labs%2Fargocd-notifications/merge_requests/11/notes",
+		"/api/v4/projects/argoproj-labs%2Fargocd-notifications/merge_requests/22/notes",
 	}, notePaths)
 }
 
