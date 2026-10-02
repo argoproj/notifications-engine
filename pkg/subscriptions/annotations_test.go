@@ -259,6 +259,19 @@ func TestUnsubscribe(t *testing.T) {
 	assert.False(t, ok)
 }
 
+func TestUnsubscribe_PreservesRecipientSeparator(t *testing.T) {
+	a := Annotations(map[string]string{
+		"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel1;my-channel2;my-channel3",
+	})
+
+	a.Unsubscribe("my-trigger", "slack", "my-channel2")
+
+	assert.Equal(t, "my-channel1;my-channel3", a["notifications.argoproj.io/subscribe.my-trigger.slack"])
+	assert.True(t, a.Has("slack", "my-channel1"))
+	assert.True(t, a.Has("slack", "my-channel3"))
+	assert.False(t, a.Has("slack", "my-channel1my-channel3"))
+}
+
 func TestSetAnnotationPrefix(t *testing.T) {
 	origPrefix := annotationPrefix
 	defer func() {
