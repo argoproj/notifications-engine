@@ -7,14 +7,15 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"strings"
 	texttemplate "text/template"
-
-	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/slack-go/slack"
 	"golang.org/x/time/rate"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 )
 
 // No rate limit unless Slack requests it (allows for Slack to control bursting)
@@ -116,6 +117,95 @@ func NewSlackService(opts SlackOptions) NotificationService {
 	return &slackService{opts: opts}
 }
 
+// TemplateFuncs returns Slack-specific template functions (slackUserByEmail,
+// slackChannel, slackUserGroup). They are injected per-send by the API layer so
+// they are scoped to this Slack service instance rather than registered
+// globally. Each function resolves the human-readable identifier to a Slack ID
+// via the API and returns the ready-to-use mention string. On failure it logs a
+// warning and returns an empty string so the rest of the message is delivered.
+func (s *slackService) TemplateFuncs() texttemplate.FuncMap {
+	return texttemplate.FuncMap{
+		"slackUserByEmail": s.slackUserByEmail,
+		"slackChannel":     s.slackChannel,
+		"slackUserGroup":   s.slackUserGroup,
+	}
+}
+
+// slackUserByEmail looks up a Slack user by email and returns "<@USERID>".
+// Requires the users:read and users:read.email OAuth scopes.
+func (s *slackService) slackUserByEmail(email string) string {
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		log.Warnf("slackUserByEmail: failed to create client: %v", err)
+		return ""
+	}
+	user, err := client.GetUserByEmail(email)
+	if err != nil {
+		log.Warnf("slackUserByEmail: failed to lookup user %q: %v", email, err)
+		return ""
+	}
+	return fmt.Sprintf("<@%s>", user.ID)
+}
+
+// slackChannel looks up a Slack channel by name and returns "<#CHANNELID>".
+// Requires the channels:read and groups:read OAuth scopes. Note that private
+// channels are only visible when the bot has been invited to them.
+func (s *slackService) slackChannel(channelName string) string {
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		log.Warnf("slackChannel: failed to create client: %v", err)
+		return ""
+	}
+	// Accept names with or without a leading '#'.
+	channelName = strings.TrimPrefix(channelName, "#")
+	cursor := ""
+	for {
+		channels, nextCursor, err := client.GetConversations(&slack.GetConversationsParameters{
+			Cursor:          cursor,
+			ExcludeArchived: true,
+			Limit:           1000,
+			Types:           []string{"public_channel", "private_channel"},
+		})
+		if err != nil {
+			log.Warnf("slackChannel: failed to list channels: %v", err)
+			return ""
+		}
+		for _, ch := range channels {
+			if ch.Name == channelName {
+				return fmt.Sprintf("<#%s>", ch.ID)
+			}
+		}
+		if nextCursor == "" {
+			break
+		}
+		cursor = nextCursor
+	}
+	log.Warnf("slackChannel: channel %q not found", channelName)
+	return ""
+}
+
+// slackUserGroup looks up a Slack user group by handle or name and returns
+// "<!subteam^GROUPID>". Requires the usergroups:read OAuth scope.
+func (s *slackService) slackUserGroup(handle string) string {
+	client, err := newSlackClient(s.opts)
+	if err != nil {
+		log.Warnf("slackUserGroup: failed to create client: %v", err)
+		return ""
+	}
+	groups, err := client.GetUserGroups(slack.GetUserGroupsOptionIncludeDisabled(false))
+	if err != nil {
+		log.Warnf("slackUserGroup: failed to list user groups: %v", err)
+		return ""
+	}
+	for _, g := range groups {
+		if g.Handle == handle || g.Name == handle {
+			return fmt.Sprintf("<!subteam^%s>", g.ID)
+		}
+	}
+	log.Warnf("slackUserGroup: user group %q not found", handle)
+	return ""
+}
+
 func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNotification, []slack.MsgOption, error) {
 	msgOptions := []slack.MsgOption{slack.MsgOptionText(notification.Message, false)}
 	slackNotification := &SlackNotification{}
@@ -170,14 +260,16 @@ func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNo
 }
 
 func (s *slackService) Send(notification Notification, dest Destination) error {
-	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
-	if err != nil {
-		return err
-	}
 	client, err := newSlackClient(s.opts)
 	if err != nil {
 		return err
 	}
+
+	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
+	if err != nil {
+		return err
+	}
+
 	return slackutil.NewThreadedClient(
 		client,
 		slackState,

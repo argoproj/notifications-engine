@@ -206,3 +206,79 @@ template.app-sync-failed: |
 ```
 
 The message is sent according to the `deliveryPolicy` string field under the `slack` field. The available modes are `Post` (default), `PostAndUpdate`, and `Update`. The `PostAndUpdate` and `Update` settings require `groupingKey` to be set.
+
+## Mentioning Users, Channels, and User Groups
+
+The Slack notification service supports mentioning users by email, channels by name, and user groups by handle using special template functions. These functions look up the corresponding Slack IDs via the Slack API when the template is rendered and format them as proper mentions.
+
+If a lookup fails (for example, the user, channel, or group does not exist, or the required scope is missing), the function logs a warning and returns an empty string, so the rest of the message is still delivered.
+
+### Template Functions
+
+- `slackUserByEmail` - Mention a user by their email address
+- `slackChannel` - Mention a channel by its name
+- `slackUserGroup` - Mention a user group by its handle or name
+
+### Examples
+
+#### Mentioning a user by email
+
+```yaml
+template.app-sync-succeeded: |
+  message: |
+    Hey {{slackUserByEmail "user@example.com"}}, your application {{.app.metadata.name}} has been successfully synced!
+```
+
+This will render as: `Hey <@U024BE7LH>, your application my-app has been successfully synced!`
+
+#### Using with template variables
+
+You can combine these functions with template variables. For example, to mention the commit author:
+
+```yaml
+template.app-deployed: |
+  message: |
+    {{slackUserByEmail (call .repo.GetCommitMetadata .app.status.sync.revision).Author}}, your changes have been deployed to {{.app.metadata.name}}.
+```
+
+!!! note
+    The `.repo.GetCommitMetadata` function and `.app.status.sync.revision` field are provided by Argo CD and are only available when the notification is triggered from Argo CD. For **multi-source** applications `.app.status.sync.revision` is empty; the revisions are stored as a list in `.app.status.sync.revisions`, so select the relevant one with `index`, e.g. `(call .repo.GetCommitMetadata (index .app.status.sync.revisions 0)).Author`. The email returned by `.Author` must match the email on the user's Slack profile for `slackUserByEmail` to resolve it.
+
+#### Mentioning a channel
+
+```yaml
+template.app-health-degraded: |
+  message: |
+    Application {{.app.metadata.name}} health is degraded. Check {{slackChannel "alerts"}} for more details.
+```
+
+This will render as: `Application my-app health is degraded. Check <#C123ABC456> for more details.`
+
+A channel name may be given with or without a leading `#` (`"alerts"` and `"#alerts"` are equivalent). Note that **private channels are only visible to the lookup if the Slack bot has been invited to them**; otherwise the lookup will fail and the mention is omitted.
+
+#### Mentioning a user group
+
+```yaml
+template.critical-alert: |
+  message: |
+    {{slackUserGroup "oncall"}}, critical issue detected in {{.app.metadata.name}}!
+```
+
+This will render as: `<!subteam^SAZ94GDB8>, critical issue detected in my-app!`
+
+#### Multiple mentions in one message
+
+```yaml
+template.deployment-notification: |
+  message: |
+    Hey {{slackUserByEmail (call .repo.GetCommitMetadata .app.status.sync.revision).Author}}, your deployment to {{slackChannel "production"}} is complete.
+    {{slackUserGroup "platform-team"}} has been notified.
+```
+
+### Required Slack Scopes
+
+To use these mention features, your Slack app needs the following additional OAuth scopes:
+
+- `users:read` and `users:read.email` - For looking up users by email
+- `channels:read` and `groups:read` - For looking up channels by name
+- `usergroups:read` - For looking up user groups by handle/name
