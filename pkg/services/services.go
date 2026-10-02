@@ -31,6 +31,7 @@ type Notification struct {
 	PagerDuty      *PagerDutyNotification      `json:"pagerduty,omitempty"`
 	PagerDutyV2    *PagerDutyV2Notification    `json:"pagerdutyv2,omitempty"`
 	Newrelic       *NewrelicNotification       `json:"newrelic,omitempty"`
+	Kafka          *KafkaNotification          `json:"kafka,omitempty"`
 }
 
 // Destinations holds notification destinations group by trigger
@@ -112,6 +113,9 @@ func (n *Notification) GetTemplater(name string, f texttemplate.FuncMap) (Templa
 	}
 	if n.Newrelic != nil {
 		sources = append(sources, n.Newrelic)
+	}
+	if n.Kafka != nil {
+		sources = append(sources, n.Kafka)
 	}
 	return n.getTemplater(name, f, sources)
 }
@@ -261,6 +265,12 @@ func NewService(serviceType string, optsData []byte) (NotificationService, error
 			return nil, err
 		}
 		return NewGcpPubsubService(opts), nil
+	case "kafka":
+		var opts KafkaOptions
+		if err := yaml.Unmarshal(optsData, &opts); err != nil {
+			return nil, err
+		}
+		return NewKafkaService(opts), nil
 	default:
 		return nil, fmt.Errorf("service type '%s' is not supported", serviceType)
 	}
