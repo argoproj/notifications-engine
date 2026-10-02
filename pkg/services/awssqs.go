@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"os"
+	"strings"
 	texttemplate "text/template"
 
 	log "github.com/sirupsen/logrus"
@@ -68,9 +69,16 @@ func (s awsSqsService) Send(notif Notification, dest Destination) error {
 
 func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *sqs.SendMessageInput {
 	input := &sqs.SendMessageInput{
-		QueueUrl:     queueUrl,
-		MessageBody:  aws.String(notif.Message),
-		DelaySeconds: 10,
+		QueueUrl:    queueUrl,
+		MessageBody: aws.String(notif.Message),
+	}
+
+	// FIFO queues reject a per-message DelaySeconds: "When you set FifoQueue, you
+	// can't set DelaySeconds per message. You can set this parameter only on a
+	// queue level." Sending it makes every delivery to a FIFO queue fail, so only
+	// set it for standard queues. FIFO queue names always end in ".fifo".
+	if !isFifoQueue(queueUrl) {
+		input.DelaySeconds = 10
 	}
 
 	// Add MessageGroupId if available (required for FIFO queues)
@@ -79,6 +87,12 @@ func (s awsSqsService) sendMessageInput(queueUrl *string, notif Notification) *s
 	}
 
 	return input
+}
+
+// isFifoQueue reports whether the queue URL refers to a FIFO queue. Amazon SQS
+// requires the name of a FIFO queue to end in the ".fifo" suffix.
+func isFifoQueue(queueUrl *string) bool {
+	return queueUrl != nil && strings.HasSuffix(*queueUrl, ".fifo")
 }
 
 func (s awsSqsService) getQueueInput(dest Destination) *sqs.GetQueueUrlInput {
