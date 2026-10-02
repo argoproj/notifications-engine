@@ -90,6 +90,30 @@ func EqChatPost() gomock.Matcher {
 	return slackAPIMethodMatcher{"chat.postMessage"}
 }
 
+func TestState_ExportAndRestore(t *testing.T) {
+	s := NewState(rate.NewLimiter(rate.Inf, 1))
+	s.ThreadTSs["channel"] = map[string]string{"group": "123.456"}
+	s.ChannelIDs["channel"] = "channel-ID"
+
+	snapshot, err := s.Export()
+	require.NoError(t, err)
+	assert.NotEmpty(t, snapshot)
+
+	restored := NewStateFromJSON(rate.NewLimiter(rate.Inf, 1), snapshot)
+	assert.Equal(t, s.ThreadTSs, restored.ThreadTSs)
+	assert.Equal(t, s.ChannelIDs, restored.ChannelIDs)
+}
+
+func TestNewStateFromJSON_EmptyOrInvalid(t *testing.T) {
+	empty := NewStateFromJSON(rate.NewLimiter(rate.Inf, 1), "")
+	assert.Empty(t, empty.ThreadTSs)
+	assert.Empty(t, empty.ChannelIDs)
+
+	invalid := NewStateFromJSON(rate.NewLimiter(rate.Inf, 1), "not-json")
+	assert.Empty(t, invalid.ThreadTSs)
+	assert.Empty(t, invalid.ChannelIDs)
+}
+
 func TestThreadedClient(t *testing.T) {
 	const (
 		groupingKey string = "group"

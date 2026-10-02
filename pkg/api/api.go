@@ -20,6 +20,10 @@ type GetVars func(obj map[string]any, dest services.Destination) map[string]any
 // API provides high level interface to send notifications and manage notification services
 type API interface {
 	Send(obj map[string]any, templates []string, dest services.Destination) error
+	// SendWithAnnotations behaves like Send but additionally returns any annotations that
+	// the notification service wants persisted onto the target resource (e.g. Slack thread
+	// state), so state survives controller restarts and leader-election failovers.
+	SendWithAnnotations(obj map[string]any, templates []string, dest services.Destination) (map[string]string, error)
 	RunTrigger(triggerName string, vars map[string]any) ([]triggers.ConditionResult, error)
 	AddNotificationService(name string, service services.NotificationService)
 	GetNotificationServices() map[string]services.NotificationService
@@ -50,9 +54,16 @@ func (n *api) GetNotificationServices() map[string]services.NotificationService 
 
 // Send sends notification using specified service and template to the specified destination
 func (n *api) Send(obj map[string]any, templates []string, dest services.Destination) error {
+	_, err := n.SendWithAnnotations(obj, templates, dest)
+	return err
+}
+
+// SendWithAnnotations behaves like Send but additionally returns any annotations that the
+// notification service wants persisted onto the target resource.
+func (n *api) SendWithAnnotations(obj map[string]any, templates []string, dest services.Destination) (map[string]string, error) {
 	notificationService, ok := n.notificationServices[dest.Service]
 	if !ok {
-		return fmt.Errorf("notification service '%s' is not supported", dest.Service)
+		return nil, fmt.Errorf("notification service '%s' is not supported", dest.Service)
 	}
 
 	vars := n.getVars(obj, dest)
@@ -65,10 +76,13 @@ func (n *api) Send(obj map[string]any, templates []string, dest services.Destina
 	in[recipientVarName] = dest.Recipient
 	notification, err := n.templatesService.FormatNotification(in, templates...)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return notificationService.Send(*notification, dest)
+	if annotating, ok := notificationService.(services.AnnotatingNotificationService); ok {
+		return annotating.SendWithAnnotations(*notification, dest)
+	}
+	return nil, notificationService.Send(*notification, dest)
 }
 
 func (n *api) RunTrigger(triggerName string, obj map[string]any) ([]triggers.ConditionResult, error) {

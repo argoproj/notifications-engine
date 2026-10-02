@@ -81,6 +81,45 @@ func NewState(limiter *rate.Limiter) *state {
 	}
 }
 
+type stateSnapshot struct {
+	ThreadTSs  timestampMap
+	ChannelIDs channelMap
+}
+
+// NewStateFromJSON creates a state seeded with a previously exported ThreadTSs/ChannelIDs
+// snapshot (see (*state).Export), so thread continuity survives process restarts. An empty
+// or invalid snapshot results in an empty state, same as NewState.
+func NewStateFromJSON(limiter *rate.Limiter, snapshot string) *state {
+	s := NewState(limiter)
+	if snapshot == "" {
+		return s
+	}
+	var exported stateSnapshot
+	if err := json.Unmarshal([]byte(snapshot), &exported); err != nil {
+		return s
+	}
+	if exported.ThreadTSs != nil {
+		s.ThreadTSs = exported.ThreadTSs
+	}
+	if exported.ChannelIDs != nil {
+		s.ChannelIDs = exported.ChannelIDs
+	}
+	return s
+}
+
+// Export serializes the ThreadTSs/ChannelIDs so they can be persisted (e.g. as a resource
+// annotation) and later restored via NewStateFromJSON.
+func (s *state) Export() (string, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	bs, err := json.Marshal(stateSnapshot{s.ThreadTSs, s.ChannelIDs})
+	if err != nil {
+		return "", err
+	}
+	return string(bs), nil
+}
+
 type threadedClient struct {
 	Client SlackClient
 	*state
