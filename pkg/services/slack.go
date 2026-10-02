@@ -158,7 +158,10 @@ func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNo
 				return nil, nil, fmt.Errorf("failed to unmarshal blocks '%s' : %w", notification.Slack.Blocks, err)
 			}
 		}
-		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...), slack.MsgOptionBlocks(blocks.BlockSet...))
+		msgOptions = append(msgOptions, slack.MsgOptionAttachments(attachments...))
+		if notification.Slack.Blocks != "" {
+			msgOptions = append(msgOptions, slack.MsgOptionBlocks(blocks.BlockSet...))
+		}
 		slackNotification = notification.Slack
 	}
 
