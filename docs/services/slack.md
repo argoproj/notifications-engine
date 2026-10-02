@@ -206,3 +206,38 @@ template.app-sync-failed: |
 ```
 
 The message is sent according to the `deliveryPolicy` string field under the `slack` field. The available modes are `Post` (default), `PostAndUpdate`, and `Update`. The `PostAndUpdate` and `Update` settings require `groupingKey` to be set.
+
+## Mentioning users, channels, and user groups
+
+Slack supports rich mentions via special formatting strings. Because most workflows only have an email address or a human-readable name rather than a Slack ID, notifications-engine provides three template functions that perform the lookup automatically.
+
+| Function | Output format | Required OAuth scopes |
+|---|---|---|
+| `slackUserByEmail "user@example.com"` | `<@USERID>` | `users:read`, `users:read.email` |
+| `slackChannel "channel-name"` | `<#CHANNELID>` | `channels:read`, `groups:read` |
+| `slackUserGroup "handle-or-name"` | `<!subteam^GROUPID>` | `usergroups:read` |
+
+Results are cached in-memory for the lifetime of the process to minimise API calls. If a lookup fails the function logs a warning and returns an empty string, so the rest of the message is still delivered.
+
+```yaml
+template.app-sync-succeeded: |
+  message: |
+    Application {{.app.metadata.name}} synced successfully.
+    Deployed by {{slackUserByEmail "deployer@example.com"}}.
+    See {{slackChannel "deployments"}} for details.
+    Ping {{slackUserGroup "oncall"}} if anything looks wrong.
+```
+
+## Commit author for multi-source applications
+
+For **single-source** applications the commit author can be accessed with:
+
+```
+{{(call .repo.GetCommitMetadata .app.status.sync.revision).Author}}
+```
+
+For **multi-source** applications `.app.status.sync.revision` is empty; the revisions are stored as a list in `.app.status.sync.revisions`. Use the built-in `index` function to select the revision for the source you care about:
+
+```
+{{(call .repo.GetCommitMetadata (index .app.status.sync.revisions 0)).Author}}
+```
