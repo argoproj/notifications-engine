@@ -290,6 +290,44 @@ func TestGetTemplater_Github_RepositoryDispatch(t *testing.T) {
 	assert.JSONEq(t, `{ "sha": "0123456789" }`, notification.GitHub.RepositoryDispatch.ClientPayload)
 }
 
+func TestGetTemplater_Github_WorkflowDispatch(t *testing.T) {
+	n := Notification{
+		GitHub: &GitHubNotification{
+			RepoURLPath:  "{{.sync.spec.git.repo}}",
+			RevisionPath: "{{.sync.status.lastSyncedCommit}}",
+			WorkflowDispatch: &GitHubWorkflowDispatch{
+				Workflow: "deploy.yml",
+				Ref:      "{{.sync.spec.git.branch}}",
+				Inputs:   `{ "sha": "{{.sync.status.lastSyncedCommit}}" }`,
+			},
+		},
+	}
+	templater, err := n.GetTemplater("", template.FuncMap{})
+
+	require.NoError(t, err)
+
+	var notification Notification
+	err = templater(&notification, map[string]any{
+		"sync": map[string]any{
+			"spec": map[string]any{
+				"git": map[string]any{
+					"repo":   "https://github.com/argoproj-labs/argocd-notifications.git",
+					"branch": "main",
+				},
+			},
+			"status": map[string]any{
+				"lastSyncedCommit": "0123456789",
+			},
+		},
+	})
+
+	require.NoError(t, err)
+
+	assert.Equal(t, "deploy.yml", notification.GitHub.WorkflowDispatch.Workflow)
+	assert.Equal(t, "main", notification.GitHub.WorkflowDispatch.Ref)
+	assert.JSONEq(t, `{ "sha": "0123456789" }`, notification.GitHub.WorkflowDispatch.Inputs)
+}
+
 func TestGetTemplater_Github_PullRequestCommentWithTag(t *testing.T) {
 	n := Notification{
 		GitHub: &GitHubNotification{
@@ -438,29 +476,47 @@ func (m *mockChecksService) CreateCheckRun(_ context.Context, _, _ string, opts 
 	return &github.CheckRun{}, nil, nil
 }
 
+type workflowDispatchCall struct {
+	workflow string
+	event    github.CreateWorkflowDispatchEventRequest
+}
+
+type mockActionsService struct {
+	dispatches []workflowDispatchCall
+}
+
+func (m *mockActionsService) CreateWorkflowDispatchEventByFileName(_ context.Context, _, _, workflowFileName string, event github.CreateWorkflowDispatchEventRequest) (*github.Response, error) {
+	m.dispatches = append(m.dispatches, workflowDispatchCall{workflow: workflowFileName, event: event})
+	return nil, nil
+}
+
 // Mock client implementation
 type mockGitHubClientImpl struct {
-	issues *mockIssuesService
-	prs    *mockPullRequestsService
-	repos  *mockRepositoriesService
-	checks *mockChecksService
+	issues  *mockIssuesService
+	prs     *mockPullRequestsService
+	repos   *mockRepositoriesService
+	checks  *mockChecksService
+	actions *mockActionsService
 }
 
 func (m *mockGitHubClientImpl) GetIssues() issuesService             { return m.issues }
 func (m *mockGitHubClientImpl) GetPullRequests() pullRequestsService { return m.prs }
 func (m *mockGitHubClientImpl) GetRepositories() repositoriesService { return m.repos }
 func (m *mockGitHubClientImpl) GetChecks() checksService             { return m.checks }
+func (m *mockGitHubClientImpl) GetActions() actionsService           { return m.actions }
 
 func setupMockServices() (*mockIssuesService, *mockPullRequestsService, *mockRepositoriesService, githubClient) {
 	issues := &mockIssuesService{comments: []*github.IssueComment{}}
 	pulls := &mockPullRequestsService{prs: []*github.PullRequest{{Number: github.Ptr(1)}}}
 	repos := &mockRepositoriesService{}
 	checks := &mockChecksService{}
+	actions := &mockActionsService{}
 	client := &mockGitHubClientImpl{
-		issues: issues,
-		prs:    pulls,
-		repos:  repos,
-		checks: checks,
+		issues:  issues,
+		prs:     pulls,
+		repos:   repos,
+		checks:  checks,
+		actions: actions,
 	}
 	return issues, pulls, repos, client
 }
@@ -488,6 +544,31 @@ func TestGitHubService_Send_RepositoryDispatch(t *testing.T) {
 	payload, err := repos.dispatches[0].ClientPayload.MarshalJSON()
 	require.NoError(t, err)
 	assert.JSONEq(t, `{ "sha": "12345678" }`, string(payload))
+}
+
+func TestGitHubService_Send_WorkflowDispatch(t *testing.T) {
+	_, _, _, client := setupMockServices()
+	actions := client.(*mockGitHubClientImpl).actions
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			WorkflowDispatch: &GitHubWorkflowDispatch{
+				Workflow: "deploy.yml",
+				Ref:      "main",
+				Inputs:   `{ "environment": "prod" }`,
+			},
+		},
+	}, Destination{})
+
+	require.NoError(t, err)
+	require.Len(t, actions.dispatches, 1)
+	assert.Equal(t, "deploy.yml", actions.dispatches[0].workflow)
+	assert.Equal(t, "main", actions.dispatches[0].event.Ref)
+	assert.Equal(t, map[string]any{"environment": "prod"}, actions.dispatches[0].event.Inputs)
 }
 
 func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
