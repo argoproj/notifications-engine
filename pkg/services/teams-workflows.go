@@ -162,6 +162,10 @@ func (n *TeamsWorkflowsNotification) GetTemplater(name string, f texttemplate.Fu
 type TeamsWorkflowsOptions struct {
 	RecipientUrls      map[string]string `json:"recipientUrls"`
 	InsecureSkipVerify bool              `json:"insecureSkipVerify"`
+	// RawCardPayload sends the AdaptiveCard JSON directly as the POST body,
+	// skipping the "type":"message" + "attachments" envelope. Use this for
+	// webhook endpoints that expect the card at the root level.
+	RawCardPayload bool `json:"rawCardPayload"`
 	httputil.TransportOptions
 }
 
@@ -223,7 +227,7 @@ func (s teamsWorkflowsService) Send(notification Notification, dest Destination)
 	}
 
 	// Generate message payload
-	message, err := teamsWorkflowsNotificationToReader(notification)
+	message, err := teamsWorkflowsNotificationToReader(notification, s.opts.RawCardPayload)
 	if err != nil {
 		return fmt.Errorf("failed to generate message payload for teams-workflows: %w", err)
 	}
@@ -484,15 +488,19 @@ func buildAdaptiveCard(data *notificationData) *adaptiveCard {
 	return card
 }
 
-func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
+func teamsWorkflowsNotificationToReader(n Notification, rawCardPayload bool) ([]byte, error) {
 	// Check if a custom AdaptiveCard template is provided
 	if n.TeamsWorkflows != nil && n.TeamsWorkflows.AdaptiveCard != "" {
-		// Use the custom AdaptiveCard template directly, wrapped in message envelope.
+		// Use the custom AdaptiveCard template directly.
 		// Keep it as raw JSON so custom cards are not lossy-converted through limited structs.
 		cardBytes := bytes.TrimSpace([]byte(n.TeamsWorkflows.AdaptiveCard))
 		var raw json.RawMessage
 		if err := json.Unmarshal(cardBytes, &raw); err != nil {
 			return nil, fmt.Errorf("teams-workflows adaptiveCard unmarshalling error %w", err)
+		}
+
+		if rawCardPayload {
+			return raw, nil
 		}
 
 		payload := adaptiveMessage{
@@ -513,12 +521,17 @@ func teamsWorkflowsNotificationToReader(n Notification) ([]byte, error) {
 		return nil, err
 	}
 
-	// Build AdaptiveCard and wrap it in the message envelope
+	// Build AdaptiveCard
 	card := buildAdaptiveCard(data)
 	cardBytes, err := json.Marshal(card)
 	if err != nil {
 		return nil, fmt.Errorf("teams-workflows adaptive card marshalling error %w", err)
 	}
+
+	if rawCardPayload {
+		return cardBytes, nil
+	}
+
 	payload := adaptiveMessage{
 		Type: "message",
 		Attachments: []adaptiveAttachment{
