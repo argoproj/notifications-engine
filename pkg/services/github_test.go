@@ -133,6 +133,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 				RequiredContexts:     []string{},
 				AutoMerge:            &f,
 				TransientEnvironment: &tr,
+				Payload:              `{"image":"registry/app:{{.sync.status.lastSyncedCommit}}"}`,
 			},
 		},
 	}
@@ -171,6 +172,7 @@ func TestGetTemplater_GitHub_Deployment(t *testing.T) {
 	assert.Equal(t, &f, notification.GitHub.Deployment.AutoMerge)
 	assert.Equal(t, &tr, notification.GitHub.Deployment.TransientEnvironment)
 	assert.Equal(t, "v0.0.1", notification.GitHub.Deployment.Reference)
+	assert.JSONEq(t, `{"image":"registry/app:0123456789"}`, notification.GitHub.Deployment.Payload)
 }
 
 func TestNewGitHubService_GitHubOptions(t *testing.T) {
@@ -403,7 +405,8 @@ type mockPullRequestsService struct {
 }
 
 type mockRepositoriesService struct {
-	dispatches []github.DispatchRequestOptions
+	dispatches        []github.DispatchRequestOptions
+	lastDeploymentReq *github.DeploymentRequest
 }
 
 func (m *mockRepositoriesService) CreateStatus(_ context.Context, _, _, _ string, status *github.RepoStatus) (*github.RepoStatus, *github.Response, error) {
@@ -414,7 +417,8 @@ func (m *mockRepositoriesService) ListDeployments(_ context.Context, _, _ string
 	return nil, nil, nil
 }
 
-func (m *mockRepositoriesService) CreateDeployment(_ context.Context, _, _ string, _ *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
+func (m *mockRepositoriesService) CreateDeployment(_ context.Context, _, _ string, req *github.DeploymentRequest) (*github.Deployment, *github.Response, error) {
+	m.lastDeploymentReq = req
 	return &github.Deployment{ID: github.Ptr(int64(1))}, nil, nil
 }
 
@@ -488,6 +492,52 @@ func TestGitHubService_Send_RepositoryDispatch(t *testing.T) {
 	payload, err := repos.dispatches[0].ClientPayload.MarshalJSON()
 	require.NoError(t, err)
 	assert.JSONEq(t, `{ "sha": "12345678" }`, string(payload))
+}
+
+func TestGitHubService_Send_Deployment_ForwardsPayload(t *testing.T) {
+	_, _, repos, client := setupMockServices()
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			Deployment: &GitHubDeployment{
+				State:       "success",
+				Environment: "production",
+				Reference:   "abc123",
+				Payload:     `{"image":"registry/app:1.2.3"}`,
+			},
+		},
+	}, Destination{})
+
+	require.NoError(t, err)
+	require.NotNil(t, repos.lastDeploymentReq)
+	require.NotNil(t, repos.lastDeploymentReq.Payload)
+	assert.JSONEq(t, `{"image":"registry/app:1.2.3"}`, repos.lastDeploymentReq.Payload.(string))
+}
+
+func TestGitHubService_Send_Deployment_OmitsEmptyPayload(t *testing.T) {
+	_, _, repos, client := setupMockServices()
+
+	service := &gitHubService{client: client}
+
+	err := service.Send(Notification{
+		GitHub: &GitHubNotification{
+			repoURL:  "https://github.com/owner/repo",
+			revision: "abc123",
+			Deployment: &GitHubDeployment{
+				State:       "success",
+				Environment: "production",
+				Reference:   "abc123",
+			},
+		},
+	}, Destination{})
+
+	require.NoError(t, err)
+	require.NotNil(t, repos.lastDeploymentReq)
+	assert.Nil(t, repos.lastDeploymentReq.Payload)
 }
 
 func TestGitHubService_Send_PullRequestCommentWithTag(t *testing.T) {
