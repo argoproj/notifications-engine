@@ -32,7 +32,7 @@ kind: Secret
 metadata:
   name: <secret-name>
 stringData:
-  space-webhook-url: https://chat.googleapis.com/v1/spaces/<space_id>/messages?key=<key>&token=<token>  
+  space-webhook-url: https://chat.googleapis.com/v1/spaces/<space_id>/messages?key=<key>&token=<token>
 ```
 
 6. Create a subscription for your space
@@ -47,14 +47,9 @@ metadata:
 
 ## Templates
 
-You can send [simple text](https://developers.google.com/chat/reference/message-formats/basic) or [card messages](https://developers.google.com/chat/reference/message-formats/cards) to a Google Chat space. A simple text message template can be defined as follows:
+### Card Message
 
-```yaml
-template.app-sync-succeeded: |
-  message: The app {{ .app.metadata.name }} has successfully synced!
-```
-
-A card message can be defined as follows:
+You can send [card messages](https://developers.google.com/chat/reference/message-formats/cards) to a Google Chat space. A card message can be defined as follows:
 
 ```yaml
 template.app-sync-succeeded: |
@@ -82,6 +77,53 @@ in notifications. It is also possible to use the previous (now deprecated) `card
 but this is not recommended as Google has deprecated this field and recommends using the newer `cardsV2`.
 
 The card message can be written in JSON too.
+
+### Simple Text
+
+You can send [simple text](https://developers.google.com/chat/reference/message-formats/basic) to a Google Chat space. A simple text message template can be defined as follows:
+
+```yaml
+template.app-sync-succeeded: |
+  googlechat:
+    text: The app {{ .app.metadata.name }} has successfully synced!
+```
+
+If neither `googlechat.text` nor `googlechat.cardsV2`/`googlechat.cards` is specified, it default to `message` field:
+
+```yaml
+template.app-sync-succeeded: |
+  message: The app {{ .app.metadata.name }} has successfully synced!
+```
+
+If you want to include simple text even if cards are specified or text is resolved to empty (or not provided), you can still default to `message` field:
+
+```yaml
+template.app-sync-succeeded: |
+  message: The app {{ .app.metadata.name }} has successfully synced!
+  googlechat:
+    text: "{{if false}}never{{end}}"
+    defaultTextToMessage: true
+```
+
+### Fallback Text
+
+You can provide a [fallback text](https://developers.google.com/workspace/chat/api/reference/rest/v1/spaces.messages#Message.FIELDS.fallback_text) to be used when sending messages. It's a plain-text description of the message's cards, used when the actual cards can't be displayed—for example, mobile notifications. The fallback text can be defined as follows:
+
+```yaml
+template.app-sync-succeeded: |
+  googlechat:
+    fallbackText: The app {{ .app.metadata.name }} has successfully synced!
+```
+
+If you want to include fallback text even if it is resolved to empty (or not provided), you can still default to `message` field:
+
+```yaml
+template.app-sync-succeeded: |
+  message: The app {{ .app.metadata.name }} has successfully synced!
+  googlechat:
+    fallbackText: "{{if false}}never{{end}}"
+    defaultFallbackTextToMessage: true
+```
 
 ## Chat Threads
 
