@@ -7,13 +7,11 @@ The GitHub notification service changes commit status using [GitHub Apps](https:
 - `appID` - the app id
 - `installationID` - the app installation id
 - `privateKey` - the app private key
-- `enterpriseBaseURL` - optional URL, e.g. https://git.example.com/api/v3
+- `enterpriseBaseURL` - optional URL, e.g. https://git.example.com
 - `maxIdleConns` - optional, maximum number of idle (keep-alive) connections across all hosts.
 - `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
 - `maxConnsPerHost` - optional, maximum total connections per host.
 - `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing.
-
-> ⚠️ _NOTE:_ Specifying `/api/v3` in the `enterpriseBaseURL` is required until [argoproj/notifications-engine#205](https://github.com/argoproj/notifications-engine/issues/205) is resolved.
 
 ## Configuration
 
