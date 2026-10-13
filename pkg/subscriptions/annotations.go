@@ -61,8 +61,8 @@ type Destination struct {
 func (a Annotations) iterate(callback func(trigger string, service string, recipients []string, key string)) {
 	prefix := annotationPrefix + "/subscribe."
 	altPrefix := annotationPrefix + "/subscriptions"
-	var recipients []string
 	for k, v := range a {
+		var recipients []string
 		switch {
 		case strings.HasPrefix(k, prefix):
 			parts := strings.Split(k[len(prefix):], ".")
@@ -128,8 +128,6 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 					}
 				}
 			}
-		default:
-			callback("", "", recipients, k)
 		}
 	}
 }
