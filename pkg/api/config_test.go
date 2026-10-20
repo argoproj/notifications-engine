@@ -190,10 +190,15 @@ func TestParseConfig_RetiredTeams(t *testing.T) {
 	for _, key := range []string{"service.teams", "service.teams.custom", "service.teams.shared"} {
 		t.Run(key, func(t *testing.T) {
 			cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
-				key:                              "recipientUrls: [", // Obsolete options must not be parsed.
+				key:                              "recipientUrls: {}",
 				"service.teams-workflows.shared": "recipientUrls: {}",
 				"service.webhook":                "url: https://example.com",
-				"template.mixed":                 "message: hello\nteams:\n  title: '{{obsoleteFunction}}'\nteams-workflows:\n  title: hello\n",
+				"template.mixed": `message: hello
+teams:
+  title: '{{obsoleteFunction}}'
+teams-workflows:
+  title: hello
+`,
 			}}, emptySecret)
 			require.NoError(t, err)
 			require.Len(t, cfg.Services, 2)
@@ -209,8 +214,9 @@ func TestParseConfig_RetiredTeams(t *testing.T) {
 
 func TestParseConfig_RetiredTeamsPreservesValidation(t *testing.T) {
 	_, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
-		"service.teams":   "recipientUrls: [",
-		"service.webhook": "url: [",
+		"service.teams": "recipientUrls: {}",
+		// An undefined YAML alias must still be rejected for supported services.
+		"service.webhook": "url: *undefined",
 	}}, emptySecret)
 	require.ErrorContains(t, err, "webhook")
 }
@@ -219,11 +225,16 @@ func TestParseConfig_RetiredTeamsTemplateWarning(t *testing.T) {
 	oldHooks := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
 	t.Cleanup(func() { log.StandardLogger().ReplaceHooks(oldHooks) })
 	hook := logtest.NewGlobal()
-	for _, retired := range []string{"teams:\n  title: '{{obsoleteFunction}}'\n", "teams: null\n", "teams: ignored\n"} {
+	for _, retired := range []string{`teams:
+  title: '{{obsoleteFunction}}'
+`, "teams: null\n", "teams: ignored\n"} {
 		t.Run(retired, func(t *testing.T) {
 			hook.Reset()
 			cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
-				"template.mixed": retired + "message: hello\nteams-workflows:\n  title: Supported\n",
+				"template.mixed": retired + `message: hello
+teams-workflows:
+  title: Supported
+`,
 			}}, emptySecret)
 			require.NoError(t, err)
 			entry := hook.LastEntry()
@@ -239,7 +250,10 @@ func TestParseConfig_RetiredTeamsTemplateWarning(t *testing.T) {
 	}
 	hook.Reset()
 	_, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
-		"template.supported": "message: hello\nteams-workflows:\n  title: Supported\n",
+		"template.supported": `message: hello
+teams-workflows:
+  title: Supported
+`,
 	}}, emptySecret)
 	require.NoError(t, err)
 	assert.Empty(t, hook.AllEntries())
