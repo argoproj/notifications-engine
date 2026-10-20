@@ -6,6 +6,8 @@ import (
 	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/subscriptions"
 
+	log "github.com/sirupsen/logrus"
+	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -182,4 +184,77 @@ func TestParseConfig_Subscriptions(t *testing.T) {
 	assert.Equal(t, subscriptions.DefaultSubscriptions([]subscriptions.DefaultSubscription{
 		{Triggers: []string{"my-trigger2"}, Selector: label},
 	}), cfg.Subscriptions)
+}
+
+func TestParseConfig_RetiredTeams(t *testing.T) {
+	for _, key := range []string{"service.teams", "service.teams.custom", "service.teams.shared"} {
+		t.Run(key, func(t *testing.T) {
+			cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
+				key:                              "recipientUrls: {}",
+				"service.teams-workflows.shared": "recipientUrls: {}",
+				"service.webhook":                "url: https://example.com",
+				"template.mixed": `message: hello
+teams:
+  title: '{{obsoleteFunction}}'
+teams-workflows:
+  title: hello
+`,
+			}}, emptySecret)
+			require.NoError(t, err)
+			require.Len(t, cfg.Services, 2)
+			require.Contains(t, cfg.Services, "shared")
+			require.Contains(t, cfg.Services, "webhook")
+			instance, err := NewAPI(*cfg, nil)
+			require.NoError(t, err)
+			assert.Len(t, instance.GetNotificationServices(), 2)
+			require.ErrorContains(t, instance.Send(nil, []string{"mixed"}, services.Destination{Service: "teams"}), "not supported")
+		})
+	}
+}
+
+func TestParseConfig_RetiredTeamsPreservesValidation(t *testing.T) {
+	_, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
+		"service.teams": "recipientUrls: {}",
+		// An undefined YAML alias must still be rejected for supported services.
+		"service.webhook": "url: *undefined",
+	}}, emptySecret)
+	require.ErrorContains(t, err, "webhook")
+}
+
+func TestParseConfig_RetiredTeamsTemplateWarning(t *testing.T) {
+	oldHooks := log.StandardLogger().ReplaceHooks(make(log.LevelHooks))
+	t.Cleanup(func() { log.StandardLogger().ReplaceHooks(oldHooks) })
+	hook := logtest.NewGlobal()
+	for _, retired := range []string{`teams:
+  title: '{{obsoleteFunction}}'
+`, "teams: null\n", "teams: ignored\n"} {
+		t.Run(retired, func(t *testing.T) {
+			hook.Reset()
+			cfg, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
+				"template.mixed": retired + `message: hello
+teams-workflows:
+  title: Supported
+`,
+			}}, emptySecret)
+			require.NoError(t, err)
+			entry := hook.LastEntry()
+			require.NotNil(t, entry)
+			assert.Equal(t, log.WarnLevel, entry.Level)
+			assert.Contains(t, entry.Message, "template.mixed")
+			assert.Contains(t, entry.Message, "teams-workflows")
+			_, err = NewAPI(*cfg, nil)
+			require.NoError(t, err)
+			require.NotNil(t, cfg.Templates["mixed"].TeamsWorkflows)
+			assert.Equal(t, "Supported", cfg.Templates["mixed"].TeamsWorkflows.Title)
+		})
+	}
+	hook.Reset()
+	_, err := ParseConfig(&corev1.ConfigMap{Data: map[string]string{
+		"template.supported": `message: hello
+teams-workflows:
+  title: Supported
+`,
+	}}, emptySecret)
+	require.NoError(t, err)
+	assert.Empty(t, hook.AllEntries())
 }

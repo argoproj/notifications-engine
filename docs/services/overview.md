@@ -47,8 +47,8 @@ metadata:
 * [Grafana](./grafana.md)
 * [Webhook](./webhook.md)
 * [Telegram](./telegram.md)
-* [Teams (Office 365 Connectors)](./teams.md) - Legacy service (deprecated, retires March 31, 2026)
-* [Teams Workflows](./teams-workflows.md) - Recommended replacement for Office 365 Connectors
+* [Teams (Office 365 Connectors)](./teams.md) - Retired by Microsoft on May 22, 2026; no longer supported
+* [Teams Workflows](./teams-workflows.md) - Only supported notification service for Microsoft Teams after the Office 365 Connectors retirement
 * [Google Chat](./googlechat.md)
 * [Rocket.Chat](./rocketchat.md)
 * [Pushover](./pushover.md)

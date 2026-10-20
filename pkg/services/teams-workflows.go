@@ -544,3 +544,9 @@ func teamsWorkflowsNotificationToReader(n Notification, rawCardPayload bool) ([]
 
 	return json.Marshal(payload)
 }
+
+// MessageCard compatibility payload types used by Teams Workflows.
+type (
+	teamsSection = map[string]any
+	teamsAction  = map[string]any
+)
