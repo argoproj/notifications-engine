@@ -92,3 +92,32 @@ template.app-deployed: |
         }]
       }]
 ```
+
+### Acknowledgement and group reset
+
+Set `requestedAck: true` to request Mattermost's native acknowledgement on root
+posts (Important priority, persistent reminders disabled). Replies never request
+acknowledgement. Acknowledging a post does not reset its group.
+
+Set `resetGroupingKey: true` on a recovery template using the same `groupingKey`
+as its problem template. The selected delivery policy runs first; only after
+successful delivery is the cached root ID cleared. The next problem creates a
+new root. Without a known root, recovery is silently skipped. Reset without a
+grouping key is a configuration error.
+
+These options only affect delivery. Configure a recovery trigger separately.
+Group IDs remain in memory: restart loses them, and replicas do not share them.
+The existing partial-failure retry behavior of `PostAndUpdate` is unchanged.
+
+```yaml
+# Problem template
+mattermost:
+  groupingKey: "{{.app.metadata.uid}}:health"
+  deliveryPolicy: Post
+  requestedAck: true
+# Recovery template (separate notification)
+# mattermost:
+#   groupingKey: "{{.app.metadata.uid}}:health"
+#   deliveryPolicy: Post
+#   resetGroupingKey: true
+```

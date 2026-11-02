@@ -15,9 +15,11 @@ import (
 )
 
 type MattermostNotification struct {
-	Attachments    string                   `json:"attachments,omitempty"`
-	GroupingKey    string                   `json:"groupingKey,omitempty"`
-	DeliveryPolicy MattermostDeliveryPolicy `json:"deliveryPolicy,omitempty"`
+	RequestedAck     bool                     `json:"requestedAck,omitempty"`
+	ResetGroupingKey bool                     `json:"resetGroupingKey,omitempty"`
+	Attachments      string                   `json:"attachments,omitempty"`
+	GroupingKey      string                   `json:"groupingKey,omitempty"`
+	DeliveryPolicy   MattermostDeliveryPolicy `json:"deliveryPolicy,omitempty"`
 }
 
 type MattermostDeliveryPolicy string
@@ -67,6 +69,8 @@ func (n *MattermostNotification) GetTemplater(name string, f texttemplate.FuncMa
 		}
 		notification.Mattermost.GroupingKey = groupingKeyData.String()
 		notification.Mattermost.DeliveryPolicy = n.DeliveryPolicy
+		notification.Mattermost.RequestedAck = n.RequestedAck
+		notification.Mattermost.ResetGroupingKey = n.ResetGroupingKey
 		return nil
 	}, nil
 }
@@ -138,8 +142,11 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 
 	deliveryPolicy := MattermostPost
 	groupingKey := ""
+	requestedAck, resetGroupingKey := false, false
 	if notification.Mattermost != nil {
 		groupingKey = notification.Mattermost.GroupingKey
+		requestedAck = notification.Mattermost.RequestedAck
+		resetGroupingKey = notification.Mattermost.ResetGroupingKey
 		if notification.Mattermost.DeliveryPolicy != "" {
 			deliveryPolicy = notification.Mattermost.DeliveryPolicy
 		}
@@ -148,7 +155,10 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 		return fmt.Errorf("unsupported Mattermost delivery policy %q", deliveryPolicy)
 	}
 	if groupingKey == "" {
-		_, err = m.post(client, notification.Message, attachments, dest.Recipient, "", false)
+		if resetGroupingKey {
+			return errors.New("resetGroupingKey requires a groupingKey")
+		}
+		_, err = m.post(client, notification.Message, attachments, dest.Recipient, "", false, requestedAck)
 		return err
 	}
 
@@ -156,7 +166,11 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 	update.mutex.Lock()
 	defer update.mutex.Unlock()
 	if update.postID == "" {
-		postID, err := m.post(client, notification.Message, attachments, dest.Recipient, "", true)
+		// A recovery without a known problem must not create a new root.
+		if resetGroupingKey {
+			return nil
+		}
+		postID, err := m.post(client, notification.Message, attachments, dest.Recipient, "", true, requestedAck)
 		if err != nil {
 			return err
 		}
@@ -165,23 +179,34 @@ func (m *mattermostService) Send(notification Notification, dest Destination) er
 	}
 
 	if deliveryPolicy == MattermostPost || deliveryPolicy == MattermostPostAndUpdate {
-		if _, err := m.post(client, notification.Message, attachments, dest.Recipient, update.postID, false); err != nil {
+		if _, err := m.post(client, notification.Message, attachments, dest.Recipient, update.postID, false, false); err != nil {
 			return err
 		}
 	}
 	if deliveryPolicy == MattermostUpdate || deliveryPolicy == MattermostPostAndUpdate {
-		return m.update(client, notification.Message, attachments, update.postID)
+		if err := m.update(client, notification.Message, attachments, update.postID); err != nil {
+			return err
+		}
+	}
+	if resetGroupingKey {
+		// Keep the per-key lock: deleting the entry would race with waiting senders.
+		update.postID = ""
 	}
 	return nil
 }
 
-func (m *mattermostService) post(client *http.Client, message string, attachments []any, channelID, rootID string, requireID bool) (string, error) {
+func (m *mattermostService) post(client *http.Client, message string, attachments []any, channelID, rootID string, requireID, requestedAck bool) (string, error) {
 	body := map[string]any{
 		"channel_id": channelID,
 		"message":    message,
 		"props": map[string]any{
 			"attachments": attachments,
 		},
+	}
+	if rootID == "" && requestedAck {
+		body["metadata"] = map[string]any{"priority": map[string]any{
+			"priority": "important", "requested_ack": true, "persistent_notifications": false,
+		}}
 	}
 	if rootID != "" {
 		body["root_id"] = rootID
