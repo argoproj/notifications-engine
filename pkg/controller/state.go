@@ -68,6 +68,17 @@ func (s NotificationsState) SetAlreadyNotified(isSelfConfig bool, apiNamespace, 
 	return true
 }
 
+// RemoveAlreadyNotified drops the state of given trigger/destination regardless of oncePer and returns if the state has been changed.
+// It is meant for rolling back the state recorded before a delivery that subsequently failed.
+func (s NotificationsState) RemoveAlreadyNotified(isSelfConfig bool, apiNamespace, trigger string, result triggers.ConditionResult, dest services.Destination) bool {
+	key := StateItemKey(isSelfConfig, apiNamespace, trigger, result, dest)
+	if _, ok := s[key]; !ok {
+		return false
+	}
+	delete(s, key)
+	return true
+}
+
 func (s NotificationsState) Persist(res metav1.Object) (map[string]string, error) {
 	s.truncate(notifiedHistoryMaxSize)
 
