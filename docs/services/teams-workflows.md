@@ -194,6 +194,10 @@ service.teams-workflows: |
 ```
 When enabled, the Adaptive Card is sent directly as the request body without the `message` + `attachments` envelope.
 
+For Power Automate flows using raw payloads, pass the webhook trigger body directly to the **Post card in a chat or channel** action. In code view, this is represented as `@triggerBody()`.
+
+If an existing flow uses `attachments[0].content`, update that mapping because the `attachments` wrapper is not present in raw payload mode.
+
 The default value is `false`, so existing configurations keep the current behavior.
 
 ## Template Fields
