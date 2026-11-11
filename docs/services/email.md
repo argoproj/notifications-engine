@@ -27,6 +27,22 @@ To Generate an app password, follow this link https://myaccount.google.com/apppa
 
 ## Example
 
+Replace `<secret-name>` with the configured notifications Secret name (`argocd-notifications-secret` by default in Argo CD).
+Create the Secret in the same namespace as `argocd-notifications-cm`.
+The keys below match the `$username`, `$password`, and `$email-address` references in the service configuration.
+Use `stringData` to provide the values without base64 encoding, and do not commit real credentials to Git.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: <secret-name>
+stringData:
+  username: <your-gmail-address>
+  password: <your-app-password>
+  email-address: <sender-email-address>
+```
+
 The following snippet contains sample Gmail service configuration:
 
 ```yaml
@@ -74,3 +90,18 @@ data:
       {{if eq .serviceType "slack"}}:white_check_mark:{{end}} Application {{.app.metadata.name}} has been successfully synced at {{.app.status.operationState.finishedAt}}.
       Sync operation details are available at: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}?operation=true .
 ```
+
+## Subscriptions
+
+With the `on-sync-succeeded` [trigger](../triggers.md) configured to send the `app-sync-succeeded` template,
+add the following annotation to an existing Application to subscribe it to the Gmail service above:
+
+```yaml
+metadata:
+  annotations:
+    notifications.argoproj.io/subscribe.on-sync-succeeded.gmail: user@example.com
+```
+
+`service.email.gmail` defines an email service named `gmail`, so the annotation uses `.gmail`, not `.email.gmail`.
+If the service is configured as `service.email` instead, use `notifications.argoproj.io/subscribe.on-sync-succeeded.email`.
+To notify multiple recipients, separate their email addresses with `;`, for example `user@example.com;other@example.com`.
