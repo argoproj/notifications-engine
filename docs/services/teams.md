@@ -4,4 +4,4 @@ Microsoft [retired Office 365 Connectors within Teams](https://devblogs.microsof
 
 Use [Teams Workflows](./teams-workflows.md) to send notifications to Microsoft Teams. See its [migration instructions](./teams-workflows.md#migration-from-office-365-connectors) to update service settings, templates, and subscriptions.
 
-Existing `service.teams` entries and `teams` template sections are ignored with migration warnings so other notification services can continue to load.
+Migrate or remove existing `service.teams` and `service.teams.<name>` entries before upgrading. The retired service is no longer recognized, so leftover service entries prevent notification API initialization.
