@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -98,17 +97,11 @@ func ParseConfig(configMap *corev1.ConfigMap, secret *corev1.Secret) (*Config, e
 		switch {
 		case strings.HasPrefix(k, "template."):
 			name := strings.Join(parts[1:], ".")
-			template := struct {
-				services.Notification
-				RetiredTeams json.RawMessage `json:"teams"`
-			}{}
+			template := services.Notification{}
 			if err := yaml.Unmarshal([]byte(v), &template); err != nil {
 				return nil, fmt.Errorf("failed to unmarshal template %s: %w", name, err)
 			}
-			if len(template.RetiredTeams) > 0 {
-				log.Warnf("ignoring retired Teams Office 365 Connector section in template %q; migrate to teams-workflows", k)
-			}
-			cfg.Templates[name] = template.Notification
+			cfg.Templates[name] = template
 		case strings.HasPrefix(k, "service."):
 			name := ""
 			serviceType := ""
@@ -120,12 +113,6 @@ func ParseConfig(configMap *corev1.ConfigMap, secret *corev1.Secret) (*Config, e
 				serviceType, name = parts[1], parts[1]
 			default:
 				return nil, fmt.Errorf("invalid service key; expected 'service.<type>(.<name>)' but got '%s'", k)
-			}
-
-			// Retired connector configuration must not prevent supported services from loading.
-			if serviceType == "teams" {
-				log.Warnf("ignoring retired Teams Office 365 Connector service %q; migrate to teams-workflows", k)
-				continue
 			}
 
 			optsData, err := replaceServiceConfigSecrets(v, secret)
