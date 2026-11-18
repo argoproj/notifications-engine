@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	texttemplate "text/template"
 
 	"github.com/argoproj/notifications-engine/pkg/services"
 	"github.com/argoproj/notifications-engine/pkg/templates"
@@ -63,7 +64,12 @@ func (n *api) Send(obj map[string]any, templates []string, dest services.Destina
 	}
 	in[serviceTypeVarName] = dest.Service
 	in[recipientVarName] = dest.Recipient
-	notification, err := n.templatesService.FormatNotification(in, templates...)
+
+	var extraFuncs texttemplate.FuncMap
+	if p, ok := notificationService.(services.TemplateFuncsProvider); ok {
+		extraFuncs = p.TemplateFuncs()
+	}
+	notification, err := n.templatesService.FormatNotification(in, extraFuncs, templates...)
 	if err != nil {
 		return err
 	}
@@ -90,6 +96,7 @@ func NewAPI(cfg Config, getVars GetVars) (*api, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	templatesService, err := templates.NewService(cfg.Templates)
 	if err != nil {
 		return nil, err
