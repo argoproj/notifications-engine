@@ -449,11 +449,13 @@ func NewGitHubService(opts GitHubOptions) (*gitHubService, error) {
 	if opts.EnterpriseBaseURL == "" {
 		ghclient = github.NewClient(&http.Client{Transport: itr})
 	} else {
-		itr.BaseURL = opts.EnterpriseBaseURL
 		ghclient, err = github.NewClient(&http.Client{Transport: itr}).WithEnterpriseURLs(opts.EnterpriseBaseURL, "")
 		if err != nil {
 			return nil, err
 		}
+		// ghinstallation builds the app token request URL on its own, so it needs the
+		// API base URL WithEnterpriseURLs derived, which appends /api/v3 when missing.
+		itr.BaseURL = strings.TrimSuffix(ghclient.BaseURL.String(), "/")
 	}
 
 	return &gitHubService{
