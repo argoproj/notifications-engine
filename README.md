@@ -1,7 +1,7 @@
 # Notifications Engine
 
 Notifications Engine is a configuration-driven Golang library that provides notifications for cloud-native applications.
-The project provides integration with dozen of services like Slack, MS Teams, Mattermost, SMTP, Telegram, Netgenie, and the list keeps growing.
+The project provides integration with dozen of services like Slack, MS Teams, Mattermost, Rocket.Chat, SMTP, Telegram, Netgenie, and the list keeps growing.
 
 <p align="center">
 <img width="460" src="https://user-images.githubusercontent.com/426437/115815221-70139a00-a3ab-11eb-8dc9-3e15f6b17804.png">
