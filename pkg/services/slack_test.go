@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 	"text/template"
 
-	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
-
+	"github.com/slack-go/slack"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	slackutil "github.com/argoproj/notifications-engine/pkg/util/slack"
 )
 
 func TestValidIconEmoji(t *testing.T) {
@@ -576,4 +578,118 @@ func TestSlack_SendNotification_WithInvalidJSON(t *testing.T) {
 	)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to unmarshal")
+}
+
+// mentionMockServer returns an httptest server that answers the Slack lookup
+// endpoints used by the template functions.
+func mentionMockServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.Contains(r.URL.Path, "users.lookupByEmail"):
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": slack.User{ID: "U024BE7LH", Name: "testuser"},
+			})
+		case strings.Contains(r.URL.Path, "conversations.list"):
+			response := struct {
+				OK               bool            `json:"ok"`
+				Channels         []slack.Channel `json:"channels"`
+				ResponseMetadata struct {
+					NextCursor string `json:"next_cursor"`
+				} `json:"response_metadata"`
+			}{
+				OK: true,
+				Channels: []slack.Channel{
+					{GroupConversation: slack.GroupConversation{
+						Conversation: slack.Conversation{ID: "C123ABC456"},
+						Name:         "general",
+					}},
+				},
+			}
+			_ = json.NewEncoder(w).Encode(response)
+		case strings.Contains(r.URL.Path, "usergroups.list"):
+			_ = json.NewEncoder(w).Encode(struct {
+				OK         bool              `json:"ok"`
+				UserGroups []slack.UserGroup `json:"usergroups"`
+			}{
+				OK: true,
+				UserGroups: []slack.UserGroup{
+					{ID: "SAZ94GDB8", Handle: "developers", Name: "Developers"},
+				},
+			})
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func newMentionService(t *testing.T, apiURL string) *slackService {
+	t.Helper()
+	svc, ok := NewSlackService(SlackOptions{
+		Token:              "test-token",
+		ApiURL:             apiURL + "/",
+		InsecureSkipVerify: true,
+	}).(*slackService)
+	require.True(t, ok)
+	return svc
+}
+
+func TestSlackTemplateFuncs(t *testing.T) {
+	server := mentionMockServer()
+	defer server.Close()
+
+	fns := newMentionService(t, server.URL).TemplateFuncs()
+
+	t.Run("slackUserByEmail resolves to mention", func(t *testing.T) {
+		byEmail := fns["slackUserByEmail"].(func(string) string)
+		assert.Equal(t, "<@U024BE7LH>", byEmail("user@example.com"))
+	})
+
+	t.Run("slackChannel resolves to link", func(t *testing.T) {
+		channel := fns["slackChannel"].(func(string) string)
+		assert.Equal(t, "<#C123ABC456>", channel("general"))
+	})
+
+	t.Run("slackChannel accepts a leading '#'", func(t *testing.T) {
+		channel := fns["slackChannel"].(func(string) string)
+		assert.Equal(t, "<#C123ABC456>", channel("#general"))
+	})
+
+	t.Run("slackUserGroup resolves by handle", func(t *testing.T) {
+		group := fns["slackUserGroup"].(func(string) string)
+		assert.Equal(t, "<!subteam^SAZ94GDB8>", group("developers"))
+	})
+
+	t.Run("slackUserGroup resolves by name", func(t *testing.T) {
+		group := fns["slackUserGroup"].(func(string) string)
+		assert.Equal(t, "<!subteam^SAZ94GDB8>", group("Developers"))
+	})
+}
+
+func TestSlackTemplateFuncs_NotFound(t *testing.T) {
+	server := mentionMockServer()
+	defer server.Close()
+
+	fns := newMentionService(t, server.URL).TemplateFuncs()
+
+	// Failed lookups log a warning and return an empty string so the rest of
+	// the message is still delivered.
+	assert.Equal(t, "", fns["slackChannel"].(func(string) string)("missing"))
+	assert.Equal(t, "", fns["slackUserGroup"].(func(string) string)("missing"))
+}
+
+func TestSlackTemplateFuncs_InTemplate(t *testing.T) {
+	server := mentionMockServer()
+	defer server.Close()
+
+	svc := newMentionService(t, server.URL)
+
+	n := SlackNotification{Username: `{{slackUserByEmail "user@example.com"}}`}
+	templater, err := n.GetTemplater("test", svc.TemplateFuncs())
+	require.NoError(t, err)
+
+	var result Notification
+	require.NoError(t, templater(&result, map[string]any{}))
+	assert.Equal(t, "<@U024BE7LH>", result.Slack.Username)
 }
