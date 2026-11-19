@@ -69,7 +69,10 @@ func (a Annotations) iterate(callback func(trigger string, service string, recip
 			trigger := parts[0]
 			service := ""
 			if len(parts) >= 2 {
-				service = parts[1]
+				// Join the remaining segments so named services (e.g. "github.orgb",
+				// registered as service.github.orgb in the config) resolve correctly.
+				// Using only parts[1] dropped the name and broke the lookup.
+				service = strings.Join(parts[1:], ".")
 			} else {
 				service = parts[0]
 				trigger = ""
