@@ -265,6 +265,34 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 	assert.Empty(t, annotations[notifiedAnnotationKey])
 }
 
+func TestRetriesNotificationWithOncePerIfSendThrows(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.TODO())
+	defer cancel()
+
+	app := newResource("test", withAnnotations(map[string]string{
+		subscriptions.SubscribeAnnotationKey("my-trigger", "mock"): "recipient",
+	}))
+	ctrl, api, err := newController(t, ctx, newFakeClient(app))
+	require.NoError(t, err)
+
+	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
+	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, OncePer: "rev-1", Templates: []string{"test"}}}, nil).Times(2)
+	gomock.InOrder(
+		api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("boom")),
+		api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil),
+	)
+
+	// The failed delivery must not be recorded as notified, even though the trigger uses oncePer.
+	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+	require.NoError(t, err)
+	assert.Empty(t, annotations[notifiedAnnotationKey])
+
+	// The next reconciliation sends again and, once it succeeds, the state is recorded.
+	annotations, err = ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
+	require.NoError(t, err)
+	assert.NotEmpty(t, annotations[notifiedAnnotationKey])
+}
+
 func TestRemovesAnnotationIfNoTrigger(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.TODO())
 	defer cancel()
