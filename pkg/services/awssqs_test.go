@@ -251,8 +251,42 @@ func TestSendMessageInput_WithMessageGroupId_AwsSqs(t *testing.T) {
 
 	assert.Equal(t, &queueUrl, input.QueueUrl)
 	assert.Equal(t, "Hello", *input.MessageBody)
-	assert.Equal(t, int32(10), input.DelaySeconds)
+	// FIFO queues reject a per-message DelaySeconds, so it must be left unset.
+	assert.Zero(t, input.DelaySeconds)
 	assert.Equal(t, "test-group-id", *input.MessageGroupId)
+}
+
+func TestSendMessageInput_FifoQueueOmitsDelaySeconds_AwsSqs(t *testing.T) {
+	s := NewTypedAwsSqsService(AwsSqsOptions{})
+
+	for _, tc := range []struct {
+		name             string
+		queueUrl         string
+		wantDelaySeconds int32
+	}{
+		{
+			name:             "fifo queue omits DelaySeconds",
+			queueUrl:         "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue.fifo",
+			wantDelaySeconds: 0,
+		},
+		{
+			name:             "standard queue keeps DelaySeconds",
+			queueUrl:         "https://sqs.us-east-1.amazonaws.com/123456789012/test-queue",
+			wantDelaySeconds: 10,
+		},
+		{
+			name:             "standard queue whose name merely contains fifo",
+			queueUrl:         "https://sqs.us-east-1.amazonaws.com/123456789012/fifo-lookalike",
+			wantDelaySeconds: 10,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			queueUrl := tc.queueUrl
+			input := SendMessageInput(s, &queueUrl, Notification{Message: "Hello"})
+
+			assert.Equal(t, tc.wantDelaySeconds, input.DelaySeconds)
+		})
+	}
 }
 
 func TestSendMessageInput_WithoutMessageGroupId_AwsSqs(t *testing.T) {
