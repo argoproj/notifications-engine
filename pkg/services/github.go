@@ -43,6 +43,7 @@ type GitHubNotification struct {
 	RevisionPath       string                    `json:"revisionPath,omitempty"`
 	CheckRun           *GitHubCheckRun           `json:"checkRun,omitempty"`
 	RepositoryDispatch *GitHubRepositoryDispatch `json:"repositoryDispatch,omitempty"`
+	WorkflowDispatch   *GitHubWorkflowDispatch   `json:"workflowDispatch,omitempty"`
 }
 
 type GitHubStatus struct {
@@ -96,6 +97,16 @@ func (e *TooManyGitHubCommitStatusesError) Error() string {
 type GitHubRepositoryDispatch struct {
 	EventType     string `json:"event_type,omitempty"`
 	ClientPayload string `json:"client_payload,omitempty"`
+}
+
+type GitHubWorkflowDispatch struct {
+	// Workflow is the workflow file name (e.g. "deploy.yml") or workflow ID to trigger.
+	Workflow string `json:"workflow,omitempty"`
+	// Ref is the git reference (branch or tag name) the workflow runs from.
+	Ref string `json:"ref,omitempty"`
+	// Inputs is a JSON object of workflow inputs. It is templated and then
+	// decoded into the inputs map sent to GitHub.
+	Inputs string `json:"inputs,omitempty"`
 }
 
 const (
@@ -227,6 +238,22 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			return nil, err
 		}
 		repoDispatchClientPayload, err = texttemplate.New(name).Funcs(f).Parse(g.RepositoryDispatch.ClientPayload)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	var workflowDispatchWorkflow, workflowDispatchRef, workflowDispatchInputs *texttemplate.Template
+	if g.WorkflowDispatch != nil {
+		workflowDispatchWorkflow, err = texttemplate.New(name).Funcs(f).Parse(g.WorkflowDispatch.Workflow)
+		if err != nil {
+			return nil, err
+		}
+		workflowDispatchRef, err = texttemplate.New(name).Funcs(f).Parse(g.WorkflowDispatch.Ref)
+		if err != nil {
+			return nil, err
+		}
+		workflowDispatchInputs, err = texttemplate.New(name).Funcs(f).Parse(g.WorkflowDispatch.Inputs)
 		if err != nil {
 			return nil, err
 		}
@@ -416,6 +443,25 @@ func (g *GitHubNotification) GetTemplater(name string, f texttemplate.FuncMap) (
 			notification.GitHub.RepositoryDispatch.ClientPayload = clientPayloadData.String()
 		}
 
+		if g.WorkflowDispatch != nil {
+			notification.GitHub.WorkflowDispatch = &GitHubWorkflowDispatch{}
+			var workflowData bytes.Buffer
+			if err := workflowDispatchWorkflow.Execute(&workflowData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.WorkflowDispatch.Workflow = workflowData.String()
+			var refData bytes.Buffer
+			if err := workflowDispatchRef.Execute(&refData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.WorkflowDispatch.Ref = refData.String()
+			var inputsData bytes.Buffer
+			if err := workflowDispatchInputs.Execute(&inputsData, vars); err != nil {
+				return err
+			}
+			notification.GitHub.WorkflowDispatch.Inputs = inputsData.String()
+		}
+
 		return nil
 	}, nil
 }
@@ -471,6 +517,7 @@ type githubClient interface {
 	GetPullRequests() pullRequestsService
 	GetRepositories() repositoriesService
 	GetChecks() checksService
+	GetActions() actionsService
 }
 
 type issuesService interface {
@@ -495,6 +542,10 @@ type checksService interface {
 	CreateCheckRun(ctx context.Context, owner, repo string, opts github.CreateCheckRunOptions) (*github.CheckRun, *github.Response, error)
 }
 
+type actionsService interface {
+	CreateWorkflowDispatchEventByFileName(ctx context.Context, owner, repo, workflowFileName string, event github.CreateWorkflowDispatchEventRequest) (*github.Response, error)
+}
+
 // Adapter implementation
 type githubClientAdapter struct {
 	client *github.Client
@@ -514,6 +565,10 @@ func (g *githubClientAdapter) GetRepositories() repositoriesService {
 
 func (g *githubClientAdapter) GetChecks() checksService {
 	return g.client.Checks
+}
+
+func (g *githubClientAdapter) GetActions() actionsService {
+	return g.client.Actions
 }
 
 func trunc(message string, n int) string {
@@ -783,6 +838,27 @@ func (g gitHubService) Send(notification Notification, _ Destination) error {
 				EventType:     notification.GitHub.RepositoryDispatch.EventType,
 				ClientPayload: &payload,
 			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	if notification.GitHub.WorkflowDispatch != nil {
+		event := github.CreateWorkflowDispatchEventRequest{
+			Ref: notification.GitHub.WorkflowDispatch.Ref,
+		}
+		if inputs := notification.GitHub.WorkflowDispatch.Inputs; inputs != "" {
+			if err := json.Unmarshal([]byte(inputs), &event.Inputs); err != nil {
+				return err
+			}
+		}
+		_, err := g.client.GetActions().CreateWorkflowDispatchEventByFileName(
+			context.Background(),
+			u[0],
+			u[1],
+			notification.GitHub.WorkflowDispatch.Workflow,
+			event,
 		)
 		if err != nil {
 			return err
