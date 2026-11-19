@@ -232,6 +232,22 @@ func TestGetDestinations(t *testing.T) {
 	}
 }
 
+// Annotations that aren't subscriptions must not produce destinations, and must not pick up the
+// recipients of a subscription annotation iterated before them (map order is random, hence the loop).
+func TestGetDestinations_NonSubscriptionAnnotations(t *testing.T) {
+	a := NewAnnotations(map[string]string{
+		"notifications.argoproj.io/subscribe.my-trigger.slack": "my-channel",
+		"notified.notifications.argoproj.io":                   "{}",
+		"kubectl.kubernetes.io/last-applied-configuration":     "{}",
+	})
+	want := services.Destinations{
+		"my-trigger": {{Service: "slack", Recipient: "my-channel"}},
+	}
+	for i := 0; i < 100; i++ {
+		assert.Equal(t, want, a.GetDestinations([]string{"my-default-trigger"}, nil))
+	}
+}
+
 func TestSubscribe(t *testing.T) {
 	a := Annotations(map[string]string{})
 	a.Subscribe("my-trigger", "slack", "my-channel1")
