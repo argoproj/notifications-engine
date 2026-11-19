@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - name: Checkout code
@@ -40,7 +40,7 @@ jobs:
           key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
           restore-keys: |
             ${{ runner.os }}-go-
-      - uses: actions/setup-go@v3
+      - uses: actions/setup-go@v6
         with:
           go-version: ${{ env.GOLANG_VERSION }}
       - name: Add ~/go/bin to PATH
