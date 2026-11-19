@@ -18,7 +18,15 @@ import (
 )
 
 // No rate limit unless Slack requests it (allows for Slack to control bursting)
-var slackState = slackutil.NewState(rate.NewLimiter(rate.Inf, 1))
+var slackLimiter = rate.NewLimiter(rate.Inf, 1)
+
+// slackThreadStateAnnotationKey is the annotation used to persist Slack thread timestamps
+// (groupingKey -> thread_ts) on the target resource, so threading survives controller
+// restarts and leader-election failovers. Without this, thread state only lives in an
+// in-memory map and is lost on restart, causing grouped notifications to start a new
+// top-level thread instead of replying to the existing one.
+// See https://github.com/argoproj/argo-rollouts/issues/4809.
+const slackThreadStateAnnotationKey = "notifications.argoproj.io/slack-thread-state"
 
 type SlackNotification struct {
 	Username        string                   `json:"username,omitempty"`
@@ -170,17 +178,29 @@ func buildMessageOptions(notification Notification, opts SlackOptions) (*SlackNo
 }
 
 func (s *slackService) Send(notification Notification, dest Destination) error {
+	_, err := s.SendWithAnnotations(notification, dest)
+	return err
+}
+
+// SendWithAnnotations sends the Slack notification and returns the annotations that should be
+// persisted on the target resource so thread state (groupingKey -> thread_ts) survives
+// controller restarts and leader-election failovers. Callers that don't persist the returned
+// annotations back onto the resource will fall back to per-process, in-memory-only threading,
+// same as before this method existed.
+func (s *slackService) SendWithAnnotations(notification Notification, dest Destination) (map[string]string, error) {
 	slackNotification, msgOptions, err := buildMessageOptions(notification, s.opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	client, err := newSlackClient(s.opts)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return slackutil.NewThreadedClient(
+
+	state := slackutil.NewStateFromJSON(slackLimiter, dest.Annotations[slackThreadStateAnnotationKey])
+	sendErr := slackutil.NewThreadedClient(
 		client,
-		slackState,
+		state,
 	).SendMessage(
 		context.TODO(),
 		dest.Recipient,
@@ -189,6 +209,17 @@ func (s *slackService) Send(notification Notification, dest Destination) error {
 		slackNotification.DeliveryPolicy,
 		msgOptions,
 	)
+
+	snapshot, exportErr := state.Export()
+	if exportErr != nil {
+		if sendErr != nil {
+			return nil, sendErr
+		}
+		return nil, exportErr
+	}
+
+	annotations := map[string]string{slackThreadStateAnnotationKey: snapshot}
+	return annotations, sendErr
 }
 
 // GetSigningSecret exposes signing secret for slack bot

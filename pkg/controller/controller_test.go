@@ -153,10 +153,12 @@ func TestSendsNotificationIfTriggered(t *testing.T) {
 	receivedObj := map[string]any{}
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]any) bool {
+	api.EXPECT().SendWithAnnotations(mock.MatchedBy(func(obj map[string]any) bool {
 		receivedObj = obj
 		return true
-	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
+	}), []string{"test"}, mock.MatchedBy(func(dest services.Destination) bool {
+		return dest.Service == "mock" && dest.Recipient == "recipient"
+	})).Return(nil, nil)
 
 	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 	if err != nil {
@@ -211,7 +213,7 @@ func TestDoesNotSendNotificationIfTooManyCommitStatusesReceived(t *testing.T) {
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
-	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(&services.TooManyGitHubCommitStatusesError{Sha: "sha", Context: "context"}).Times(1)
+	api.EXPECT().SendWithAnnotations(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, &services.TooManyGitHubCommitStatusesError{Sha: "sha", Context: "context"}).Times(1)
 
 	// First attempt should hit the TooManyCommitStatusesError.
 	// Returned annotations1 should contain the information about processed notification
@@ -250,7 +252,7 @@ func TestRetriesNotificationIfSendThrows(t *testing.T) {
 
 	api.EXPECT().GetConfig().Return(notificationApi.Config{}).AnyTimes()
 	api.EXPECT().RunTrigger("my-trigger", gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil).Times(2)
-	api.EXPECT().Send(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("boom")).Times(2)
+	api.EXPECT().SendWithAnnotations(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, errors.New("boom")).Times(2)
 
 	// First attempt. The returned annotations should not contain the notification state due to the error.
 	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
@@ -417,7 +419,7 @@ func TestWithEventCallback(t *testing.T) {
 			description: "EventCallback should be invoked with non-nil error on send failure",
 			sendErr:     errors.New("this is a send error"),
 			expectedErrors: []error{
-				fmt.Errorf("failed to deliver notification my-trigger to {mock recipient}: %w using the configuration in namespace ", errors.New("this is a send error")),
+				fmt.Errorf("failed to deliver notification my-trigger to {mock recipient map[]}: %w using the configuration in namespace ", errors.New("this is a send error")),
 			},
 		},
 		{
@@ -449,9 +451,11 @@ func TestWithEventCallback(t *testing.T) {
 
 			if tc.apiErr == nil {
 				api.EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-				api.EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
+				api.EXPECT().SendWithAnnotations(mock.MatchedBy(func(_ map[string]any) bool {
 					return true
-				}), []string{"test"}, destination).Return(tc.sendErr)
+				}), []string{"test"}, mock.MatchedBy(func(dest services.Destination) bool {
+					return dest.Service == destination.Service && dest.Recipient == destination.Recipient
+				})).Return(nil, tc.sendErr)
 			}
 
 			ctrl.processQueueItem()
@@ -490,10 +494,12 @@ func TestProcessResourceWithAPIWithSelfService(t *testing.T) {
 	// SelfService API: config has IsSelfServiceConfig set to true
 	api.EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: namespace}).AnyTimes()
 	api.EXPECT().RunTrigger(trigger, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	api.EXPECT().Send(mock.MatchedBy(func(obj map[string]any) bool {
+	api.EXPECT().SendWithAnnotations(mock.MatchedBy(func(obj map[string]any) bool {
 		receivedObj = obj
 		return true
-	}), []string{"test"}, services.Destination{Service: "mock", Recipient: "recipient"}).Return(nil)
+	}), []string{"test"}, mock.MatchedBy(func(dest services.Destination) bool {
+		return dest.Service == "mock" && dest.Recipient == "recipient"
+	})).Return(nil, nil)
 
 	annotations, err := ctrl.processResourceWithAPI(api, app, logEntry, &NotificationEventSequence{})
 	if err != nil {
@@ -530,15 +536,19 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 	// SelfService API: config has IsSelfServiceConfig set to true
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: true, Namespace: "selfservice_namespace"}).Times(3)
 	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
+	apiMap["selfservice_namespace"].(*mocks.MockAPI).EXPECT().SendWithAnnotations(mock.MatchedBy(func(_ map[string]any) bool {
 		return true
-	}), []string{"test"}, destination).Return(nil).AnyTimes()
+	}), []string{"test"}, mock.MatchedBy(func(dest services.Destination) bool {
+		return dest.Service == destination.Service && dest.Recipient == destination.Recipient
+	})).Return(nil, nil).AnyTimes()
 
 	apiMap["default"].(*mocks.MockAPI).EXPECT().GetConfig().Return(notificationApi.Config{IsSelfServiceConfig: false, Namespace: "default"}).Times(3)
 	apiMap["default"].(*mocks.MockAPI).EXPECT().RunTrigger(triggerName, gomock.Any()).Return([]triggers.ConditionResult{{Triggered: true, Templates: []string{"test"}}}, nil)
-	apiMap["default"].(*mocks.MockAPI).EXPECT().Send(mock.MatchedBy(func(_ map[string]any) bool {
+	apiMap["default"].(*mocks.MockAPI).EXPECT().SendWithAnnotations(mock.MatchedBy(func(_ map[string]any) bool {
 		return true
-	}), []string{"test"}, destination).Return(nil).AnyTimes()
+	}), []string{"test"}, mock.MatchedBy(func(dest services.Destination) bool {
+		return dest.Service == destination.Service && dest.Recipient == destination.Recipient
+	})).Return(nil, nil).AnyTimes()
 
 	ctrl.apiFactory = &mocks.FakeFactory{ApiMap: apiMap}
 
@@ -558,7 +568,8 @@ func TestProcessItemsWithSelfService(t *testing.T) {
 	}
 	for i, event := range actualSequence.Delivered {
 		assert.Equal(t, expectedDeliveries[i].Trigger, event.Trigger)
-		assert.Equal(t, expectedDeliveries[i].Destination, event.Destination)
+		assert.Equal(t, expectedDeliveries[i].Destination.Service, event.Destination.Service)
+		assert.Equal(t, expectedDeliveries[i].Destination.Recipient, event.Destination.Recipient)
 	}
 }
 
