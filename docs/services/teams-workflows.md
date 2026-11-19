@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Teams Workflows notification service sends message notifications using Microsoft Teams Workflows (Power Automate). This is the recommended replacement for the legacy Office 365 Connectors service, which will be retired on March 31, 2026.
+The Teams Workflows notification service sends message notifications using Microsoft Teams Workflows (Power Automate). Microsoft [retired Office 365 Connectors within Teams](https://devblogs.microsoft.com/microsoft365dev/retirement-of-office-365-connectors-within-microsoft-teams/) on May 22, 2026. Teams Workflows is the supported option for Teams notifications; the legacy connector endpoints are no longer operational.
 
 ## Parameters
 
@@ -265,7 +265,9 @@ The Teams Workflows service supports the following template fields, which are au
 
 ## Migration from Office 365 Connectors
 
-If you're currently using the `teams` service with Office 365 Connectors, follow these steps to migrate:
+The retired `teams` Office 365 Connector service and its template sections are no longer supported. Migrate or remove `service.teams` and `service.teams.<name>` entries before upgrading; leftover entries cause notification API initialization to return an unsupported-service error. Rename `teams:` template sections to `teams-workflows:` as part of the migration.
+
+Follow these steps to migrate:
 
 1. **Create a new Workflows webhook** using the configuration steps above
 
@@ -303,7 +305,7 @@ If you're currently using the `teams` service with Office 365 Connectors, follow
 | Private Channels | ❌ | ✅ (Dec 2025+) |
 | Card Format | messageCard (legacy) | Adaptive Cards (modern) |
 | Template Conversion | N/A | Automatic conversion from template fields |
-| Retirement Date | March 31, 2026 | Active |
+| Retirement Date | May 22, 2026 | Active |
 
 ## Adaptive Card Features
 
