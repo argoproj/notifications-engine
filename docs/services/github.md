@@ -84,6 +84,8 @@ template.app-deployed: |
       autoMerge: true
       transientEnvironment: false
       reference: v1.0.0
+      payload: >-
+        {"image": "registry/app:{{.app.status.sync.revision}}"}
     pullRequestComment:
       content: |
         Application {{.app.metadata.name}} is now running new version of deployments manifests.
