@@ -15,6 +15,7 @@ The notification service is used to push events to [Alertmanager](https://github
 * `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
 * `maxConnsPerHost` - optional, maximum total connections per host.
 * `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing.
+* `requestTimeout` - optional, maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take, e.g. '30s'. Default: no timeout. Note this is distinct from `timeout` above: `timeout` bounds the overall send across all `targets`, while `requestTimeout` bounds a single HTTP attempt to one target.
 
 `basicAuth` or `bearerToken` is used for authentication, you can choose one. If the two are set at the same time, `basicAuth` takes precedence over `bearerToken`.
 

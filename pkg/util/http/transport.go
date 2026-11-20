@@ -3,6 +3,7 @@ package http
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"net/http"
 	"net/url"
 	"time"
@@ -15,6 +16,11 @@ type TransportOptions struct {
 	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
 	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
 	IdleConnTimeout     string `json:"idleConnTimeout"`
+	// RequestTimeout bounds a single HTTP attempt end to end (connect + TLS + headers +
+	// body), as a Go duration string such as "30s". Empty means no timeout, preserving
+	// prior behavior. For services that retry (e.g. webhook's retryMax), this applies per
+	// attempt - total wall time is roughly (retryMax+1)*RequestTimeout plus backoff.
+	RequestTimeout string `json:"requestTimeout"`
 }
 
 var certResolver func(serverName string) ([]string, error)
@@ -65,9 +71,17 @@ func NewTransport(tp TransportOptions, rawURL string, insecureSkipVerify bool) *
 
 func NewServiceHTTPClient(tp TransportOptions, insecureSkipVerify bool, apiURL string, serviceName string) (*http.Client, error) {
 	transport := NewTransport(tp, apiURL, insecureSkipVerify)
-	return &http.Client{
+	client := &http.Client{
 		Transport: NewLoggingRoundTripper(transport, log.WithField("service", serviceName)),
-	}, nil
+	}
+	if tp.RequestTimeout != "" {
+		timeout, err := time.ParseDuration(tp.RequestTimeout)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse requestTimeout %q: %w", tp.RequestTimeout, err)
+		}
+		client.Timeout = timeout
+	}
+	return client, nil
 }
 
 func getCertPoolFromPEMData(pemData []string) *x509.CertPool {

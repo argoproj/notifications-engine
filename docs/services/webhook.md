@@ -18,6 +18,7 @@ The Webhook notification service configuration includes following settings:
 - `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
 - `maxConnsPerHost` - optional, maximum total connections per host.
 - `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing, e.g. '90s'.
+- `requestTimeout` - optional, maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take, e.g. '30s'. Default: no timeout. This applies per attempt, so with retries enabled the total time for a destination may be as long as `(retryMax+1) * requestTimeout` plus backoff.
 
 ## Retry Behavior
 

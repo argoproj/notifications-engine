@@ -13,6 +13,7 @@ Available parameters :
 * `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
 * `maxConnsPerHost` - optional, maximum total connections per host.
 * `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing.
+* `requestTimeout` - optional, maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take, e.g. '30s'. Default: no timeout.
 
 1. Login to your Grafana instance as `admin`
 2. On the left menu, go to Configuration / API Keys

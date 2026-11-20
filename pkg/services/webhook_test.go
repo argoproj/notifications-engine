@@ -7,9 +7,12 @@ import (
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	httputil "github.com/argoproj/notifications-engine/pkg/util/http"
 )
 
 func TestWebhook_SuccessfullySendsNotification(t *testing.T) {
@@ -156,4 +159,59 @@ func TestWebhookService_Send_Retry(t *testing.T) {
 	if count != 4 {
 		t.Errorf("Expected 4 requests, got %d", count)
 	}
+}
+
+func TestWebhookService_Send_RequestTimeout(t *testing.T) {
+	// A handler that never responds within the test's lifetime, simulating a destination
+	// that accepts the connection but hangs.
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		time.Sleep(10 * time.Second)
+	}))
+	defer server.Close()
+
+	service := NewWebhookService(WebhookOptions{
+		URL: server.URL,
+		// RetryMax is explicitly non-zero so it isn't overwritten by NewWebhookService's
+		// zero-value default of 3; small retry waits keep the test fast regardless.
+		RetryMax:     1,
+		RetryWaitMin: 1 * time.Millisecond,
+		RetryWaitMax: 1 * time.Millisecond,
+		TransportOptions: httputil.TransportOptions{
+			RequestTimeout: "50ms",
+		},
+	})
+
+	start := time.Now()
+	err := service.Send(
+		Notification{
+			Webhook: map[string]WebhookNotification{
+				"test": {Body: "hello world", Method: http.MethodPost},
+			},
+		}, Destination{Recipient: "test", Service: "test"})
+	elapsed := time.Since(start)
+
+	require.Error(t, err)
+	// Bounded by (RetryMax+1) attempts at ~50ms each, plus negligible backoff - nowhere
+	// near the handler's 10s sleep. This is the behavior the requestTimeout option exists
+	// to guarantee.
+	assert.Less(t, elapsed, 5*time.Second)
+}
+
+func TestWebhookService_Send_InvalidRequestTimeout(t *testing.T) {
+	service := NewWebhookService(WebhookOptions{
+		URL: "http://127.0.0.1:0",
+		TransportOptions: httputil.TransportOptions{
+			RequestTimeout: "30sec",
+		},
+	})
+
+	err := service.Send(
+		Notification{
+			Webhook: map[string]WebhookNotification{
+				"test": {Body: "hello world", Method: http.MethodPost},
+			},
+		}, Destination{Recipient: "test", Service: "test"})
+
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "requestTimeout")
 }
