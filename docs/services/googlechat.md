@@ -5,6 +5,11 @@
 The Google Chat notification service send message notifications to a google chat webhook. This service uses the following settings:
 
 * `webhooks` - a map of the form `webhookName: webhookUrl`
+* `insecureSkipVerify` - optional bool, true or false
+* `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
+* `maxConnsPerHost` - optional, maximum total connections per host.
+* `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing.
+* `requestTimeout` - optional, maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take, e.g. '30s'. Default: no timeout.
 
 ## Configuration
 

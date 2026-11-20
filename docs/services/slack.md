@@ -20,6 +20,7 @@ The Slack notification service configuration includes following settings:
 | `maxIdleConnsPerHost` | False        | `int`          | Maximum number of idle (keep-alive) connections per host.                                       | —                      |
 | `maxConnsPerHost`     | False        | `int`          | Maximum total connections per host.                                                             | —                      |
 | `idleConnTimeout`     | False        | `string`       | Maximum amount of time an idle (keep-alive) connection will remain open before closing (e.g., `90s`). | —              |
+| `requestTimeout`      | False        | `string`       | Maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take (e.g., `30s`). No timeout by default. | —              |
 
 
 ## Configuration

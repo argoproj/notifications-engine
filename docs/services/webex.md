@@ -5,6 +5,12 @@
 The Webex Teams notification service configuration includes following settings:
 
 * `token` - the app token
+* `apiURL` - the API URL
+* `insecureSkipVerify` - optional bool, true or false
+* `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
+* `maxConnsPerHost` - optional, maximum total connections per host.
+* `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing.
+* `requestTimeout` - optional, maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take, e.g. '30s'. Default: no timeout.
 
 ## Configuration
 
