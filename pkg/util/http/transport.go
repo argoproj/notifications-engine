@@ -16,11 +16,7 @@ type TransportOptions struct {
 	MaxIdleConnsPerHost int    `json:"maxIdleConnsPerHost"`
 	MaxConnsPerHost     int    `json:"maxConnsPerHost"`
 	IdleConnTimeout     string `json:"idleConnTimeout"`
-	// RequestTimeout bounds a single HTTP attempt end to end (connect + TLS + headers +
-	// body), as a Go duration string such as "30s". Empty means no timeout, preserving
-	// prior behavior. For services that retry (e.g. webhook's retryMax), this applies per
-	// attempt - total wall time is roughly (retryMax+1)*RequestTimeout plus backoff.
-	RequestTimeout string `json:"requestTimeout"`
+	RequestTimeout      string `json:"requestTimeout"` // optional: empty means no timeout. Applies per attempt
 }
 
 var certResolver func(serverName string) ([]string, error)
