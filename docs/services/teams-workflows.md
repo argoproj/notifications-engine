@@ -10,6 +10,11 @@ The Teams Workflows notification service requires specifying the following setti
 
 * `recipientUrls` - the webhook url map, e.g. `channelName: https://api.powerautomate.com/webhook/...`
 * `rawCardPayload` - optional boolean. When `true`, sends the Adaptive Card directly as the request body instead of wrapping it in the standard `message` + `attachments` envelope. Defaults to `false`.
+* `insecureSkipVerify` - optional bool, true or false
+* `maxIdleConnsPerHost` - optional, maximum number of idle (keep-alive) connections per host.
+* `maxConnsPerHost` - optional, maximum total connections per host.
+* `idleConnTimeout` - optional, maximum amount of time an idle (keep-alive) connection will remain open before closing.
+* `requestTimeout` - optional, maximum amount of time a single request attempt (connect, TLS handshake, headers, and body) may take, e.g. '30s'. Default: no timeout.
 
 ## Supported Webhook URL Formats
 
