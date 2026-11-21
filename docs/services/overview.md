@@ -41,6 +41,7 @@ metadata:
 * [AwsSqs](./awssqs.md)
 * [Email](./email.md)
 * [GitHub](./github.md)
+* [GitLab](./gitlab.md)
 * [Slack](./slack.md)
 * [Mattermost](./mattermost.md)
 * [Opsgenie](./opsgenie.md)
